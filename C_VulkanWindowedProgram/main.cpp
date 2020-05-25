@@ -1,11 +1,20 @@
 #include "Engine.h"
 
+void testInit(Engine *engine);
+
 int main()
 {
-	Engine engine = Engine();
-	engine.SetupEngine();
+	Engine engine;
 
-    // Poll for user input.
+	engine.Init_SDL();
+	engine.Create_Window_SDL("[Project Name] Window", 0, 0, 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+	engine.Set_LayersAndInstanceExtensions();
+	engine.Create_Instance();
+	engine.Create_Surface_SDL();
+	engine.Pick_PhysicalDevice();
+	engine.Create_Device();
+	engine.Setup_Engine();
+
     bool stillRunning = true;
     while(stillRunning) {
 
@@ -16,11 +25,12 @@ int main()
 			keystate[SDL_SCANCODE_ESCAPE] ? stillRunning = false : 0;
 
             switch(event.type) {
+
             case SDL_QUIT:
                 stillRunning = false;
                 break;
+
             default:
-                // Do nothing.
                 break;
             }
         }

@@ -13,6 +13,7 @@ int main()
 	engine.Create_Surface_SDL();
 	engine.Pick_PhysicalDevice();
 	engine.Create_Device();
+	engine.Create_Swapchain();
 	engine.Setup_Engine();
 
     bool stillRunning = true;

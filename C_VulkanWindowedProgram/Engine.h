@@ -309,7 +309,17 @@ inline int Engine::Create_Swapchain()
 	result = vkCreateSwapchainKHR(this->device, &swapchainCreateInfo, nullptr, &this->swapchain);
 
 	result == VK_SUCCESS ? printf("all good!\n") : printf("somethig went wrong\n");
-	return result;
+	//return result;
+
+	/////////////////////////////////:
+	// GET SWAPCHAIN IMAGES
+
+	Uint32 swhapchainImageCount = 0;
+	vkGetSwapchainImagesKHR(this->device, this->swapchain, &swhapchainImageCount, NULL);
+	this->swapchainImages.resize(swhapchainImageCount);
+	vkGetSwapchainImagesKHR(this->device, this->swapchain, &swhapchainImageCount, this->swapchainImages.data());
+
+	return 0;
 }
 
 inline VkSurfaceFormatKHR Engine::GetSurfaceFormatIfAvailable(std::vector<VkSurfaceFormatKHR> &surfaceFormats) {

@@ -1,2 +1,4 @@
 # Vulkan_Renderer
-ADD DESCRIPTION BEFORE MAKING PUBLIC /!\
+
+Sources:
+https://www.fasterthan.life/blog/2017/7/11/i-am-graphics-and-so-can-you-part-1

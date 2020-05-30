@@ -110,6 +110,7 @@ inline int Engine::Set_LayersAndInstanceExtensions()
 
 	// Use validation validationLayers if this is a debug build
 //#ifdef _DEBUG
+	//validationLayers.push_back("VK_LAYER_KHRONOS_validation");
 	validationLayers.push_back("VK_LAYER_LUNARG_standard_validation");
 //#endif
 	instanceExtensions.push_back("VK_KHR_surface");
@@ -143,6 +144,7 @@ inline int Engine::Create_Instance()
 	instInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 	instInfo.ppEnabledLayerNames = validationLayers.data();
 	
+
 	VkResult result = vkCreateInstance(&instInfo, NULL, &this->instance);
 	if (result == VK_ERROR_INCOMPATIBLE_DRIVER) {
 		printf("Unable to find a compatible Vulkan Driver.\n");

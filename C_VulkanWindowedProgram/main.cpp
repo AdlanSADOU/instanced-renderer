@@ -100,6 +100,11 @@ int main()
 		 /!\ Meaning: "if you have an "empty" render loop that just presents images that have never been rendered to, you get error messages like this from the debug layers"
 		 https://github.com/vulkano-rs/vulkano/issues/519
 		*/
+
+		//vkCmdBindDescriptorSets()
+		//vkCmdBindPipeline()
+		//vkCmdEndRenderPass()
+
 		// present queue
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;

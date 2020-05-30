@@ -32,12 +32,18 @@ struct Engine
 	VkPhysicalDevice	physicalDevice	= VK_NULL_HANDLE;
 	VkQueue				queueGraphics	= VK_NULL_HANDLE;
 	VkDevice			device			= VK_NULL_HANDLE;
+	VkCommandPool		commandPool		= VK_NULL_HANDLE;
+	VkDescriptorPool	descriptorPool	= VK_NULL_HANDLE;
 	VkSwapchainKHR		swapchain		= VK_NULL_HANDLE;
+	Uint32				swhapchainImageCount = 0;
+	VkRenderPass		renderPass		= VK_NULL_HANDLE;
+	std::vector<VkImage>swapchainImages {};
+	VkClearColorValue	clearColor{0.1f, 0, 0.5f, 1};
+	VkCommandBuffer		commandBuffer	= VK_NULL_HANDLE;
 	
 private:
 	Uint32						graphicsFamilyIndex	= 0;
 	SwapchainInfo				swapchainInfo	{};
-	std::vector<VkImage>		swapchainImages {};
 	std::vector<const char*>	validationLayers;
 	std::vector<const char*>	instanceExtensions;
 	VkPhysicalDeviceProperties	physicalDeviceProperties;
@@ -55,13 +61,10 @@ public:
 	inline int Create_Instance();
 	inline int Pick_PhysicalDevice();
 	inline int Create_Device();
+	inline int Create_Pool();
 	inline int Create_Swapchain();
-	inline int Setup_Engine();
+	inline int Create_renderPass();
 };
-
-inline int Engine::Setup_Engine() {
-	return 0;
-}
 
 //////////////////////////////////////////////////////////////////
 // INITIALIZE SDL
@@ -106,13 +109,13 @@ inline int Engine::Set_LayersAndInstanceExtensions()
 	}
 
 	// Use validation validationLayers if this is a debug build
-#ifdef _DEBUG
+//#ifdef _DEBUG
 	validationLayers.push_back("VK_LAYER_LUNARG_standard_validation");
-#endif
+//#endif
 	instanceExtensions.push_back("VK_KHR_surface");
-#ifdef _DEBUG
+//#ifdef _DEBUG
 	instanceExtensions.push_back("VK_EXT_debug_report");
-#endif
+//#endif
 
 	return 0;
 }
@@ -128,7 +131,7 @@ inline int Engine::Create_Instance()
 	appInfo.applicationVersion = 1;
 	appInfo.pEngineName = "LunarG SDK";
 	appInfo.engineVersion = 1;
-	appInfo.apiVersion = VK_API_VERSION_1_0;
+	appInfo.apiVersion = VK_API_VERSION_1_1;
 
 	VkInstanceCreateInfo instInfo = {};
 	instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -139,7 +142,7 @@ inline int Engine::Create_Instance()
 	instInfo.ppEnabledExtensionNames = instanceExtensions.data();
 	instInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 	instInfo.ppEnabledLayerNames = validationLayers.data();
-
+	
 	VkResult result = vkCreateInstance(&instInfo, NULL, &this->instance);
 	if (result == VK_ERROR_INCOMPATIBLE_DRIVER) {
 		printf("Unable to find a compatible Vulkan Driver.\n");
@@ -205,8 +208,8 @@ inline int Engine::Pick_PhysicalDevice()
 	// Needed for swapchain, dunno were to move this yet
 	VkBool32 is_surfaceSupported = VK_FALSE;
 
-	result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(this->physicalDevice, this->surface, &surfaceCapabilities);
-	vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, this->graphicsFamilyIndex, this->surface, &is_surfaceSupported);
+	VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(this->physicalDevice, this->surface, &surfaceCapabilities));
+	VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, this->graphicsFamilyIndex, this->surface, &is_surfaceSupported));
 	if (!is_surfaceSupported) {
 		printf("ERROR: surface not supported...!\n");
 		return result;
@@ -238,7 +241,7 @@ inline int Engine::Pick_PhysicalDevice()
 	presentModes.resize(presentModesCount);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(this->physicalDevice, this->surface, &presentModesCount, presentModes.data());
 	swapchainInfo.presentMode = GetPresentModeIfAvailable(presentModes, VK_PRESENT_MODE_MAILBOX_KHR);
-
+	
 	return result;
 }
 
@@ -279,11 +282,42 @@ inline int Engine::Create_Device()
 	return result;
 }
 
+inline int Engine::Create_Pool()
+{
+	VkCommandPoolCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	createInfo.pNext = NULL;
+	createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	createInfo.queueFamilyIndex = this->graphicsFamilyIndex;
+	
+	VK_CHECK(vkCreateCommandPool(this->device, &createInfo, NULL, &this->commandPool));
+
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.pNext = NULL;
+	allocInfo.commandPool = this->commandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = 1;
+
+	VK_CHECK(vkAllocateCommandBuffers(this->device, &allocInfo, &this->commandBuffer));
+
+	//// TODO::
+	//VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
+	//descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	//descriptorPoolCreateInfo.pNext;
+	//descriptorPoolCreateInfo.flags;
+	//descriptorPoolCreateInfo.maxSets;
+	//descriptorPoolCreateInfo.poolSizeCount;
+	//descriptorPoolCreateInfo.pPoolSizes;
+	//vkCreateDescriptorPool(this->device, &descriptorPoolCreateInfo, NULL, &this->descriptorPool);
+
+	return 1;
+}
+
 inline int Engine::Create_Swapchain()
 {
 	//////////////////////////////////////////////////////////////////
 	// SWAPCHAIN
-	VkResult result;
 	// Needs to be recreated on window resize ?
 
 	VkSwapchainCreateInfoKHR swapchainCreateInfo{};
@@ -305,16 +339,15 @@ inline int Engine::Create_Swapchain()
 	swapchainCreateInfo.clipped = VK_TRUE;
 	swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
-	// One mistake that is not catched by the validation validationLayers is if you don't enable the device extension VK_KHR_SWAPCHAIN_EXTENSION_NAME
-	result = vkCreateSwapchainKHR(this->device, &swapchainCreateInfo, nullptr, &this->swapchain);
+	// One mistake that is not catched by the validationLayers is if you don't enable the device extension VK_KHR_SWAPCHAIN_EXTENSION_NAME, swapchain will be NULL
+	VK_CHECK(vkCreateSwapchainKHR(this->device, &swapchainCreateInfo, nullptr, &this->swapchain));
 
-	result == VK_SUCCESS ? printf("all good!\n") : printf("somethig went wrong\n");
 	//return result;
 
 	/////////////////////////////////:
 	// GET SWAPCHAIN IMAGES
 
-	Uint32 swhapchainImageCount = 0;
+	
 	vkGetSwapchainImagesKHR(this->device, this->swapchain, &swhapchainImageCount, NULL);
 	this->swapchainImages.resize(swhapchainImageCount);
 	vkGetSwapchainImagesKHR(this->device, this->swapchain, &swhapchainImageCount, this->swapchainImages.data());
@@ -322,6 +355,24 @@ inline int Engine::Create_Swapchain()
 	return 0;
 }
 
+inline int Engine::Create_renderPass()
+{
+
+	VkAttachmentDescription attachments;
+
+	VkRenderPassCreateInfo renderPassCreateInfo{};
+	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassCreateInfo.pNext = NULL;
+	renderPassCreateInfo.flags = VK_RENDER_PASS_CREATE_TRANSFORM_BIT_QCOM;
+	renderPassCreateInfo.pAttachments = &attachments;
+	
+	vkCreateRenderPass(this->device, &renderPassCreateInfo, NULL, &this->renderPass);
+
+	return 1;
+}
+
+/////////////////////////////////////////////////////
+// UTILITY FUNCTIONS
 inline VkSurfaceFormatKHR Engine::GetSurfaceFormatIfAvailable(std::vector<VkSurfaceFormatKHR> &surfaceFormats) {
 	for (const auto &format : surfaceFormats)
 	{

@@ -19,9 +19,20 @@
 #define VK_CHECK(status) \
 	(status < VK_SUCCESS ? printf("something went wrong, and also... DO BETTER ERROR CHECKING THAN THIS !") : 0); \
 
+struct Texture {
+	VkSampler		sampler;
+	VkImage			image;
+	VkImageLayout	layout;
+	VkDeviceMemory	memory;
+	Uint32			width, height;
+	UINT32			mipLevels;
+};
+
 struct SwapchainInfo {
 	VkPresentModeKHR presentMode;
 	VkSurfaceFormatKHR surfaceFormat;
+	std::vector<VkImage>Images {};
+	std::vector<VkImageView>ImageViews{};
 };
 
 struct Engine
@@ -35,23 +46,24 @@ struct Engine
 	VkCommandPool		commandPool		= VK_NULL_HANDLE;
 	VkDescriptorPool	descriptorPool	= VK_NULL_HANDLE;
 	VkSwapchainKHR		swapchain		= VK_NULL_HANDLE;
+	SwapchainInfo		swapchainInfo	{};
 	Uint32				swhapchainImageCount = 0;
 	VkRenderPass		renderPass		= VK_NULL_HANDLE;
-	std::vector<VkImage>swapchainImages {};
-	VkClearColorValue	clearColor{0.1f, 0, 0.5f, 1};
+	VkClearColorValue	clearColor		{0.1f, 0, 0.5f, 1};
 	VkCommandBuffer		commandBuffer	= VK_NULL_HANDLE;
 	
 private:
 	Uint32						graphicsFamilyIndex	= 0;
-	SwapchainInfo				swapchainInfo	{};
 	std::vector<const char*>	validationLayers;
 	std::vector<const char*>	instanceExtensions;
 	VkPhysicalDeviceProperties	physicalDeviceProperties;
 	VkSurfaceCapabilitiesKHR	surfaceCapabilities{};
 	VkPhysicalDeviceFeatures deviceFeatures{};
 
-	VkSurfaceFormatKHR	GetSurfaceFormatIfAvailable	(std::vector<VkSurfaceFormatKHR> &surfaceFormats);
-	VkPresentModeKHR	GetPresentModeIfAvailable	(std::vector<VkPresentModeKHR> &modes, VkPresentModeKHR desired);
+	inline VkSurfaceFormatKHR	GetSurfaceFormatIfAvailable	(std::vector<VkSurfaceFormatKHR> &surfaceFormats);
+	inline VkPresentModeKHR	GetPresentModeIfAvailable	(std::vector<VkPresentModeKHR> &modes, VkPresentModeKHR desired);
+	inline void Create_framebuffer(VkFramebuffer *framebuffer);
+	inline void Create_ImageViews(VkImage image, VkImageView *imageView);
 public:
 
 	inline int Init_SDL();
@@ -109,14 +121,13 @@ inline int Engine::Set_LayersAndInstanceExtensions()
 	}
 
 	// Use validation validationLayers if this is a debug build
-//#ifdef _DEBUG
-	//validationLayers.push_back("VK_LAYER_KHRONOS_validation");
+#ifdef _DEBUG
 	validationLayers.push_back("VK_LAYER_LUNARG_standard_validation");
-//#endif
+#endif
 	instanceExtensions.push_back("VK_KHR_surface");
-//#ifdef _DEBUG
+#ifdef _DEBUG
 	instanceExtensions.push_back("VK_EXT_debug_report");
-//#endif
+#endif
 
 	return 0;
 }
@@ -132,7 +143,7 @@ inline int Engine::Create_Instance()
 	appInfo.applicationVersion = 1;
 	appInfo.pEngineName = "LunarG SDK";
 	appInfo.engineVersion = 1;
-	appInfo.apiVersion = VK_API_VERSION_1_1;
+	appInfo.apiVersion = VK_API_VERSION_1_0;
 
 	VkInstanceCreateInfo instInfo = {};
 	instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -347,19 +358,20 @@ inline int Engine::Create_Swapchain()
 	//return result;
 
 	/////////////////////////////////:
-	// GET SWAPCHAIN IMAGES
+	// GET SWAPCHAIN IMAGES & VIEWS
+	VK_CHECK(vkGetSwapchainImagesKHR(this->device, this->swapchain, &swhapchainImageCount, NULL));
+	this->swapchainInfo.Images.resize(swhapchainImageCount);
+	VK_CHECK(vkGetSwapchainImagesKHR(this->device, this->swapchain, &swhapchainImageCount, this->swapchainInfo.Images.data()));
 
-	
-	vkGetSwapchainImagesKHR(this->device, this->swapchain, &swhapchainImageCount, NULL);
-	this->swapchainImages.resize(swhapchainImageCount);
-	vkGetSwapchainImagesKHR(this->device, this->swapchain, &swhapchainImageCount, this->swapchainImages.data());
+	swapchainInfo.ImageViews.resize(swhapchainImageCount);
+	Create_ImageViews(this->swapchainInfo.Images[0], &this->swapchainInfo.ImageViews[0]);
+	Create_ImageViews(this->swapchainInfo.Images[1], &this->swapchainInfo.ImageViews[1]);
 
 	return 0;
 }
 
 inline int Engine::Create_renderPass()
 {
-
 	VkAttachmentDescription attachments;
 
 	VkRenderPassCreateInfo renderPassCreateInfo{};
@@ -369,8 +381,55 @@ inline int Engine::Create_renderPass()
 	renderPassCreateInfo.pAttachments = &attachments;
 	
 	vkCreateRenderPass(this->device, &renderPassCreateInfo, NULL, &this->renderPass);
+	
+	VkFramebuffer framebuffer = VK_NULL_HANDLE;
 
 	return 1;
+}
+
+inline void Engine::Create_ImageViews(VkImage image, VkImageView *imageView)
+{
+	VkImageSubresourceRange range{};
+	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	range.levelCount = 1;
+	range.layerCount = 1;
+	range.baseArrayLayer = 0;
+	range.baseMipLevel = 0;
+
+	VkImageViewCreateInfo IviewCreateInfo{};
+	IviewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	IviewCreateInfo.pNext = NULL;
+	IviewCreateInfo.flags = 0;
+	IviewCreateInfo.image = image;
+	IviewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	
+	// VK_FORMAT_B8G8R8A8_SRGB with tiling VK_IMAGE_TILING_OPTIMAL does not support usage that includes VK_IMAGE_USAGE_STORAGE_BIT.
+	// The Vulkan spec states: If usage contains VK_IMAGE_USAGE_STORAGE_BIT, then the image view's format features must contain VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT.
+	IviewCreateInfo.format = this->swapchainInfo.surfaceFormat.format;
+	
+	IviewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+	IviewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_G;
+	IviewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_B;
+	IviewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_A;
+	IviewCreateInfo.subresourceRange = range;
+
+	VK_CHECK(vkCreateImageView(this->device, &IviewCreateInfo, NULL, imageView));
+}
+
+inline void Engine::Create_framebuffer(VkFramebuffer *framebuffer)
+{
+	VkFramebufferCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	createInfo.pNext = NULL;
+	createInfo.flags;
+	createInfo.renderPass = this->renderPass;
+	createInfo.attachmentCount = 1;
+	createInfo.pAttachments;
+	createInfo.width;
+	createInfo.height;
+	createInfo.layers;
+
+	vkCreateFramebuffer(this->device, &createInfo, NULL, framebuffer);
 }
 
 /////////////////////////////////////////////////////
@@ -378,7 +437,7 @@ inline int Engine::Create_renderPass()
 inline VkSurfaceFormatKHR Engine::GetSurfaceFormatIfAvailable(std::vector<VkSurfaceFormatKHR> &surfaceFormats) {
 	for (const auto &format : surfaceFormats)
 	{
-		if (format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR && format.format == VK_FORMAT_B8G8R8A8_SRGB)
+		if (format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR && format.format == VK_FORMAT_B8G8R8A8_UNORM)
 			return format;
 	}
 	printf("VK_COLOR_SPACE_SRGB_NONLINEAR_KHR && VK_FORMAT_B8G8R8A8_SRGB are not supported ! FIX THIS !!!\n");

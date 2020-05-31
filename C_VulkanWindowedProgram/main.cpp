@@ -12,8 +12,8 @@ int main()
 	eng.Pick_PhysicalDevice();
 	eng.Create_Device();
 	eng.Create_Pool();
-	eng.Create_renderPass();
 	eng.Create_Swapchain();
+	//eng.Create_renderPass();
 	
 	VkSemaphore acquireSemaphore;
 	VkSemaphoreCreateInfo semaphoreCreateInfo;
@@ -72,7 +72,7 @@ int main()
 		
 		// clear
 		
-		vkCmdClearColorImage(eng.commandBuffer, eng.swapchainImages[imageIndex], VK_IMAGE_LAYOUT_GENERAL, &eng.clearColor, 1, &range);
+		vkCmdClearColorImage(eng.commandBuffer, eng.swapchainInfo.Images[imageIndex], VK_IMAGE_LAYOUT_GENERAL, &eng.clearColor, 1, &range);
 		
 		// end cmd
 		VK_CHECK(vkEndCommandBuffer(eng.commandBuffer));

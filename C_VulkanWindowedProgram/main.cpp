@@ -13,20 +13,29 @@ int main()
 	eng.Create_Device();
 	eng.Create_Pool();
 	eng.Create_Swapchain();
-	//eng.Create_renderPass();
-	
+	eng.Create_renderPass();
+
+	////////////////////////////////////////////////////////////
+	eng.bytecode_SPIR_V.resize(2);
+	eng.Load_Shader("shaders/vert.spv", eng.bytecode_SPIR_V[0]);
+	eng.Load_Shader("shaders/frag.spv", eng.bytecode_SPIR_V[1]);
+
+
+
+	/////////////////////////////////////////////////////////
+	// clearing
 	VkSemaphore acquireSemaphore;
 	VkSemaphoreCreateInfo semaphoreCreateInfo;
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 	semaphoreCreateInfo.pNext = NULL;
-	semaphoreCreateInfo.flags = 1;
+	semaphoreCreateInfo.flags = 0;
 	VK_CHECK(vkCreateSemaphore(eng.device, &semaphoreCreateInfo, NULL, &acquireSemaphore));
 	
 	VkSemaphore graphicsSemaphore;
 	VkSemaphoreCreateInfo semephoreCreateInfo;
 	semephoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 	semephoreCreateInfo.pNext = NULL;
-	semephoreCreateInfo.flags = 1;
+	semephoreCreateInfo.flags = 0;
 	VK_CHECK(vkCreateSemaphore(eng.device, &semephoreCreateInfo, NULL, &graphicsSemaphore));
 
 
@@ -62,23 +71,28 @@ int main()
 		VK_CHECK(vkAcquireNextImageKHR(eng.device, eng.swapchain, NULL, acquireSemaphore, NULL, &imageIndex));
 	
 		vkResetCommandPool(eng.device, eng.commandPool, 0);
-		// begin cmd
+		// begin
+		//VkRenderPassBeginInfo rpBeginInfo;
+		
 		VkCommandBufferBeginInfo cmdBeginInfo{};
 		cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		cmdBeginInfo.pNext = NULL;
 		cmdBeginInfo.flags;
 		cmdBeginInfo.pInheritanceInfo;
+
+		//VK_CHECK(vkCmdBeginRenderPass(eng.commandBuffer, ))
 		VK_CHECK(vkBeginCommandBuffer(eng.commandBuffer, &cmdBeginInfo));
 		
 		// clear
 		
 		vkCmdClearColorImage(eng.commandBuffer, eng.swapchainInfo.Images[imageIndex], VK_IMAGE_LAYOUT_GENERAL, &eng.clearColor, 1, &range);
-		
+		//vkCmdDraw()
 		// end cmd
 		VK_CHECK(vkEndCommandBuffer(eng.commandBuffer));
 
 		// queue submit
 		VkPipelineStageFlags pipeStageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.pNext = NULL;

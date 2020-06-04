@@ -16,11 +16,13 @@ int main()
 	eng.Create_renderPass();
 
 	////////////////////////////////////////////////////////////
-	eng.bytecode_SPIR_V.resize(2);
-	eng.Load_Shader("shaders/vert.spv", eng.bytecode_SPIR_V[0]);
-	eng.Load_Shader("shaders/frag.spv", eng.bytecode_SPIR_V[1]);
+	eng.Load_Shader("shaders/vert.spv", eng.vertShaderSPV);
+	eng.Load_Shader("shaders/frag.spv", eng.fragShaderSPV);
 
-
+	VkShaderModule vertModule = VK_NULL_HANDLE;
+	VkShaderModule fragModule = VK_NULL_HANDLE;
+	VK_CHECK(eng.Create_ShaderModule(&vertModule, eng.vertShaderSPV));
+	VK_CHECK(eng.Create_ShaderModule(&fragModule, eng.fragShaderSPV));
 
 	/////////////////////////////////////////////////////////
 	// clearing

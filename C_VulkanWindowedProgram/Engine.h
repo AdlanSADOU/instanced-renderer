@@ -24,7 +24,6 @@
 #define WIDTH 1280
 #define HEIGHT 720
 #define NUM_SAMPLES VK_SAMPLE_COUNT_1_BIT;
-#define NUM_DESC 1
 
 struct Texture {
 	VkSampler		sampler;
@@ -64,7 +63,8 @@ public:
 	VkDescriptorPool	descriptorPool	= VK_NULL_HANDLE;
 	std::vector< VkDescriptorSetLayout> desc_layouts;
 	std::vector<VkShaderModule>	shader_modules{};
-	std::vector<char *> bytecode_SPIR_V{};
+	std::vector<char> vertShaderSPV{};
+	std::vector<char> fragShaderSPV{};
 
 	VkClearColorValue	clearColor		{0.1f, 0, 0.5f, 1};
 	
@@ -80,9 +80,9 @@ private:
 	inline VkPresentModeKHR	GetPresentModeIfAvailable	(std::vector<VkPresentModeKHR> &modes, VkPresentModeKHR desired);
 	inline int Create_framebuffer(VkFramebuffer *framebuffer);
 	inline int Create_SwapchainImageViews(VkImage image, VkImageView *imageView);
-	inline VkResult Engine::Create_ShaderModule(VkShaderModule *shader_module, std::vector<char>& bytecode);
 public:
-	inline int Engine::Load_Shader(char *filepath, char *out_buffer);
+	inline VkResult Engine::Create_ShaderModule(VkShaderModule *shader_module, std::vector<char> &bytecode);
+	inline int Engine::Load_Shader(char *filepath, std::vector<char> &bytecode);
 
 	inline int Init_SDL();
 	inline int Create_Window_SDL(const char *title, int x, int y, int w, int h, Uint32 flags);
@@ -332,18 +332,79 @@ inline int Engine::Create_Pool()
 
 	VK_CHECK(vkAllocateCommandBuffers(this->device, &allocInfo, &this->commandBuffer));
 
-	////// TODO::
-	//VkDescriptorPoolSize poolSize{};
-	//poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	//poolSize.descriptorCount = 1;
-	//VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
-	//descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	//descriptorPoolCreateInfo.pNext = NULL;
-	//descriptorPoolCreateInfo.flags = 0;
-	//descriptorPoolCreateInfo.maxSets = NUM_DESC;
-	//descriptorPoolCreateInfo.poolSizeCount = 1;
-	//descriptorPoolCreateInfo.pPoolSizes;
-	//vkCreateDescriptorPool(this->device, &descriptorPoolCreateInfo, NULL, &this->descriptorPool);
+	//////////////////////////////////////////////////////
+	// DESCRIPTOR POOL & SETS
+	this->desc_layouts.resize(2);
+	std::vector<VkDescriptorPoolSize> poolSizes(2);
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[0].descriptorCount = 1;
+	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[1].descriptorCount = 1;
+	
+#define NUM_DESC 2
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
+	descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descriptorPoolCreateInfo.pNext = NULL;
+	descriptorPoolCreateInfo.flags = 0;
+	descriptorPoolCreateInfo.maxSets = NUM_DESC;
+	descriptorPoolCreateInfo.poolSizeCount = poolSizes.size();
+	descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
+	vkCreateDescriptorPool(this->device, &descriptorPoolCreateInfo, NULL, &this->descriptorPool);
+
+	VkDescriptorSetLayoutBinding uniformBufferLayoutBinding{};
+	uniformBufferLayoutBinding.binding = 0;
+	uniformBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uniformBufferLayoutBinding.descriptorCount = 1;
+	uniformBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	uniformBufferLayoutBinding.pImmutableSamplers = NULL;
+
+	std::vector< VkDescriptorSetLayoutCreateInfo> layoutCreateInfos(2);
+	layoutCreateInfos[0].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutCreateInfos[0].pNext = NULL;
+	layoutCreateInfos[0].flags = 0;
+	layoutCreateInfos[0].bindingCount = 1;
+	layoutCreateInfos[0].pBindings = &uniformBufferLayoutBinding;
+
+	vkCreateDescriptorSetLayout(this->device, &layoutCreateInfos[0], NULL, &this->desc_layouts[0]);
+	////////////////////
+	// Texture layout
+	VkSamplerCreateInfo textureSamplerInfo{};
+	textureSamplerInfo.sType;
+	textureSamplerInfo.pNext;
+	textureSamplerInfo.flags;
+	textureSamplerInfo.magFilter;
+	textureSamplerInfo.minFilter;
+	textureSamplerInfo.mipmapMode;
+	textureSamplerInfo.addressModeU;
+	textureSamplerInfo.addressModeV;
+	textureSamplerInfo.addressModeW;
+	textureSamplerInfo.mipLodBias;
+	textureSamplerInfo.anisotropyEnable;
+	textureSamplerInfo.maxAnisotropy;
+	textureSamplerInfo.compareEnable;
+	textureSamplerInfo.compareOp;
+	textureSamplerInfo.minLod;
+	textureSamplerInfo.maxLod;
+	textureSamplerInfo.borderColor;
+	textureSamplerInfo.unnormalizedCoordinates;
+
+	VkSampler textureSampler = VK_NULL_HANDLE;
+	vkCreateSampler(this->device, &textureSamplerInfo, NULL, &textureSampler);
+
+	VkDescriptorSetLayoutBinding textureLayoutBinding{};
+	uniformBufferLayoutBinding.binding = 0;
+	uniformBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	uniformBufferLayoutBinding.descriptorCount = 1;
+	uniformBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	uniformBufferLayoutBinding.pImmutableSamplers = &textureSampler;
+
+	layoutCreateInfos[0].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutCreateInfos[0].pNext = NULL;
+	layoutCreateInfos[0].flags = 0;
+	layoutCreateInfos[0].bindingCount = 1;
+	layoutCreateInfos[0].pBindings = &textureLayoutBinding;
+
+	vkCreateDescriptorSetLayout(this->device, &layoutCreateInfos[1], NULL, &this->desc_layouts[1]);
 
 	return 1;
 }
@@ -444,7 +505,7 @@ inline int Engine::Create_renderPass()
 /////////////////////////////////////////////////////
 // UTILITY FUNCTIONS
 
-inline VkResult Engine::Create_ShaderModule(VkShaderModule *shader_module, std::vector<char>& bytecode)
+inline VkResult Engine::Create_ShaderModule(VkShaderModule *shader_module, std::vector<char> &bytecode)
 {
 	VkShaderModuleCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -452,10 +513,10 @@ inline VkResult Engine::Create_ShaderModule(VkShaderModule *shader_module, std::
 	createInfo.codeSize = bytecode.size();
 	createInfo.pCode = reinterpret_cast<Uint32 *>(bytecode.data());
 
-	vkCreateShaderModule(this->device, &createInfo, NULL, shader_module);
+	return vkCreateShaderModule(this->device, &createInfo, NULL, shader_module);
 }
 
-inline int Engine::Load_Shader(char *filepath, char *out_buffer)
+inline int Engine::Load_Shader(char *filepath, std::vector<char> &bytecode)
 {
 	long lsize = 0;
 	size_t result = 0;
@@ -470,10 +531,12 @@ inline int Engine::Load_Shader(char *filepath, char *out_buffer)
 	lsize = ftell(fptr);
 	rewind(fptr);
 
-	out_buffer = (char *)malloc(sizeof(char) * lsize);
+	bytecode.resize(lsize);
 
-	result = fread(out_buffer, sizeof(char), lsize, fptr);
-	printf("%s\nsize: %ld", out_buffer, lsize);
+	result = fread(bytecode.data(), sizeof(char), lsize, fptr);
+	if (result < 0) { printf("ERROR: during shader read: \n"); exit(84); }
+
+	fclose(fptr);
 }
 
 inline int Engine::Create_framebuffer(VkFramebuffer *framebuffer)

@@ -2,57 +2,23 @@
 
 int main()
 {
-	Engine eng;
+	Renderer ren;
 	
-	eng.Init_SDL();
-	eng.Create_Window_SDL("[Project Name] Window", 0, 0, 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
-	eng.Set_LayersAndInstanceExtensions();
-	eng.Create_Instance();
-	eng.Create_Surface_SDL();
-	eng.Pick_PhysicalDevice();
-	eng.Create_Device();
-	eng.Create_Pool();
-	eng.Create_Swapchain();
-	eng.Create_renderPass();
-
-	////////////////////////////////////////////////////////////
-	eng.Load_Shader("shaders/vert.spv", eng.vertShaderSPV);
-	eng.Load_Shader("shaders/frag.spv", eng.fragShaderSPV);
-
-	VkShaderModule vertModule = VK_NULL_HANDLE;
-	VkShaderModule fragModule = VK_NULL_HANDLE;
-	VK_CHECK(eng.Create_ShaderModule(&vertModule, eng.vertShaderSPV));
-	VK_CHECK(eng.Create_ShaderModule(&fragModule, eng.fragShaderSPV));
-
-	/////////////////////////////////////////////////////////
-	// clearing
-	VkSemaphore acquireSemaphore;
-	VkSemaphoreCreateInfo semaphoreCreateInfo;
-	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	semaphoreCreateInfo.pNext = NULL;
-	semaphoreCreateInfo.flags = 0;
-	VK_CHECK(vkCreateSemaphore(eng.device, &semaphoreCreateInfo, NULL, &acquireSemaphore));
-	
-	VkSemaphore graphicsSemaphore;
-	VkSemaphoreCreateInfo semephoreCreateInfo;
-	semephoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	semephoreCreateInfo.pNext = NULL;
-	semephoreCreateInfo.flags = 0;
-	VK_CHECK(vkCreateSemaphore(eng.device, &semephoreCreateInfo, NULL, &graphicsSemaphore));
-
-
-
-	VkImageSubresourceRange range;
-	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	range.baseMipLevel = 0;
-	range.levelCount = VK_REMAINING_MIP_LEVELS;
-	range.baseArrayLayer = 0;
-	range.layerCount = VK_REMAINING_ARRAY_LAYERS;
-	
+	ren.Init_SDL();
+	ren.Create_Window_SDL("[Project Name] Window", 0, 0, 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+	ren.Set_LayersAndInstanceExtensions();
+	ren.Create_Instance();
+	ren.Create_Surface_SDL();
+	ren.Pick_PhysicalDevice();
+	ren.Create_Device();
+	ren.Create_CommandBuffers();
+	ren.Create_Swapchain();
+	ren.Create_renderPass();
+	ren.Create_Semaphores();
+	ren.Create_Pipeline();
 
     bool stillRunning = true;
     while(stillRunning) {
-		Uint32 imageIndex = 0;
         SDL_Event event;
         while(SDL_PollEvent(&event)) {
 			
@@ -70,84 +36,106 @@ int main()
             }
         }
 
-		VK_CHECK(vkAcquireNextImageKHR(eng.device, eng.swapchain, NULL, acquireSemaphore, NULL, &imageIndex));
-	
-		vkResetCommandPool(eng.device, eng.commandPool, 0);
-		// begin
-		//VkRenderPassBeginInfo rpBeginInfo;
-		
-		VkCommandBufferBeginInfo cmdBeginInfo{};
-		cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		cmdBeginInfo.pNext = NULL;
-		cmdBeginInfo.flags;
-		cmdBeginInfo.pInheritanceInfo;
+		vkWaitForFences(ren.device, 1, &ren.inFlightFences[ren.currentFrame], VK_TRUE, UINT64_MAX);
 
-		//VK_CHECK(vkCmdBeginRenderPass(eng.commandBuffer, ))
-		VK_CHECK(vkBeginCommandBuffer(eng.commandBuffer, &cmdBeginInfo));
-		
-		// clear
-		
-		vkCmdClearColorImage(eng.commandBuffer, eng.swapchainInfo.Images[imageIndex], VK_IMAGE_LAYOUT_GENERAL, &eng.clearColor, 1, &range);
-		//vkCmdDraw()
-		// end cmd
-		VK_CHECK(vkEndCommandBuffer(eng.commandBuffer));
+		uint32_t imageIndex;
+		VK_CHECK(vkAcquireNextImageKHR(ren.device, ren.swapchain, UINT64_MAX, ren.imageAcquireSemaphores[ren.currentFrame], VK_NULL_HANDLE, &imageIndex));
 
-		// queue submit
-		VkPipelineStageFlags pipeStageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		if (ren.imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+			vkWaitForFences(ren.device, 1, &ren.imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+		}
+		ren.imagesInFlight[imageIndex] = ren.inFlightFences[ren.currentFrame];
+
+		{ /////////////////
+			VkCommandBufferBeginInfo cmdBeginInfo{};
+			cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			cmdBeginInfo.pNext = NULL;
+			cmdBeginInfo.flags;
+			cmdBeginInfo.pInheritanceInfo;
+			VK_CHECK(vkBeginCommandBuffer(ren.commandBuffers[ren.currentFrame], &cmdBeginInfo));
+
+			VkRenderPassBeginInfo renderpassBeginInfo{};
+			renderpassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderpassBeginInfo.pNext = NULL;
+			renderpassBeginInfo.renderPass = ren.renderPass;
+			renderpassBeginInfo.framebuffer = ren.swapchainInfo.framebuffers[ren.currentFrame];
+			renderpassBeginInfo.renderArea.extent.width = WIDTH;
+			renderpassBeginInfo.renderArea.extent.height = HEIGHT;
+			renderpassBeginInfo.clearValueCount = 1;
+			renderpassBeginInfo.pClearValues = &ren.clearValue;
+
+			VkSubpassContents subpassContents{ VK_SUBPASS_CONTENTS_INLINE };
+
+			vkCmdBeginRenderPass(ren.commandBuffers[ren.currentFrame], &renderpassBeginInfo, subpassContents);
+			vkCmdBindPipeline(ren.commandBuffers[ren.currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, ren.pipeline);
+			vkCmdDraw(ren.commandBuffers[ren.currentFrame], 3, 1, 0, 0);
+			vkCmdEndRenderPass(ren.commandBuffers[ren.currentFrame]);
+			VK_CHECK(vkEndCommandBuffer(ren.commandBuffers[ren.currentFrame]));
+		} //////////////////
 
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.pNext = NULL;
+
+		VkSemaphore waitSemaphores[] = { ren.imageAcquireSemaphores[ren.currentFrame] };
+		VkSemaphore signalSemaphores[] = { ren.queueSubmittedSemaphore[ren.currentFrame] };
+
+		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &acquireSemaphore;
-		submitInfo.pWaitDstStageMask = &pipeStageFlags;
+		submitInfo.pWaitSemaphores = waitSemaphores;
+		submitInfo.pWaitDstStageMask = waitStages;
 		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &eng.commandBuffer;
+		submitInfo.pCommandBuffers = &ren.commandBuffers[imageIndex];
 		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &graphicsSemaphore;
+		submitInfo.pSignalSemaphores = signalSemaphores;
 
-		VK_CHECK(vkQueueSubmit(eng.queueGraphics, 1, &submitInfo, NULL));
-		/*
-		 presentInfo Validation ERROR: Images passed to present must be in layout VK_IMAGE_LAYOUT_PRESENT_SRC_KHR or VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR but is in VK_IMAGE_LAYOUT_UNDEFINED.
-		 The Vulkan spec states: Each element of pImageIndices must be the index of a presentable image acquired from the swapchain specified by the corresponding element of the pSwapchains array,
-		 and the presented image subresource must be in the VK_IMAGE_LAYOUT_PRESENT_SRC_KHR layout at the time the operation is executed on a VkDevice
-		 (https://github.com/KhronosGroup/Vulkan-Docs/search?q=VUID-VkPresentInfoKHR-pImageIndices-01296)
+		VK_CHECK(vkResetFences(ren.device, 1, &ren.inFlightFences[ren.currentFrame]));
 
-		 /!\ Meaning: "if you have an "empty" render loop that just presents images that have never been rendered to, you get error messages like this from the debug layers"
-		 https://github.com/vulkano-rs/vulkano/issues/519
-		*/
+		if (vkQueueSubmit(ren.queueGraphics, 1, &submitInfo, ren.inFlightFences[ren.currentFrame]) != VK_SUCCESS) {
+			throw std::runtime_error("failed to submit draw command buffer!");
+		}
 
-		//vkCmdBindDescriptorSets()
-		//vkCmdBindPipeline()
-		//vkCmdEndRenderPass()
-
-		// present queue
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.pNext = NULL;
+
 		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &graphicsSemaphore;
+		presentInfo.pWaitSemaphores = signalSemaphores;
+
+		VkSwapchainKHR swapChains[] = { ren.swapchain };
 		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &eng.swapchain;
+		presentInfo.pSwapchains = swapChains;
+
 		presentInfo.pImageIndices = &imageIndex;
-		presentInfo.pResults;
 
-		VK_CHECK(vkQueuePresentKHR(eng.queueGraphics, &presentInfo));
+		VK_CHECK(vkQueuePresentKHR(ren.queueGraphics, &presentInfo));
 
-		VK_CHECK(vkDeviceWaitIdle(eng.device));
+		ren.currentFrame = (ren.currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
+		vkDeviceWaitIdle(ren.device);
     }
 
     // Clean up.
-	vkDestroyRenderPass(eng.device, eng.renderPass, NULL);
-	vkDestroyCommandPool(eng.device, eng.commandPool, NULL);
-	vkDestroySemaphore(eng.device, acquireSemaphore, NULL);
-	vkDestroySemaphore(eng.device, graphicsSemaphore, NULL);
-	vkDestroySwapchainKHR(eng.device, eng.swapchain, NULL);
-    vkDestroySurfaceKHR(eng.instance, eng.surface, NULL);
-	vkDestroyDevice(eng.device, NULL);
-    SDL_DestroyWindow(eng.window);
+	vkDestroyImageView(ren.device, ren.swapchainInfo.ImageViews[0], NULL);
+	vkDestroyImageView(ren.device, ren.swapchainInfo.ImageViews[1], NULL);
+	vkDestroyShaderModule(ren.device, ren.vertModule, NULL);
+	vkDestroyShaderModule(ren.device, ren.fragModule, NULL);
+	vkDestroyPipelineLayout(ren.device, ren.pipelineLayout, NULL);
+	vkDestroyPipeline(ren.device, ren.pipeline, NULL);
+	vkDestroyFramebuffer(ren.device, ren.swapchainInfo.framebuffers[0], NULL);
+	vkDestroyFramebuffer(ren.device, ren.swapchainInfo.framebuffers[1], NULL);
+	vkDestroyRenderPass(ren.device, ren.renderPass, NULL);
+	vkDestroyCommandPool(ren.device, ren.commandPool, NULL);
+	vkDestroyDescriptorPool(ren.device, ren.descriptorPool, NULL);
+	vkDestroyFence(ren.device, ren.inFlightFences[0], NULL);
+	vkDestroyFence(ren.device, ren.inFlightFences[1], NULL);
+	vkDestroySemaphore(ren.device, ren.imageAcquireSemaphores[0], NULL);
+	vkDestroySemaphore(ren.device, ren.imageAcquireSemaphores[1], NULL);
+	vkDestroySemaphore(ren.device, ren.queueSubmittedSemaphore[0], NULL);
+	vkDestroySemaphore(ren.device, ren.queueSubmittedSemaphore[1], NULL);
+	vkDestroySwapchainKHR(ren.device, ren.swapchain, NULL);
+    vkDestroySurfaceKHR(ren.instance, ren.surface, NULL);
+	vkDestroyDevice(ren.device, NULL);
+    SDL_DestroyWindow(ren.window);
     SDL_Quit();
-    vkDestroyInstance(eng.instance, NULL);
-
+    vkDestroyInstance(ren.instance, NULL);
     return 0;
 }

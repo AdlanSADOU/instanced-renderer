@@ -4,6 +4,7 @@ int main()
 {
 	Renderer ren;
 	
+	system("dir");
 	ren.Init_SDL();
 	ren.Create_Window_SDL("[Project Name] Window", 0, 0, 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 	ren.Set_LayersAndInstanceExtensions();

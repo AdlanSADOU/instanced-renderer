@@ -19,8 +19,9 @@
 #include <vector>
 
 #define VK_CHECK(status) \
-	(status < VK_SUCCESS ? printf("something went wrong, and also... DO BETTER ERROR CHECKING THAN THIS !\nLine: %d\n", __LINE__) : 0); \
+	(status < VK_SUCCESS ? printf("something went wrong: vkRsult: %d!\nLine: %d in %s\n", status, __LINE__, __FILE__) : 0); \
 
+#define API_VERSION VK_API_VERSION_1_0
 #define WIDTH 1280
 #define HEIGHT 720
 #define NUM_SAMPLES VK_SAMPLE_COUNT_1_BIT
@@ -33,6 +34,30 @@ struct Texture {
 	VkDeviceMemory	memory;
 	Uint32			width, height;
 	UINT32			mipLevels;
+};
+
+struct VertexData {
+	float x, y, z, w;
+	float r, g, b, a;
+};
+
+VertexData vertex_Data[] = {
+  {
+	-0.7f, -0.7f, 0.0f, 1.0f,
+	1.0f, 0.0f, 0.0f, 0.0f
+  },
+  {
+	-0.7f, 0.7f, 0.0f, 1.0f,
+	0.0f, 1.0f, 0.0f, 0.0f
+  },
+  {
+	0.7f, -0.7f, 0.0f, 1.0f,
+	0.0f, 0.0f, 1.0f, 0.0f
+  },
+  {
+	0.7f, 0.7f, 0.0f, 1.0f,
+	0.3f, 0.3f, 0.3f, 0.0f
+  }
 };
 
 struct SwapchainInfo {
@@ -52,56 +77,59 @@ public:
 	VkInstance			instance		= VK_NULL_HANDLE;
 	VkSurfaceKHR		surface			= VK_NULL_HANDLE;
 	VkPhysicalDevice	physicalDevice	= VK_NULL_HANDLE;
-
 	VkQueue				queueGraphics	= VK_NULL_HANDLE;
 	VkDevice			device			= VK_NULL_HANDLE;
 	
 	VkCommandPool		commandPool		= VK_NULL_HANDLE;
-	std::vector<VkCommandBuffer> commandBuffers{};
 	
 	VkSwapchainKHR		swapchain		= VK_NULL_HANDLE;
-	SwapchainInfo		swapchainInfo	{};
-	Uint32				swhapchainImageCount = 0;
+
 	VkRenderPass		renderPass		= VK_NULL_HANDLE;
+
+	VkPipelineLayout	pipelineLayout	= VK_NULL_HANDLE;
 	VkPipeline			pipeline		= VK_NULL_HANDLE;
-	VkPipelineLayout pipelineLayout		= VK_NULL_HANDLE;
 
 	VkDescriptorPool	descriptorPool	= VK_NULL_HANDLE;
+	VkShaderModule		vertModule		= VK_NULL_HANDLE;
+	VkShaderModule		fragModule		= VK_NULL_HANDLE;
+
 	std::vector< VkDescriptorSetLayout> descriptorSetLayouts{};
-	std::vector<char> vertShaderSPV{};
-	std::vector<char> fragShaderSPV{};
-	VkShaderModule vertModule = VK_NULL_HANDLE;
-	VkShaderModule fragModule = VK_NULL_HANDLE;
-	VkViewport viewport{};
-	VkRect2D scissor{};
+	VkPhysicalDeviceMemoryProperties	memoryProperties{};
+	std::vector<VkCommandBuffer>		commandBuffers{};
+	std::vector<VkSemaphore>			queueSubmittedSemaphore{};
+	std::vector<VkSemaphore>			imageAcquireSemaphores{};
+	std::vector<VkFence>				inFlightFences{};
+	std::vector<VkFence>				imagesInFlight{};
+	std::vector<char>					vertShaderSPV{};
+	std::vector<char>					fragShaderSPV{};
 
-	std::vector<VkSemaphore> imageAcquireSemaphores{};
-	std::vector<VkSemaphore> queueSubmittedSemaphore{};
-	std::vector<VkFence> inFlightFences{};
-	std::vector<VkFence> imagesInFlight{};
-	size_t currentFrame = 0;
-
-	VkClearColorValue	clearColor		{0.1f, 0.f, 0.f, 1.f};
-	VkClearValue		clearValue{ clearColor};
+	SwapchainInfo				swapchainInfo	{};
+	VkViewport					viewport{};
+	VkRect2D					scissor{};
+	size_t						currentFrame = 0;
+	Uint32						swhapchainImageCount = 0;
+	VkClearColorValue			clearColor{ 0.1f, 0.f, 0.f, 1.f };
+	VkClearValue				clearValue{ clearColor };
 	
+	VkSurfaceCapabilitiesKHR	surfaceCapabilities{};
+	VkPhysicalDeviceProperties	physicalDeviceProperties;
 private:
-	Uint32						graphicsFamilyIndex	= 0;
+	Uint32					
+	graphicsFamilyIndex	= 0;
 	std::vector<const char*>	validationLayers;
 	std::vector<const char*>	instanceExtensions;
-	VkPhysicalDeviceProperties	physicalDeviceProperties;
-	VkSurfaceCapabilitiesKHR	surfaceCapabilities{};
-	VkPhysicalDeviceFeatures deviceFeatures{};
+	VkPhysicalDeviceFeatures	deviceFeatures{};
 	
-
 	inline VkSurfaceFormatKHR	GetSurfaceFormatIfAvailable	(std::vector<VkSurfaceFormatKHR> &surfaceFormats);
-	inline VkPresentModeKHR	GetPresentModeIfAvailable	(std::vector<VkPresentModeKHR> &modes, VkPresentModeKHR desired);
-	inline void Create_framebuffer(std::vector<VkFramebuffer> &framebuffers);
-	inline int Create_SwapchainImageViews(VkImage image, VkImageView *imageView);
+	inline VkPresentModeKHR		GetPresentModeIfAvailable	(std::vector<VkPresentModeKHR> &modes, VkPresentModeKHR desired);
+	inline void					Create_framebuffers(std::vector<VkFramebuffer> &framebuffers);
+	inline int					Create_SwapchainImageViews(VkImage image, VkImageView *imageView);
 public:
-	inline VkResult BeginDraw();
-	inline void Create_Semaphores();
+	inline VkResult	BeginDraw();
+	inline void		Create_Semaphores();
 	inline VkResult Create_ShaderModule(VkShaderModule *shader_module, std::vector<char> &bytecode);
-	inline int Load_Shader(char *filepath, std::vector<char> &bytecode);
+	inline int		Load_Shader(char *filepath, std::vector<char> &bytecode);
+	inline void		OnWindowResize();
 
 	inline int Init_SDL();
 	inline int Create_Window_SDL(const char *title, int x, int y, int w, int h, Uint32 flags);
@@ -181,7 +209,7 @@ inline int Renderer::Create_Instance()
 	appInfo.applicationVersion = 1;
 	appInfo.pEngineName = "LunarG SDK";
 	appInfo.engineVersion = 1;
-	appInfo.apiVersion = VK_API_VERSION_1_0;
+	appInfo.apiVersion = API_VERSION;
 
 	VkInstanceCreateInfo instInfo = {};
 	instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -293,6 +321,7 @@ inline int Renderer::Pick_PhysicalDevice()
 	vkGetPhysicalDeviceSurfacePresentModesKHR(this->physicalDevice, this->surface, &presentModesCount, presentModes.data());
 	swapchainInfo.presentMode = GetPresentModeIfAvailable(presentModes, VK_PRESENT_MODE_MAILBOX_KHR);
 
+	vkGetPhysicalDeviceMemoryProperties(this->physicalDevice, &this->memoryProperties);
 	return result;
 }
 
@@ -335,10 +364,21 @@ inline int Renderer::Create_Device()
 
 inline int Renderer::Create_CommandBuffers()
 {
+	/*
+		VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT – Indicates that command buffers, allocated from this pool,
+		may be reset individually. Normally, without this flag, we can’t rerecord the same command buffer multiple times. 
+		It must be reset first. And, what’s more, command buffers created from one pool may be reset only all at once.
+		Specifying this flag allows us to reset command buffers individually,
+		and (even better) it is done implicitly by calling the vkBeginCommandBuffer() function.
+
+		VK_COMMAND_POOL_CREATE_TRANSIENT_BIT – This flag tells the driver that command buffers allocated from this pool
+		will be living for a short amount of time, they will be often recorded and reset (re-recorded).
+		This information helps optimize command buffer allocation and perform it more optimally.
+	*/
 	VkCommandPoolCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	createInfo.pNext = NULL;
-	createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 	createInfo.queueFamilyIndex = this->graphicsFamilyIndex;
 
 	VK_CHECK(vkCreateCommandPool(this->device, &createInfo, NULL, &this->commandPool));
@@ -443,6 +483,9 @@ inline int Renderer::Create_Swapchain()
 	//////////////////////////////////////////////////////////////////
 	// SWAPCHAIN
 	// Needs to be recreated on window resize ?
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(this->physicalDevice, this->surface, &this->surfaceCapabilities);
+	printf("%d %d\n", this->surfaceCapabilities.currentExtent.width, this->surfaceCapabilities.currentExtent.height);
+
 	VkSwapchainCreateInfoKHR swapchainCreateInfo{};
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchainCreateInfo.pNext = NULL;
@@ -456,11 +499,11 @@ inline int Renderer::Create_Swapchain()
 	swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	swapchainCreateInfo.queueFamilyIndexCount = 0;
 	swapchainCreateInfo.pQueueFamilyIndices = NULL;
-	swapchainCreateInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR; //surfaceCapabilities.currentTransform;
+	swapchainCreateInfo.preTransform = surfaceCapabilities.currentTransform;
 	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainCreateInfo.presentMode = swapchainInfo.presentMode;
 	swapchainCreateInfo.clipped = VK_TRUE;
-	swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+	swapchainCreateInfo.oldSwapchain = (this->swapchain == VK_NULL_HANDLE ? 0 : this->swapchain);
 
 	// One mistake that is not catched by the validationLayers is if you don't enable the device extension VK_KHR_SWAPCHAIN_EXTENSION_NAME, swapchain will be NULL
 	VK_CHECK(vkCreateSwapchainKHR(this->device, &swapchainCreateInfo, nullptr, &this->swapchain));
@@ -477,6 +520,7 @@ inline int Renderer::Create_Swapchain()
 	VK_CHECK(Create_SwapchainImageViews(this->swapchainInfo.Images[0], &this->swapchainInfo.ImageViews[0]));
 	VK_CHECK(Create_SwapchainImageViews(this->swapchainInfo.Images[1], &this->swapchainInfo.ImageViews[1]));
 
+	
 	return 0;
 }
 
@@ -511,54 +555,51 @@ inline int Renderer::Create_renderPass()
 	subpass.preserveAttachmentCount;
 	subpass.pPreserveAttachments;
 
-	/*
-	Subpass dependencies describe dependencies between different subpasses. 
-	When an attachment is used in one specific way in a given subpass (for example, rendering into it),
-	but in another way in another subpass (sampling from it), we can create a memory barrier or we can provide a subpass dependency
-	that describes the intended usage of an attachment in these two subpasses. 
-	Of course, the latter option is recommended, as the driver can (usually) prepare the barriers in a more optimal way.
-	And the code itself is improved—everything required to understand the code is gathered in one place, one object.
+	/*VkSubpassDependency
+		Subpass dependencies describe dependencies between different subpasses. DUH...!
+		When an attachment is used in one specific way in a given subpass (for example, rendering into it),
+		but in another way in another subpass (sampling from it), we can create a memory barrier or we can provide a subpass dependency
+		that describes the intended usage of an attachment in these two subpasses. 
+		Of course, the latter option is recommended, as the driver can (usually) prepare the barriers in a more optimal way.
+		And the code itself is improved—everything required to understand the code is gathered in one place, one object.
 
-	In our simple example, we have only one subpass, but we specify two dependencies.
-	This is because we can (and should) specify dependencies between render passes (by providing the number of a given subpass)
-	and operations outside of them (by providing a VK_SUBPASS_EXTERNAL value).
-	Here we provide one dependency for color attachment between operations occurring before a render pass and its only subpass.
-	The second dependency is defined for operations occurring inside a subpass and after the render pass.
+		In our simple example, we have only one subpass, but we specify two dependencies.
+		This is because we can (and should) specify dependencies between render passes (by providing the number of a given subpass)
+		and operations outside of them (by providing a VK_SUBPASS_EXTERNAL value).
+		Here we provide one dependency for color attachment between operations occurring before a render pass and its only subpass.
+		The second dependency is defined for operations occurring inside a subpass and after the render pass.
 	*/
-	std::vector<VkSubpassDependency> dependencies = {
-  {
-	VK_SUBPASS_EXTERNAL,                            // uint32_t                       srcSubpass – Index of a first (previous) subpass or VK_SUBPASS_EXTERNAL if we want to indicate dependency between subpass and operations outside of a render pass.
-	0,                                              // uint32_t                       dstSubpass – Index of a second (later) subpass (or VK_SUBPASS_EXTERNAL).
-	VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,           // VkPipelineStageFlags           srcStageMask – Pipeline stage during which a given attachment was used before (in a src subpass).
-	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  // VkPipelineStageFlags           dstStageMask – Pipeline stage during which a given attachment will be used later (in a dst subpass).
-	VK_ACCESS_MEMORY_READ_BIT,                      // VkAccessFlags                  srcAccessMask	– Types of memory operations that occurred in a src subpass or before a render pass.
-	VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,           // VkAccessFlags                  dstAccessMask	– Types of memory operations that occurred in a dst subpass or after a render pass.
-	VK_DEPENDENCY_BY_REGION_BIT                     // VkDependencyFlags              dependencyFlags – Flag describing the type (region) of dependency.
-  },
-  {
-	0,                                              // uint32_t                       srcSubpass
-	VK_SUBPASS_EXTERNAL,                            // uint32_t                       dstSubpass
-	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  // VkPipelineStageFlags           srcStageMask
-	VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,           // VkPipelineStageFlags           dstStageMask
-	VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,           // VkAccessFlags                  srcAccessMask
-	VK_ACCESS_MEMORY_READ_BIT,                      // VkAccessFlags                  dstAccessMask
-	VK_DEPENDENCY_BY_REGION_BIT                     // VkDependencyFlags              dependencyFlags
-  }
-	};
-
+	std::vector<VkSubpassDependency> dependencies(2);
+	dependencies[0].srcSubpass		= VK_SUBPASS_EXTERNAL;                            // uint32_t				srcSubpass – Index of a first (previous) subpass or VK_SUBPASS_EXTERNAL if we want to indicate dependency between subpass and operations outside of a render pass.
+	dependencies[0].dstSubpass		= 0;                                              // uint32_t				dstSubpass – Index of a second (later) subpass (or VK_SUBPASS_EXTERNAL).
+	dependencies[0].srcStageMask	= VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;           // VkPipelineStageFlags	srcStageMask – Pipeline stage during which a given attachment was used before (in a src subpass).
+	dependencies[0].dstStageMask	= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;  // VkPipelineStageFlags	dstStageMask – Pipeline stage during which a given attachment will be used later (in a dst subpass).
+	dependencies[0].srcAccessMask	= VK_ACCESS_MEMORY_READ_BIT;                      // VkAccessFlags			srcAccessMask – Types of memory operations that occurred in a src subpass or before a render pass.
+	dependencies[0].dstAccessMask	= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;           // VkAccessFlags			dstAccessMask – Types of memory operations that occurred in a dst subpass or after a render pass.
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;                    // VkDependencyFlags		dependencyFlags – Flag describing the type (region) of dependency.
+ 
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+ 
 	VkRenderPassCreateInfo renderPassCreateInfo{};
 	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	renderPassCreateInfo.pNext = NULL;
+	renderPassCreateInfo.flags = 0;
 	renderPassCreateInfo.attachmentCount = 1;
 	renderPassCreateInfo.pAttachments = &color_attachment;
 	renderPassCreateInfo.subpassCount = 1;
 	renderPassCreateInfo.pSubpasses = &subpass;
-	renderPassCreateInfo.dependencyCount = dependencies.size();
+	renderPassCreateInfo.dependencyCount = (uint32_t)dependencies.size();
 	renderPassCreateInfo.pDependencies = dependencies.data();
 	VK_CHECK(vkCreateRenderPass(this->device, &renderPassCreateInfo, NULL, &this->renderPass));
 
 	this->swapchainInfo.framebuffers.resize(2);
-	Create_framebuffer(this->swapchainInfo.framebuffers);
+	Create_framebuffers(this->swapchainInfo.framebuffers);
 
 	return 1;
 }
@@ -592,15 +633,41 @@ inline int Renderer::Create_Pipeline()
 
 	///////////////////////
 	// VERTEX INPUT STATE
-	// TODO: fill to provide verticies through VertexBuffer as opposed in shader
+	// Fill to provide vertices through VertexBuffer as opposed to harcoding in shader
+
+	/*
+		When we create a vertex buffer, we bind it to a chosen slot before rendering operations.
+		The slot number (an index) is this binding and here we describe how data in this slot is aligned in memory and
+		how it should be consumed (per vertex or per instance).
+		Different vertex buffers can be bound to different bindings.
+		And each binding may be differently positioned in memory.
+	*/
+	std::vector<VkVertexInputBindingDescription> vertexBindingDescription(1);
+	vertexBindingDescription[0].binding = 0;								//Index of a binding with which vertex data will be associated.
+	vertexBindingDescription[0].stride = sizeof(VertexData);				//The distance in bytes between two consecutive elements (the same attribute for two neighbor vertices).
+	vertexBindingDescription[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;	//Defines how data should be consumed, per vertex or per instance.
+
+	std::vector<VkVertexInputAttributeDescription> vertexAttibuteDescription(2);
+	// ------- Position Attributes -------
+	// .location: At this point 
+	vertexAttibuteDescription[0].location = 0;									// location the vertexBuffer will be bound to for shader access -> location layout qualifier
+	vertexAttibuteDescription[0].binding = vertexBindingDescription[0].binding; // The number of the slot from which data should be read, same binding as in a VkVertexInputBindingDescription structure and vkCmdBindVertexBuffers().
+	vertexAttibuteDescription[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	vertexAttibuteDescription[0].offset = offsetof(struct VertexData, x);
+	// ------- Color Attributes ----------
+	vertexAttibuteDescription[1].location = 1;
+	vertexAttibuteDescription[1].binding = vertexBindingDescription[0].binding;
+	vertexAttibuteDescription[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	vertexAttibuteDescription[1].offset = offsetof(struct VertexData, r);
+
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};
 	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputStateCreateInfo.pNext = NULL;
 	vertexInputStateCreateInfo.flags = 0;
-	vertexInputStateCreateInfo.vertexBindingDescriptionCount = 0;
-	vertexInputStateCreateInfo.pVertexBindingDescriptions;
-	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputStateCreateInfo.pVertexAttributeDescriptions;
+	vertexInputStateCreateInfo.vertexBindingDescriptionCount = (uint32_t)vertexBindingDescription.size();
+	vertexInputStateCreateInfo.pVertexBindingDescriptions = vertexBindingDescription.data();
+	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = (uint32_t)vertexAttibuteDescription.size();
+	vertexInputStateCreateInfo.pVertexAttributeDescriptions = &vertexAttibuteDescription[0];
 
 	/////////////////////////
 	// INPUT ASSEMBLY STATE
@@ -608,30 +675,23 @@ inline int Renderer::Create_Pipeline()
 	inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	inputAssemblyState.pNext = NULL;
 	inputAssemblyState.flags = 0;
-	inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 	inputAssemblyState.primitiveRestartEnable = VK_FALSE;
 
-	/////////////////////////////
-	// VIEWPORT & SCISSOR STATE
-	viewport.x = 0.f;
-	viewport.y = 0.f;
-	viewport.width = (float) WIDTH;
-	viewport.height = (float) HEIGHT;
-	viewport.minDepth = 0.f;
-	viewport.maxDepth = 1.f;
-
-	scissor.extent.width = WIDTH;
-	scissor.extent.height = HEIGHT;
-	scissor.offset = VkOffset2D{ 0,0 };
-
+	/*
+		Viewports and Scissors are set dynamically
+		see DynamicStates below 
+		and vkCmdSetViewport() & vkCmdSetScissor() in the draw loop
+		we must still count one of each here
+	*/
 	VkPipelineViewportStateCreateInfo viewportState{};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewportState.pNext = NULL;
 	viewportState.flags = 0;
 	viewportState.viewportCount = 1;
-	viewportState.pViewports = &viewport;
+	viewportState.pViewports;
 	viewportState.scissorCount = 1;
-	viewportState.pScissors = &scissor;
+	viewportState.pScissors;
 
 	///////////////////
 	// RASTER STATE
@@ -659,7 +719,7 @@ inline int Renderer::Create_Pipeline()
 	multisampleState.flags;
 	multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 	multisampleState.sampleShadingEnable;
-	multisampleState.minSampleShading;
+	multisampleState.minSampleShading = 1.f;
 	multisampleState.pSampleMask;
 	multisampleState.alphaToCoverageEnable;
 	multisampleState.alphaToOneEnable;
@@ -684,19 +744,19 @@ inline int Renderer::Create_Pipeline()
 	// COLOR BLEND STATE
 	VkPipelineColorBlendAttachmentState blendAttachmentState{};
 	blendAttachmentState.blendEnable;
-	blendAttachmentState.srcColorBlendFactor;
-	blendAttachmentState.dstColorBlendFactor;
-	blendAttachmentState.colorBlendOp;
-	blendAttachmentState.srcAlphaBlendFactor;
-	blendAttachmentState.dstAlphaBlendFactor;
-	blendAttachmentState.alphaBlendOp;
-	blendAttachmentState.colorWriteMask = 0xf;
+	blendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	blendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+	blendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
+	blendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	blendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	blendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
+	blendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 	VkPipelineColorBlendStateCreateInfo colorBlendState{};
 	colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlendState.pNext = NULL;
 	colorBlendState.flags = 0;
-	colorBlendState.logicOpEnable;
+	colorBlendState.logicOpEnable = VK_FALSE;
 	colorBlendState.logicOp = VK_LOGIC_OP_COPY;
 	colorBlendState.attachmentCount = 1;
 	colorBlendState.pAttachments = &blendAttachmentState;
@@ -712,7 +772,7 @@ inline int Renderer::Create_Pipeline()
 	dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamicStateInfo.pNext = NULL;
 	dynamicStateInfo.flags = 0;
-	dynamicStateInfo.dynamicStateCount = 2;
+	dynamicStateInfo.dynamicStateCount = (uint32_t)dynamicStates.size();
 	dynamicStateInfo.pDynamicStates = dynamicStates.data();
 
 	//////////////////////////////:
@@ -732,21 +792,21 @@ inline int Renderer::Create_Pipeline()
 	pipeCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipeCreateInfo.pNext = NULL;
 	pipeCreateInfo.flags = 0;
-	pipeCreateInfo.stageCount = 2;
+	pipeCreateInfo.stageCount = (uint32_t)shaderStages.size();
 	pipeCreateInfo.pStages = shaderStages.data();
 	pipeCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
 	pipeCreateInfo.pInputAssemblyState = &inputAssemblyState;
-	pipeCreateInfo.pTessellationState;
+	pipeCreateInfo.pTessellationState = nullptr;
 	pipeCreateInfo.pViewportState = &viewportState;
 	pipeCreateInfo.pRasterizationState = &rasterState;
 	pipeCreateInfo.pMultisampleState = &multisampleState;
 	pipeCreateInfo.pDepthStencilState = &depthStencilState;
 	pipeCreateInfo.pColorBlendState = &colorBlendState;
-	//pipeCreateInfo.pDynamicState = &dynamicStateInfo;
+	pipeCreateInfo.pDynamicState = &dynamicStateInfo;
 	pipeCreateInfo.layout = pipelineLayout;
 	pipeCreateInfo.renderPass = this->renderPass;
-	pipeCreateInfo.subpass;
-	pipeCreateInfo.basePipelineHandle;
+	pipeCreateInfo.subpass = 0;
+	pipeCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
 	pipeCreateInfo.basePipelineIndex = -1;
 
 	vkCreateGraphicsPipelines(this->device, NULL, 1, &pipeCreateInfo, NULL, &this->pipeline);
@@ -841,7 +901,12 @@ inline int Renderer::Load_Shader(char *filepath, std::vector<char> &bytecode)
 	return (int)result;
 }
 
-inline void Renderer::Create_framebuffer(std::vector<VkFramebuffer> &framebuffers)
+inline void Renderer::OnWindowResize()
+{
+	
+}
+
+inline void Renderer::Create_framebuffers(std::vector<VkFramebuffer> &framebuffers)
 {
 	for (size_t i = 0; i < framebuffers.size(); i++)
 	{

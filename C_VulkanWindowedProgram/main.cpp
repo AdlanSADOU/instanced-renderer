@@ -17,8 +17,59 @@ int main()
 	ren.Create_Semaphores();
 	ren.Create_Pipeline();
 
+	//----------------------------------------------------
+	VkBufferCreateInfo bufferCreateInfo{};
+	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferCreateInfo.pNext = NULL;
+	bufferCreateInfo.flags = 0;
+	bufferCreateInfo.size = sizeof(vertex_Data);
+	bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; // indicate that till buffer will contain vertex data
+	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	bufferCreateInfo.queueFamilyIndexCount = 0; // only when concurrent sharing mode is specified - presentation and graphics is done on the same queue so this buffer does not need to be shared with another queue
+	bufferCreateInfo.pQueueFamilyIndices = NULL; // only when concurrent sharing mode is specified
+
+	VkBuffer vertexBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory vertexBufferDeviceMemory = VK_NULL_HANDLE;
+
+	VK_CHECK(vkCreateBuffer(ren.device, &bufferCreateInfo, NULL, &vertexBuffer));
+
+	VkMemoryRequirements memoryRequirements{};
+	vkGetBufferMemoryRequirements(ren.device, vertexBuffer, &memoryRequirements);
+
+	//  we must find a memoryType that support our memoryRequirements.memoryTypeBits & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT : our additional requirement is that memory needs to be host visible
+	for (uint32_t i = 0; i < ren.memoryProperties.memoryTypeCount; ++i) {
+		if ((memoryRequirements.memoryTypeBits & (1 << i)) && (ren.memoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+		{
+			VkMemoryAllocateInfo memoryAllocateInfo = {
+			  VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,	  // VkStructureType                        sType
+			  NULL,										  // const void                            *pNext
+			  memoryRequirements.size,					  // VkDeviceSize                           allocationSize
+			  i                                           // uint32_t                               memoryTypeIndex
+			};
+			VK_CHECK(vkAllocateMemory(ren.device, &memoryAllocateInfo, NULL, &vertexBufferDeviceMemory));
+		}
+	}
+	
+	VK_CHECK(vkBindBufferMemory(ren.device, vertexBuffer, vertexBufferDeviceMemory, 0));
+	
+	void *vertexBufferMemoryPointer;
+	VK_CHECK(vkMapMemory(ren.device, vertexBufferDeviceMemory, 0, sizeof(vertex_Data), 0, &vertexBufferMemoryPointer));
+	memcpy(vertexBufferMemoryPointer, vertex_Data, sizeof(vertex_Data));
+
+	VkMappedMemoryRange flushRange{};
+	flushRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+	flushRange.pNext = NULL;
+	flushRange.memory = vertexBufferDeviceMemory;
+	flushRange.offset = 0;
+	flushRange.size = VK_WHOLE_SIZE;
+	vkFlushMappedMemoryRanges(ren.device, 1, &flushRange);
+
+	vkUnmapMemory(ren.device, vertexBufferDeviceMemory);
+	//____________________________________________________
+
     bool stillRunning = true;
     while(stillRunning) {
+		VkResult result{};
         SDL_Event event;
         while(SDL_PollEvent(&event)) {
 			
@@ -36,10 +87,25 @@ int main()
             }
         }
 
-		vkWaitForFences(ren.device, 1, &ren.inFlightFences[ren.currentFrame], VK_TRUE, UINT64_MAX);
+		//system("cls");
+
+		if (vkWaitForFences(ren.device, 1, &ren.inFlightFences[ren.currentFrame], VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+			printf("Fence: Waiting takes too long...!\n");
+		}
 
 		uint32_t imageIndex;
-		VK_CHECK(vkAcquireNextImageKHR(ren.device, ren.swapchain, UINT64_MAX, ren.imageAcquireSemaphores[ren.currentFrame], VK_NULL_HANDLE, &imageIndex));
+		VK_CHECK((result = vkAcquireNextImageKHR(ren.device, ren.swapchain, UINT64_MAX, ren.imageAcquireSemaphores[ren.currentFrame], VK_NULL_HANDLE, &imageIndex)));
+		switch (result)
+		{
+		case VK_SUCCESS:
+			break;
+		case VK_SUBOPTIMAL_KHR:
+			break;
+		case VK_ERROR_OUT_OF_DATE_KHR:
+			break;
+		default:
+			break;
+		}
 
 		if (ren.imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
 			vkWaitForFences(ren.device, 1, &ren.imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
@@ -50,7 +116,7 @@ int main()
 			VkCommandBufferBeginInfo cmdBeginInfo{};
 			cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			cmdBeginInfo.pNext = NULL;
-			cmdBeginInfo.flags;
+			cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 			cmdBeginInfo.pInheritanceInfo;
 			VK_CHECK(vkBeginCommandBuffer(ren.commandBuffers[ren.currentFrame], &cmdBeginInfo));
 
@@ -64,11 +130,29 @@ int main()
 			renderpassBeginInfo.clearValueCount = 1;
 			renderpassBeginInfo.pClearValues = &ren.clearValue;
 
+			VkViewport viewport{};
+			viewport.x = 0;
+			viewport.y = 0;
+			viewport.width = WIDTH;
+			viewport.height = HEIGHT;
+			viewport.minDepth = 0.f;
+			viewport.maxDepth = 1.f;
+			vkCmdSetViewport(ren.commandBuffers[ren.currentFrame], 0, 1, &viewport);
+
+			VkRect2D scissor{};
+			scissor.extent = { WIDTH, HEIGHT };
+			scissor.offset = { 0,0 };
+			vkCmdSetScissor(ren.commandBuffers[ren.currentFrame], 0, 1, &scissor);
+
 			VkSubpassContents subpassContents{ VK_SUBPASS_CONTENTS_INLINE };
 
 			vkCmdBeginRenderPass(ren.commandBuffers[ren.currentFrame], &renderpassBeginInfo, subpassContents);
 			vkCmdBindPipeline(ren.commandBuffers[ren.currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, ren.pipeline);
-			vkCmdDraw(ren.commandBuffers[ren.currentFrame], 3, 1, 0, 0);
+
+			VkDeviceSize offset = 0;
+			vkCmdBindVertexBuffers(ren.commandBuffers[ren.currentFrame], 0, 1, &vertexBuffer, &offset);
+			vkCmdDraw(ren.commandBuffers[ren.currentFrame], 4, 1, 0, 0);
+			
 			vkCmdEndRenderPass(ren.commandBuffers[ren.currentFrame]);
 			VK_CHECK(vkEndCommandBuffer(ren.commandBuffers[ren.currentFrame]));
 		} //////////////////
@@ -106,14 +190,25 @@ int main()
 
 		presentInfo.pImageIndices = &imageIndex;
 
-		VK_CHECK(vkQueuePresentKHR(ren.queueGraphics, &presentInfo));
-
+		VK_CHECK((result = vkQueuePresentKHR(ren.queueGraphics, &presentInfo)));
+		switch (result)
+		{
+		case VK_SUCCESS:
+			break;
+		case VK_SUBOPTIMAL_KHR:
+			break;
+		case VK_ERROR_OUT_OF_DATE_KHR:
+			break;
+		default:
+			break;
+		}
 		ren.currentFrame = (ren.currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
 		vkDeviceWaitIdle(ren.device);
     }
 
     // Clean up.
+	vkDestroyBuffer(ren.device, vertexBuffer, NULL);
 	vkDestroyImageView(ren.device, ren.swapchainInfo.ImageViews[0], NULL);
 	vkDestroyImageView(ren.device, ren.swapchainInfo.ImageViews[1], NULL);
 	vkDestroyShaderModule(ren.device, ren.vertModule, NULL);

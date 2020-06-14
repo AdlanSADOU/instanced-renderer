@@ -158,11 +158,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Engine.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Engine.h" />
+    <ClInclude Include="types.h" />
+    <ClInclude Include="vk_buffer.h" />
+    <ClInclude Include="includes.h" />
+    <ClInclude Include="stb_image.h" />
+    <ClInclude Include="vk_context.h" />
+    <ClInclude Include="vk_texture.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

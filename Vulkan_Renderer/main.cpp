@@ -1,8 +1,10 @@
-#include "Engine.h"
+#include "vk_context.h"
+#include "vk_buffer.h"
+#include "vk_texture.h"
 
 int main()
 {
-	Renderer ren;
+	Context ren;
 
 	ren.Init_SDL();
 	ren.Create_Window_SDL("[Project Name] Window", 0, 0, 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
@@ -16,6 +18,15 @@ int main()
 	ren.Create_renderPass();
 	ren.Create_Semaphores();
 	ren.Create_Pipeline();
+
+	// -----texture----
+	Texture image;
+	image.load_ImageData("resources/me.png");
+	image.create_Image(ren.device);
+	image.allocate_ImageMemory(ren.device, ren.deviceMemoryProperties, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	image.create_ImageView(ren.device);
+	image.create_Sampler(ren.device);
+	//image.copy_TextureData(ren.device);
 
 	//----------------------------------------------------
 #define NUM_DESCSETS 1
@@ -35,7 +46,10 @@ int main()
 	vkCreateDescriptorPool(ren.device, &descriptorPoolCreateInfo, NULL, &descriptorPool);
 
 #define	NUM_LAYOUTSETS 1
+	// LAYOUTS ARRAY
+	std::vector<VkDescriptorSetLayout> setLayouts(NUM_LAYOUTSETS);
 
+	// BINDINGS
 	VkDescriptorSetLayoutBinding setLayoutBinding{};
 	setLayoutBinding.binding = 0;
 	setLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -49,9 +63,9 @@ int main()
 	setLayoutCreateInfo.flags = 0;
 	setLayoutCreateInfo.bindingCount = 1;
 	setLayoutCreateInfo.pBindings = &setLayoutBinding;
-
-	std::vector<VkDescriptorSetLayout> setLayouts(NUM_LAYOUTSETS);
 	vkCreateDescriptorSetLayout(ren.device, &setLayoutCreateInfo, NULL, &setLayouts[0]);
+
+	// SETS
 	VkDescriptorSetAllocateInfo descriptorSetAllocInfo{};
 	descriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	descriptorSetAllocInfo.pNext = NULL;
@@ -62,10 +76,32 @@ int main()
 	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 	vkAllocateDescriptorSets(ren.device, &descriptorSetAllocInfo, &descriptorSet);
 
-	VkCopyDescriptorSet copyDescriptorSet{};
+	VkCopyDescriptorSet copySet{};
+	copySet.sType;
+	copySet.pNext;
+	copySet.srcSet;
+	copySet.srcBinding;
+	copySet.srcArrayElement;
+	copySet.dstSet;
+	copySet.dstBinding;
+	copySet.dstArrayElement;
+	copySet.descriptorCount;
 	
-	vkUpdateDescriptorSets(ren.device, 1, , 1, &descriptorSet);
+	VkWriteDescriptorSet writeSet{};
+	writeSet.sType;
+	writeSet.pNext;
+	writeSet.dstSet;
+	writeSet.dstBinding;
+	writeSet.dstArrayElement;
+	writeSet.descriptorCount;
+	writeSet.descriptorType;
+	writeSet.pImageInfo;
+	writeSet.pBufferInfo;
+	writeSet.pTexelBufferView;
 
+	//vkUpdateDescriptorSets(ren.device, 1, &writeSet, 1, &copySet);
+
+	// ---------------
 	Buffer vertexBuffer;
 	vertexBuffer.create_Buffer(ren.device, ren.deviceMemoryProperties, sizeof(vertex_Data), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 

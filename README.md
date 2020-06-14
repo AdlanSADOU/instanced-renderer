@@ -2,8 +2,8 @@
 
 This is my main side project as a CS student to learn how modern GPUs work and acquire a working knowlegde of a new powerful graphics API, namely Vulkan.
 
-Please keep in mind that this is a work in progress.
-Thus the current code structure does not represent the final view.
+Please keep in mind that this is work in progress.
+Thus, code structure will change frequently and new functionnality will be added as I learn.
 I will refactor the code base on each milestone.
 
 

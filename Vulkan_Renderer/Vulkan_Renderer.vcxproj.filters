@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Engine.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Engine.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\vertShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\fragShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="cpp.hint" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{55b6ec9d-38e6-49c1-b1f4-197c27777ca3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

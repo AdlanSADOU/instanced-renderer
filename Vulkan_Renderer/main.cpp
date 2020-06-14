@@ -3,8 +3,7 @@
 int main()
 {
 	Renderer ren;
-	
-	system("dir");
+
 	ren.Init_SDL();
 	ren.Create_Window_SDL("[Project Name] Window", 0, 0, 1280, 720, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 	ren.Set_LayersAndInstanceExtensions();
@@ -19,53 +18,60 @@ int main()
 	ren.Create_Pipeline();
 
 	//----------------------------------------------------
-	VkBufferCreateInfo bufferCreateInfo{};
-	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferCreateInfo.pNext = NULL;
-	bufferCreateInfo.flags = 0;
-	bufferCreateInfo.size = sizeof(vertex_Data);
-	bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; // indicate that till buffer will contain vertex data
-	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	bufferCreateInfo.queueFamilyIndexCount = 0; // only when concurrent sharing mode is specified - presentation and graphics is done on the same queue so this buffer does not need to be shared with another queue
-	bufferCreateInfo.pQueueFamilyIndices = NULL; // only when concurrent sharing mode is specified
+#define NUM_DESCSETS 1
+	std::vector<VkDescriptorPoolSize> poolSizes(NUM_DESCSETS);
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[0].descriptorCount = 1;
 
-	VkBuffer vertexBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory vertexBufferDeviceMemory = VK_NULL_HANDLE;
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{};
+	descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descriptorPoolCreateInfo.pNext = NULL;
+	descriptorPoolCreateInfo.flags = 0;
+	descriptorPoolCreateInfo.maxSets = NUM_DESCSETS;
+	descriptorPoolCreateInfo.poolSizeCount = poolSizes.size();
+	descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
 
-	VK_CHECK(vkCreateBuffer(ren.device, &bufferCreateInfo, NULL, &vertexBuffer));
+	VkDescriptorPool descriptorPool{};
+	vkCreateDescriptorPool(ren.device, &descriptorPoolCreateInfo, NULL, &descriptorPool);
 
-	VkMemoryRequirements memoryRequirements{};
-	vkGetBufferMemoryRequirements(ren.device, vertexBuffer, &memoryRequirements);
+#define	NUM_LAYOUTSETS 1
 
-	//  we must find a memoryType that support our memoryRequirements.memoryTypeBits & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT : our additional requirement is that memory needs to be host visible
-	for (uint32_t i = 0; i < ren.memoryProperties.memoryTypeCount; ++i) {
-		if ((memoryRequirements.memoryTypeBits & (1 << i)) && (ren.memoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
-		{
-			VkMemoryAllocateInfo memoryAllocateInfo = {
-			  VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,	  // VkStructureType                        sType
-			  NULL,										  // const void                            *pNext
-			  memoryRequirements.size,					  // VkDeviceSize                           allocationSize
-			  i                                           // uint32_t                               memoryTypeIndex
-			};
-			VK_CHECK(vkAllocateMemory(ren.device, &memoryAllocateInfo, NULL, &vertexBufferDeviceMemory));
-		}
-	}
+	VkDescriptorSetLayoutBinding setLayoutBinding{};
+	setLayoutBinding.binding = 0;
+	setLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	setLayoutBinding.descriptorCount = 1;
+	setLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	setLayoutBinding.pImmutableSamplers = NULL;
+
+	VkDescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
+	setLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	setLayoutCreateInfo.pNext = NULL;
+	setLayoutCreateInfo.flags = 0;
+	setLayoutCreateInfo.bindingCount = 1;
+	setLayoutCreateInfo.pBindings = &setLayoutBinding;
+
+	std::vector<VkDescriptorSetLayout> setLayouts(NUM_LAYOUTSETS);
+	vkCreateDescriptorSetLayout(ren.device, &setLayoutCreateInfo, NULL, &setLayouts[0]);
+	VkDescriptorSetAllocateInfo descriptorSetAllocInfo{};
+	descriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descriptorSetAllocInfo.pNext = NULL;
+	descriptorSetAllocInfo.descriptorPool = descriptorPool;
+	descriptorSetAllocInfo.descriptorSetCount = NUM_DESCSETS;
+	descriptorSetAllocInfo.pSetLayouts = setLayouts.data();
+
+	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+	vkAllocateDescriptorSets(ren.device, &descriptorSetAllocInfo, &descriptorSet);
+
+	VkCopyDescriptorSet copyDescriptorSet{};
 	
-	VK_CHECK(vkBindBufferMemory(ren.device, vertexBuffer, vertexBufferDeviceMemory, 0));
-	
-	void *vertexBufferMemoryPointer;
-	VK_CHECK(vkMapMemory(ren.device, vertexBufferDeviceMemory, 0, sizeof(vertex_Data), 0, &vertexBufferMemoryPointer));
-	memcpy(vertexBufferMemoryPointer, vertex_Data, sizeof(vertex_Data));
+	vkUpdateDescriptorSets(ren.device, 1, , 1, &descriptorSet);
 
-	VkMappedMemoryRange flushRange{};
-	flushRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-	flushRange.pNext = NULL;
-	flushRange.memory = vertexBufferDeviceMemory;
-	flushRange.offset = 0;
-	flushRange.size = VK_WHOLE_SIZE;
-	vkFlushMappedMemoryRanges(ren.device, 1, &flushRange);
+	Buffer vertexBuffer;
+	vertexBuffer.create_Buffer(ren.device, ren.deviceMemoryProperties, sizeof(vertex_Data), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	vkUnmapMemory(ren.device, vertexBufferDeviceMemory);
+	Buffer stagingBuffer; 
+	stagingBuffer.create_Buffer(ren.device, ren.deviceMemoryProperties, sizeof(vertex_Data), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+	stagingBuffer.mapCopyData(vertex_Data, sizeof(vertex_Data));
 	//____________________________________________________
 
     bool stillRunning = true;
@@ -147,11 +153,28 @@ int main()
 
 			VkSubpassContents subpassContents{ VK_SUBPASS_CONTENTS_INLINE };
 
+			VkBufferCopy bufferCopyInfo{};
+			bufferCopyInfo.dstOffset = 0;
+			bufferCopyInfo.srcOffset = 0;
+			bufferCopyInfo.size = vertexBuffer.getSize();
+			vkCmdCopyBuffer(ren.commandBuffers[ren.currentFrame], stagingBuffer.handle, vertexBuffer.handle, 1, &bufferCopyInfo);
+
+			VkBufferMemoryBarrier BufferBarrier{};
+			BufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			BufferBarrier.pNext = NULL;
+			BufferBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+			BufferBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+			BufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			BufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			BufferBarrier.buffer = vertexBuffer.handle;
+			BufferBarrier.offset = 0;
+			BufferBarrier.size = VK_WHOLE_SIZE;
+
 			vkCmdBeginRenderPass(ren.commandBuffers[ren.currentFrame], &renderpassBeginInfo, subpassContents);
 			vkCmdBindPipeline(ren.commandBuffers[ren.currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, ren.pipeline);
 
 			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(ren.commandBuffers[ren.currentFrame], 0, 1, &vertexBuffer, &offset);
+			vkCmdBindVertexBuffers(ren.commandBuffers[ren.currentFrame], 0, 1, &vertexBuffer.handle, &offset);
 			vkCmdDraw(ren.commandBuffers[ren.currentFrame], 4, 1, 0, 0);
 			
 			vkCmdEndRenderPass(ren.commandBuffers[ren.currentFrame]);
@@ -176,7 +199,7 @@ int main()
 		VK_CHECK(vkResetFences(ren.device, 1, &ren.inFlightFences[ren.currentFrame]));
 
 		if (vkQueueSubmit(ren.queueGraphics, 1, &submitInfo, ren.inFlightFences[ren.currentFrame]) != VK_SUCCESS) {
-			throw std::runtime_error("failed to submit draw command buffer!");
+			throw std::runtime_error("failed to submit draw command vertexBuffer!");
 		}
 
 		VkPresentInfoKHR presentInfo{};
@@ -209,7 +232,7 @@ int main()
     }
 
     // Clean up.
-	vkDestroyBuffer(ren.device, vertexBuffer, NULL);
+	//vkDestroyBuffer(ren.device, Buffer, NULL);
 	vkDestroyImageView(ren.device, ren.swapchainInfo.ImageViews[0], NULL);
 	vkDestroyImageView(ren.device, ren.swapchainInfo.ImageViews[1], NULL);
 	vkDestroyShaderModule(ren.device, ren.vertModule, NULL);

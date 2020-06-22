@@ -12,9 +12,7 @@ struct SwapchainInfo {
 	std::vector<VkFramebuffer> framebuffers;
 };
 
-struct Context
-{
-public:
+struct Context {
 	SDL_Window		*window = VK_NULL_HANDLE;
 	VkInstance		instance = VK_NULL_HANDLE;
 	VkSurfaceKHR		surface = VK_NULL_HANDLE;
@@ -55,6 +53,7 @@ public:
 
 	VkSurfaceCapabilitiesKHR	surfaceCapabilities{};
 	VkPhysicalDeviceProperties	physicalDeviceProperties;
+
 private:
 	Uint32				graphicsFamilyIndex = 0;
 	std::vector<const char*>	validationLayers;
@@ -65,6 +64,7 @@ private:
 	inline VkPresentModeKHR		GetPresentModeIfAvailable(std::vector<VkPresentModeKHR> &modes, VkPresentModeKHR desired);
 	inline void			Create_framebuffers(std::vector<VkFramebuffer> &framebuffers);
 	inline int			Create_SwapchainImageViews(VkImage image, VkImageView *imageView);
+
 public:
 	inline VkResult	BeginDraw();
 	inline void Create_Semaphores();

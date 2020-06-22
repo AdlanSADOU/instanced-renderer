@@ -15,12 +15,12 @@ struct SwapchainInfo {
 struct Context
 {
 public:
-	SDL_Window			*window = VK_NULL_HANDLE;
-	VkInstance			instance = VK_NULL_HANDLE;
+	SDL_Window		*window = VK_NULL_HANDLE;
+	VkInstance		instance = VK_NULL_HANDLE;
 	VkSurfaceKHR		surface = VK_NULL_HANDLE;
 	VkPhysicalDevice	physicalDevice = VK_NULL_HANDLE;
-	VkQueue				queueGraphics = VK_NULL_HANDLE;
-	VkDevice			device = VK_NULL_HANDLE;
+	VkQueue			queueGraphics = VK_NULL_HANDLE;
+	VkDevice		device = VK_NULL_HANDLE;
 
 	VkCommandPool		commandPool = VK_NULL_HANDLE;
 
@@ -29,49 +29,48 @@ public:
 	VkRenderPass		renderPass = VK_NULL_HANDLE;
 
 	VkPipelineLayout	pipelineLayout = VK_NULL_HANDLE;
-	VkPipeline			pipeline = VK_NULL_HANDLE;
+	VkPipeline		pipeline = VK_NULL_HANDLE;
 
 	VkDescriptorPool	descriptorPool = VK_NULL_HANDLE;
 	VkShaderModule		vertModule = VK_NULL_HANDLE;
 	VkShaderModule		fragModule = VK_NULL_HANDLE;
 
-	std::vector< VkDescriptorSetLayout> descriptorSetLayouts{};
+	std::vector< VkDescriptorSetLayout> 	descriptorSetLayouts{};
 	VkPhysicalDeviceMemoryProperties	deviceMemoryProperties{};
 	std::vector<VkCommandBuffer>		commandBuffers{};
-	std::vector<VkSemaphore>			queueSubmittedSemaphore{};
-	std::vector<VkSemaphore>			imageAcquireSemaphores{};
-	std::vector<VkFence>				inFlightFences{};
-	std::vector<VkFence>				imagesInFlight{};
-	std::vector<char>					vertShaderSPV{};
-	std::vector<char>					fragShaderSPV{};
+	std::vector<VkSemaphore>		queueSubmittedSemaphore{};
+	std::vector<VkSemaphore>		imageAcquireSemaphores{};
+	std::vector<VkFence>			inFlightFences{};
+	std::vector<VkFence>			imagesInFlight{};
+	std::vector<char>			vertShaderSPV{};
+	std::vector<char>			fragShaderSPV{};
 
 	SwapchainInfo				swapchainInfo{};
-	VkViewport					viewport{};
-	VkRect2D					scissor{};
-	size_t						currentFrame = 0;
-	Uint32						swhapchainImageCount = 0;
+	VkViewport				viewport{};
+	VkRect2D				scissor{};
+	size_t					currentFrame = 0;
+	Uint32					swhapchainImageCount = 0;
 	VkClearColorValue			clearColor{ 0.1f, 0.f, 0.f, 1.f };
 	VkClearValue				clearValue{ clearColor };
 
 	VkSurfaceCapabilitiesKHR	surfaceCapabilities{};
 	VkPhysicalDeviceProperties	physicalDeviceProperties;
 private:
-	Uint32
-		graphicsFamilyIndex = 0;
+	Uint32				graphicsFamilyIndex = 0;
 	std::vector<const char*>	validationLayers;
 	std::vector<const char*>	instanceExtensions;
 	VkPhysicalDeviceFeatures	deviceFeatures{};
 
 	inline VkSurfaceFormatKHR	GetSurfaceFormatIfAvailable(std::vector<VkSurfaceFormatKHR> &surfaceFormats);
 	inline VkPresentModeKHR		GetPresentModeIfAvailable(std::vector<VkPresentModeKHR> &modes, VkPresentModeKHR desired);
-	inline void					Create_framebuffers(std::vector<VkFramebuffer> &framebuffers);
-	inline int					Create_SwapchainImageViews(VkImage image, VkImageView *imageView);
+	inline void			Create_framebuffers(std::vector<VkFramebuffer> &framebuffers);
+	inline int			Create_SwapchainImageViews(VkImage image, VkImageView *imageView);
 public:
 	inline VkResult	BeginDraw();
-	inline void		Create_Semaphores();
+	inline void Create_Semaphores();
 	inline VkResult Create_ShaderModule(VkShaderModule *shader_module, std::vector<char> &bytecode);
-	inline int		Load_Shader(char *filepath, std::vector<char> &bytecode);
-	inline void		OnWindowResize();
+	inline int Load_Shader(char *filepath, std::vector<char> &bytecode);
+	inline void OnWindowResize();
 
 	inline int Init_SDL();
 	inline int Create_Window_SDL(const char *title, int x, int y, int w, int h, Uint32 flags);
@@ -307,13 +306,13 @@ inline int Context::Create_Device()
 inline int Context::Create_CommandBuffers()
 {
 	/*
-		VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT – Indicates that command buffers, allocated from this pool,
-		may be reset individually. Normally, without this flag, we can’t rerecord the same command buffer multiple times.
-		It must be reset first. And, what’s more, command buffers created from one pool may be reset only all at once.
+		VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT Â– Indicates that command buffers, allocated from this pool,
+		may be reset individually. Normally, without this flag, we canÂ’t rerecord the same command buffer multiple times.
+		It must be reset first. And, whatÂ’s more, command buffers created from one pool may be reset only all at once.
 		Specifying this flag allows us to reset command buffers individually,
 		and (even better) it is done implicitly by calling the vkBeginCommandBuffer() function.
 
-		VK_COMMAND_POOL_CREATE_TRANSIENT_BIT – This flag tells the driver that command buffers allocated from this pool
+		VK_COMMAND_POOL_CREATE_TRANSIENT_BIT Â– This flag tells the driver that command buffers allocated from this pool
 		will be living for a short amount of time, they will be often recorded and reset (re-recorded).
 		This information helps optimize command buffer allocation and perform it more optimally.
 	*/
@@ -501,7 +500,7 @@ inline int Context::Create_renderPass()
 		but in another way in another subpass (sampling from it), we can create a memory barrier or we can provide a subpass dependency
 		that describes the intended usage of an attachment in these two subpasses.
 		Of course, the latter option is recommended, as the driver can (usually) prepare the barriers in a more optimal way.
-		And the code itself is improved—everything required to understand the code is gathered in one place, one object.
+		And the code itself is improvedÂ—everything required to understand the code is gathered in one place, one object.
 
 		In our simple example, we have only one subpass, but we specify two dependencies.
 		This is because we can (and should) specify dependencies between render passes (by providing the number of a given subpass)
@@ -510,13 +509,13 @@ inline int Context::Create_renderPass()
 		The second dependency is defined for operations occurring inside a subpass and after the render pass.
 	*/
 	std::vector<VkSubpassDependency> dependencies(2);
-	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;                            // uint32_t				srcSubpass – Index of a first (previous) subpass or VK_SUBPASS_EXTERNAL if we want to indicate dependency between subpass and operations outside of a render pass.
-	dependencies[0].dstSubpass = 0;                                              // uint32_t				dstSubpass – Index of a second (later) subpass (or VK_SUBPASS_EXTERNAL).
-	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;           // VkPipelineStageFlags	srcStageMask – Pipeline stage during which a given attachment was used before (in a src subpass).
-	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;  // VkPipelineStageFlags	dstStageMask – Pipeline stage during which a given attachment will be used later (in a dst subpass).
-	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;                      // VkAccessFlags			srcAccessMask – Types of memory operations that occurred in a src subpass or before a render pass.
-	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;           // VkAccessFlags			dstAccessMask – Types of memory operations that occurred in a dst subpass or after a render pass.
-	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;                    // VkDependencyFlags		dependencyFlags – Flag describing the type (region) of dependency.
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;                            // uint32_t				srcSubpass Â– Index of a first (previous) subpass or VK_SUBPASS_EXTERNAL if we want to indicate dependency between subpass and operations outside of a render pass.
+	dependencies[0].dstSubpass = 0;                                              // uint32_t				dstSubpass Â– Index of a second (later) subpass (or VK_SUBPASS_EXTERNAL).
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;           // VkPipelineStageFlags	srcStageMask Â– Pipeline stage during which a given attachment was used before (in a src subpass).
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;  // VkPipelineStageFlags	dstStageMask Â– Pipeline stage during which a given attachment will be used later (in a dst subpass).
+	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;                      // VkAccessFlags			srcAccessMask Â– Types of memory operations that occurred in a src subpass or before a render pass.
+	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;           // VkAccessFlags			dstAccessMask Â– Types of memory operations that occurred in a dst subpass or after a render pass.
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;                    // VkDependencyFlags		dependencyFlags Â– Flag describing the type (region) of dependency.
 
 	dependencies[1].srcSubpass = 0;
 	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;

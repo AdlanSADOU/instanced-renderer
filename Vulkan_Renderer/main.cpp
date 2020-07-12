@@ -14,6 +14,8 @@ int main()
 	ren.Pick_PhysicalDevice();
 	ren.Create_Device();
 	ren.Create_CommandBuffers();
+	ren.Create_DescriptorPool();
+	ren.Create_DescriptorSets();
 	ren.Create_Swapchain();
 	ren.Create_renderPass();
 	ren.Create_Semaphores();
@@ -26,86 +28,27 @@ int main()
 	image.allocate_ImageMemory(ren.device, ren.deviceMemoryProperties, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	image.create_ImageView(ren.device);
 	image.create_Sampler(ren.device);
-	//image.copy_TextureData(ren.device);
-
 	//----------------------------------------------------
-#define NUM_DESCSETS 1
-	std::vector<VkDescriptorPoolSize> poolSizes(NUM_DESCSETS);
-	poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[0].descriptorCount = 1;
 
-	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{};
-	descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descriptorPoolCreateInfo.pNext = NULL;
-	descriptorPoolCreateInfo.flags = 0;
-	descriptorPoolCreateInfo.maxSets = NUM_DESCSETS;
-	descriptorPoolCreateInfo.poolSizeCount = poolSizes.size();
-	descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
-
-	VkDescriptorPool descriptorPool{};
-	vkCreateDescriptorPool(ren.device, &descriptorPoolCreateInfo, NULL, &descriptorPool);
-
-#define	NUM_LAYOUTSETS 1
-	// LAYOUTS ARRAY
-	std::vector<VkDescriptorSetLayout> setLayouts(NUM_LAYOUTSETS);
-
-	// BINDINGS
-	VkDescriptorSetLayoutBinding setLayoutBinding{};
-	setLayoutBinding.binding = 0;
-	setLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	setLayoutBinding.descriptorCount = 1;
-	setLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	setLayoutBinding.pImmutableSamplers = NULL;
-
-	VkDescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
-	setLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	setLayoutCreateInfo.pNext = NULL;
-	setLayoutCreateInfo.flags = 0;
-	setLayoutCreateInfo.bindingCount = 1;
-	setLayoutCreateInfo.pBindings = &setLayoutBinding;
-	vkCreateDescriptorSetLayout(ren.device, &setLayoutCreateInfo, NULL, &setLayouts[0]);
-
-	// SETS
-	VkDescriptorSetAllocateInfo descriptorSetAllocInfo{};
-	descriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	descriptorSetAllocInfo.pNext = NULL;
-	descriptorSetAllocInfo.descriptorPool = descriptorPool;
-	descriptorSetAllocInfo.descriptorSetCount = NUM_DESCSETS;
-	descriptorSetAllocInfo.pSetLayouts = setLayouts.data();
-
-	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-	vkAllocateDescriptorSets(ren.device, &descriptorSetAllocInfo, &descriptorSet);
-
-	VkCopyDescriptorSet copySet{};
-	copySet.sType;
-	copySet.pNext;
-	copySet.srcSet;
-	copySet.srcBinding;
-	copySet.srcArrayElement;
-	copySet.dstSet;
-	copySet.dstBinding;
-	copySet.dstArrayElement;
-	copySet.descriptorCount;
-	
 	VkWriteDescriptorSet writeSet{};
-	writeSet.sType;
-	writeSet.pNext;
-	writeSet.dstSet;
-	writeSet.dstBinding;
-	writeSet.dstArrayElement;
-	writeSet.descriptorCount;
-	writeSet.descriptorType;
-	writeSet.pImageInfo;
-	writeSet.pBufferInfo;
-	writeSet.pTexelBufferView;
+	writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeSet.pNext = NULL;
+	writeSet.dstSet = ren.imageSet;
+	writeSet.dstBinding = 0;
+	writeSet.dstArrayElement = 0;
+	writeSet.descriptorCount = 1;
+	writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writeSet.pImageInfo = &image.imageInfo;
+	writeSet.pBufferInfo = nullptr;
+	writeSet.pTexelBufferView = nullptr;
 
-	//vkUpdateDescriptorSets(ren.device, 1, &writeSet, 1, &copySet);
+	vkUpdateDescriptorSets(ren.device, 1, &writeSet, 0, NULL);
 
 	// ---------------
 	Buffer vertexBuffer;
 	vertexBuffer.create_Buffer(ren.device, ren.deviceMemoryProperties, sizeof(vertex_Data), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	Buffer stagingBuffer; 
+	Buffer stagingBuffer;
 	stagingBuffer.create_Buffer(ren.device, ren.deviceMemoryProperties, sizeof(vertex_Data), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 	stagingBuffer.mapCopyData(vertex_Data, sizeof(vertex_Data));
 	//____________________________________________________
@@ -163,6 +106,8 @@ int main()
 			cmdBeginInfo.pInheritanceInfo;
 			VK_CHECK(vkBeginCommandBuffer(ren.commandBuffers[ren.currentFrame], &cmdBeginInfo));
 
+			image.copy_TextureData(ren.device, ren.commandBuffers[ren.currentFrame], ren.deviceMemoryProperties);
+
 			VkRenderPassBeginInfo renderpassBeginInfo{};
 			renderpassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			renderpassBeginInfo.pNext = NULL;
@@ -209,6 +154,8 @@ int main()
 			vkCmdBeginRenderPass(ren.commandBuffers[ren.currentFrame], &renderpassBeginInfo, subpassContents);
 			vkCmdBindPipeline(ren.commandBuffers[ren.currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, ren.pipeline);
 
+			vkCmdBindDescriptorSets(ren.commandBuffers[ren.currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, ren.pipelineLayout, 0, 1, &ren.imageSet, 0, NULL);
+
 			VkDeviceSize offset = 0;
 			vkCmdBindVertexBuffers(ren.commandBuffers[ren.currentFrame], 0, 1, &vertexBuffer.handle, &offset);
 			vkCmdDraw(ren.commandBuffers[ren.currentFrame], 4, 1, 0, 0);
@@ -235,7 +182,7 @@ int main()
 		VK_CHECK(vkResetFences(ren.device, 1, &ren.inFlightFences[ren.currentFrame]));
 
 		if (vkQueueSubmit(ren.queueGraphics, 1, &submitInfo, ren.inFlightFences[ren.currentFrame]) != VK_SUCCESS) {
-			throw std::runtime_error("failed to submit draw command vertexBuffer!");
+			std::_Xruntime_error("failed to submit draw command vertexBuffer!");
 		}
 
 		VkPresentInfoKHR presentInfo{};

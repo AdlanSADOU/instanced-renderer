@@ -4,6 +4,7 @@
 struct Buffer {
 	VkBuffer handle = VK_NULL_HANDLE;
 	VkDeviceMemory BufferDeviceMemory = VK_NULL_HANDLE;
+	void* BufferMemoryPtr = nullptr;
 	uint32_t size = 0;
 	int getSize() { return size; }
 
@@ -50,7 +51,6 @@ public:
 	}
 
 	void mapCopyData(VertexData(vertex_Data)[], uint32_t array_size) {
-		void *BufferMemoryPtr;
 
 		VK_CHECK(vkMapMemory(this->device, this->BufferDeviceMemory, 0, (array_size), 0, &BufferMemoryPtr));
 		memcpy(BufferMemoryPtr, vertex_Data, (array_size));

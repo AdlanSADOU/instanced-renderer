@@ -1,6 +1,6 @@
 # Vulkan_Renderer
 
-This is my main side project as a CS student to learn how modern GPUs work and acquire a working knowlegde of a new powerful graphics API, namely Vulkan.
+This is my main side project to learn about modern GPUs, how 3D Rendering works and acquire a working knowlegde of a new powerful graphics API, namely Vulkan.
 
 Please keep in mind that this is work in progress.
 Thus, code structure will change frequently and new functionnality will be added as I learn.

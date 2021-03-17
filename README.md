@@ -4,7 +4,6 @@ This is my main side project to learn about modern GPUs, how 3D Rendering works 
 
 Please keep in mind that this is work in progress.
 Thus, code structure will change frequently and new functionnality will be added as I learn.
-I will refactor the code base on each milestone.
 
 
 ## Sources:

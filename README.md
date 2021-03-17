@@ -6,7 +6,7 @@ Please keep in mind that this is work in progress.
 Thus, code structure will change frequently and new functionnality will be added as I learn.
 
 
-<img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="66%" height="66%" class="center">
+<img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="66%" height="66%" style="transform: translate(50%, 0px);">
 
 
 ## Third party headers & libs

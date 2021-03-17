@@ -1,0 +1,326 @@
+/*
+ * MSVC++ Compiler options
+ * https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-by-category?view=msvc-160
+ */
+{
+    "tasks": [
+        { // New debug build
+            "type": "shell",
+            "label": "msvc++: [x64_Debug] build",
+            "command": "cl.exe",
+            "args": [
+                "/std:c++latest",
+                "/DEBUG",
+                "/EHsc",
+                "/MDd",
+                "/W1",
+                // "-W4",
+                "/Zi",
+                "/MP",
+                "/Fe:",
+                "${workspaceFolder}/build/win_debug_x64.exe",
+                "${workspaceFolder}/src/*.cpp",
+                "${workspaceFolder}/src/vkbootstrap/*.cpp",
+                "${workspaceFolder}/vendor/tinyobjloader/tiny_obj_loader.cc",
+                "/I",
+                "C:/VulkanSDK/1.2.135.0/Include", // VulkanSDK Include Path
+                "/I",
+                "${workspaceFolder}/vendor/SDL2/include",
+                "/I",
+                "${workspaceFolder}/vendor/glm",
+                "/I",
+                "${workspaceFolder}/vendor/tinyobjloader",
+                "/I",
+                "${workspaceFolder}/src",
+                "/I",
+                "${workspaceFolder}/src/vkbootstrap",
+                "/I",
+                "${workspaceFolder}/src/vma",
+                "/link",
+                "/verbose:incr",
+                "/time",
+                "/LIBPATH:${workspaceFolder}/vendor/SDL2/lib/x64",
+                "/LIBPATH:C:/VulkanSDK/1.2.135.0/Lib", // path to your VulkanSDK installation
+                "vulkan-1.lib",
+                "SDL2.lib",
+                "SDL2main.lib",
+                "Shell32.lib", // for dragDrop
+                "Ole32.lib",
+                "/SUBSYSTEM:CONSOLE"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": false,
+                "reveal": "silent",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            }
+        },
+        { // New release build
+            "type": "shell",
+            "label": "msvc++: [x64_Release] build",
+            "command": "cl.exe",
+            "args": [
+                "/std:c++latest",
+                "/EHsc",
+                "/MD",
+                "/O2",
+                "/GL",
+                "/MP",
+                "/Fe:",
+                "${workspaceFolder}/build/win_release_x64.exe",
+                "${workspaceFolder}/src/*.cpp",
+                "${workspaceFolder}/src/vkbootstrap/*.cpp",
+                "${workspaceFolder}/vendor/tinyobjloader/tiny_obj_loader.cc",
+                "/I",
+                "C:/VulkanSDK/1.2.135.0/Include", // VulkanSDK Include Path
+                "/I",
+                "${workspaceFolder}/vendor/SDL2/include",
+                "/I",
+                "${workspaceFolder}/vendor/glm",
+                "/I",
+                "${workspaceFolder}/vendor/tinyobjloader",
+                "/I",
+                "${workspaceFolder}/src",
+                "/I",
+                "${workspaceFolder}/src/vkbootstrap",
+                "/I",
+                "${workspaceFolder}/src/vma",
+                "/link",
+                "/verbose:incr",
+                "/time",
+                "/LIBPATH:${workspaceFolder}/vendor/SDL2/lib/x64",
+                "/LIBPATH:C:/VulkanSDK/1.2.135.0/Lib", // path to your VulkanSDK installation
+                "vulkan-1.lib",
+                "SDL2.lib",
+                "SDL2main.lib",
+                "Shell32.lib", // for dragDrop
+                "Ole32.lib",
+                "/SUBSYSTEM:CONSOLE"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": false,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            }
+        },
+        { // Old debug build with precompiled binaries
+            "type": "shell",
+            "label": "msvc++: [x64_Debug] build [OLD]",
+            "command": "cl.exe",
+            "args": [
+                "/DEBUG",
+                "/std:c++latest",
+                "/EHsc",
+                "/MDd",
+                "/Zi",
+                "/MP",
+                "/Fe:",
+                "${workspaceFolder}/build/win_debug_old_x64.exe",
+                "${workspaceFolder}/src/*.cpp",
+                "/I",
+                "${workspaceFolder}/include/",
+                "/I",
+                "${workspaceFolder}/include/imgui/",
+                "/I",
+                "${workspaceFolder}/vendor/SFML_x64/SFML-2.5.1/include",
+                "/link",
+                "/verbose:incr",
+                "/time",
+                "/LIBPATH:${workspaceFolder}/vendor/SFML_x64/SFML-2.5.1/lib/",
+                //"flac.lib","freetype.lib", "ogg.lib", "openal32.lib",
+                "opengl32.lib",
+                "sfml-window-d.lib",
+                "sfml-system-d.lib",
+                "sfml-graphics-d.lib",
+                "sfml-audio-d.lib",
+                "sfml-network-d.lib",
+                "/SUBSYSTEM:CONSOLE"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            }
+        },
+        {
+            "type": "shell",
+            "label": "msvc++: Server x64 debug build",
+            "command": "cl.exe",
+            "args": [
+                "/DEBUG",
+                "/Zi",
+                "/EHsc",
+                "/std:c++latest",
+                "/MDd",
+                "/MP",
+                "/Fe:",
+                "${workspaceFolder}/server/build/x64_Debug/server.exe",
+                "${workspaceFolder}/server/src/*.cpp",
+                "/I",
+                "${workspaceFolder}/server/include/",
+                "/I",
+                "${workspaceFolder}/vendor/SFML_x64/SFML-2.5.1/include",
+                "/link",
+                "/verbose:incr",
+                "/time",
+                "/LIBPATH:${workspaceFolder}/vendor/SFML_x64/SFML-2.5.1/lib/",
+                "sfml-system-d.lib",
+                "sfml-network-d.lib",
+                "/SUBSYSTEM:CONSOLE"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/server"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            }
+        },
+        { // Linux gcc build
+            "type": "shell",
+            "label": "gcc: [x64_Debug] build",
+            "command": "g++",
+            "args": [
+                "-fpermissive",
+                "-o",
+                "${workspaceFolder}/build/linux_debug_x64",
+                "${workspaceFolder}/src/*.cpp",
+                "-I",
+                "${workspaceFolder}/include/",
+                "-I",
+                "${workspaceFolder}/include/imgui/",
+                "-I",
+                "${workspaceFolder}/vendor/SFML_x64/SFML/include",
+                "-L",
+                "${workspaceFolder}/vendor/SFML_x64/SFML/x64_Linux_gcc/debug/",
+                //"flac.lib","freetype.lib", "ogg.lib", "openal32.lib",
+                // "opengl.so",
+                //  "-lopengl32",
+                "-lGL",
+                "-lGLU",
+                "-lglut",
+                "-lsfml-window-d",
+                "-lsfml-system-d",
+                "-lsfml-graphics-d",
+                "-lsfml-audio-d",
+                "-lsfml-network-d",
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            }
+        },
+        { // Linux gcc build
+            "type": "shell",
+            "label": "gcc: [x64 Release] build",
+            "command": "g++",
+            "args": [
+                "-fpermissive",
+                "-o",
+                "${workspaceFolder}/build/linux_release_x64",
+                "${workspaceFolder}/src/*.cpp",
+                "-I",
+                "${workspaceFolder}/include/",
+                "-I",
+                "${workspaceFolder}/include/imgui/",
+                "-I",
+                "${workspaceFolder}/vendor/SFML_x64/SFML/include",
+                "-L",
+                "${workspaceFolder}/vendor/SFML_x64/SFML/x64_Linux_gcc/release/",
+                //"flac.lib","freetype.lib", "ogg.lib", "openal32.lib",
+                // "opengl.so",
+                //  "-lopengl32",
+                "-lGL",
+                "-lGLU",
+                "-lglut",
+                "-lsfml-window-d",
+                "-lsfml-system-d",
+                "-lsfml-graphics-d",
+                "-lsfml-audio-d",
+                "-lsfml-network-d",
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            }
+        },
+    ],
+    "version": "2.0.0"
+}

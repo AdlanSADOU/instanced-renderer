@@ -30,7 +30,7 @@ using namespace std;
         }                                                               \
     } while (0)
 
-void VulkanEngine::init()
+void VulkanRenderer::init()
 {
     SDL_Init(SDL_INIT_VIDEO);
 
@@ -63,7 +63,7 @@ void VulkanEngine::init()
 // #undef _DEBUG
 // #endif // _DEBUG
 
-void VulkanEngine::init_vulkan()
+void VulkanRenderer::init_vulkan()
 {
     vkb::InstanceBuilder builder;
 
@@ -77,6 +77,9 @@ void VulkanEngine::init_vulkan()
                         .use_default_debug_messenger()
                         .build();
 
+    //
+    // Instance / Surface / Physical Device selection
+    //
     vkb::Instance vkb_inst = inst_ret.value();
     _instance              = vkb_inst.instance;
     _debug_messenger       = vkb_inst.debug_messenger;
@@ -90,16 +93,24 @@ void VulkanEngine::init_vulkan()
                                              .select()
                                              .value();
 
+    //
+    // Device
+    //
     vkb::DeviceBuilder deviceBuilder{physicalDevice};
     vkb::Device        vkbDevice = deviceBuilder.build().value();
 
     _device    = vkbDevice.device;
     _chosenGPU = physicalDevice.physical_device;
 
-    // use vkbootstrap to get a Graphics queue
+    //
+    // Graphics queue
+    //
     _graphicsQueue       = vkbDevice.get_queue(vkb::QueueType::graphics).value();
     _graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
+    //
+    // Allocator
+    //
     VmaAllocatorCreateInfo allocatorInfo = {};
 
     allocatorInfo.physicalDevice = _chosenGPU;
@@ -108,7 +119,7 @@ void VulkanEngine::init_vulkan()
     vmaCreateAllocator(&allocatorInfo, &_allocator);
 }
 
-void VulkanEngine::init_swapchain()
+void VulkanRenderer::init_swapchain()
 {
     vkb::SwapchainBuilder swapchainBuilder{_chosenGPU, _device, _surface};
 
@@ -162,7 +173,7 @@ void VulkanEngine::init_swapchain()
     });
 }
 
-void VulkanEngine::init_commands()
+void VulkanRenderer::init_commands()
 {
 
     //
@@ -188,7 +199,7 @@ void VulkanEngine::init_commands()
     }
 }
 
-void VulkanEngine::init_default_renderpass()
+void VulkanRenderer::init_default_renderpass()
 {
 
     //
@@ -256,7 +267,7 @@ void VulkanEngine::init_default_renderpass()
     });
 }
 
-void VulkanEngine::init_framebuffers()
+void VulkanRenderer::init_framebuffers()
 {
 
     //
@@ -297,7 +308,7 @@ void VulkanEngine::init_framebuffers()
     }
 }
 
-void VulkanEngine::init_sync_structures()
+void VulkanRenderer::init_sync_structures()
 {
 
     //
@@ -333,7 +344,7 @@ void VulkanEngine::init_sync_structures()
     }
 }
 
-bool VulkanEngine::load_shader_module(const char *filepath, VkShaderModule *outShaderModule)
+bool VulkanRenderer::load_shader_module(const char *filepath, VkShaderModule *outShaderModule)
 {
     std::ifstream file(filepath, std::ios::ate | std::ios::binary);
 
@@ -368,7 +379,7 @@ bool VulkanEngine::load_shader_module(const char *filepath, VkShaderModule *outS
     return true;
 }
 
-void VulkanEngine::init_descriptors()
+void VulkanRenderer::init_descriptors()
 {
 
     //create a descriptor pool that will hold 10 uniform buffers
@@ -451,7 +462,7 @@ void VulkanEngine::init_descriptors()
     }
 }
 
-void VulkanEngine::init_pipelines()
+void VulkanRenderer::init_pipelines()
 {
     //
     // ShaderModule loading
@@ -615,7 +626,7 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
     }
 }
 
-void VulkanEngine::load_meshes()
+void VulkanRenderer::load_meshes()
 {
 
     Mesh _triangleMesh;
@@ -640,7 +651,7 @@ void VulkanEngine::load_meshes()
     _meshes["triangle"] = _triangleMesh;
 }
 
-void VulkanEngine::upload_mesh(Mesh &mesh)
+void VulkanRenderer::upload_mesh(Mesh &mesh)
 {
     //allocate vertex buffer
     VkBufferCreateInfo bufferInfo = {};
@@ -672,7 +683,7 @@ void VulkanEngine::upload_mesh(Mesh &mesh)
     });
 }
 
-Material *VulkanEngine::create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name)
+Material *VulkanRenderer::create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name)
 {
     Material mat;
     mat.pipeline       = pipeline;
@@ -681,7 +692,7 @@ Material *VulkanEngine::create_material(VkPipeline pipeline, VkPipelineLayout la
     return &_materials[name];
 }
 
-Material *VulkanEngine::get_material(const std::string &name)
+Material *VulkanRenderer::get_material(const std::string &name)
 {
     //search for the object, and return nullpointer if not found
     auto it = _materials.find(name);
@@ -692,7 +703,7 @@ Material *VulkanEngine::get_material(const std::string &name)
     }
 }
 
-Mesh *VulkanEngine::get_mesh(const std::string &name)
+Mesh *VulkanRenderer::get_mesh(const std::string &name)
 {
     auto it = _meshes.find(name);
     if (it == _meshes.end()) {
@@ -702,7 +713,7 @@ Mesh *VulkanEngine::get_mesh(const std::string &name)
     }
 }
 
-void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int count)
+void VulkanRenderer::draw_objects(VkCommandBuffer cmd, RenderObject *first, int count)
 {
     //make a model view matrix for rendering the object
     //camera view
@@ -763,7 +774,7 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject *first, int co
     }
 }
 
-void VulkanEngine::init_scene()
+void VulkanRenderer::init_scene()
 {
     RenderObject monkey;
     monkey.mesh            = get_mesh("monkey");
@@ -790,7 +801,7 @@ void VulkanEngine::init_scene()
     SDL_Log("%d objects", count);
 }
 
-RenderObject *VulkanEngine::get_renderable(std::string name)
+RenderObject *VulkanRenderer::get_renderable(std::string name)
 {
     for (size_t i = 0; i < _renderables.size(); i++) {
         if (_renderables[i].mesh == get_mesh(name))
@@ -799,12 +810,12 @@ RenderObject *VulkanEngine::get_renderable(std::string name)
     return nullptr;
 }
 
-FrameData &VulkanEngine::get_current_frame()
+FrameData &VulkanRenderer::get_current_frame()
 {
     return _frames[_frameNumber % FRAME_OVERLAP];
 }
 
-AllocatedBuffer VulkanEngine::create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+AllocatedBuffer VulkanRenderer::create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
 {
     //allocate vertex buffer
     VkBufferCreateInfo bufferInfo = {};
@@ -831,7 +842,7 @@ AllocatedBuffer VulkanEngine::create_buffer(size_t allocSize, VkBufferUsageFlags
     return newBuffer;
 }
 
-void VulkanEngine::cleanup()
+void VulkanRenderer::cleanup()
 {
     if (_isInitialized) {
         vkWaitForFences(_device, 1, &_frames[0]._renderFence, true, 1000000000);
@@ -849,7 +860,7 @@ void VulkanEngine::cleanup()
     }
 }
 
-void VulkanEngine::draw()
+void VulkanRenderer::draw()
 {
     //wait until the GPU has finished rendering the last frame. Timeout of 1 second
     VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
@@ -951,7 +962,7 @@ void VulkanEngine::draw()
     _frameNumber++;
 }
 
-void VulkanEngine::run()
+void VulkanRenderer::run()
 {
     SDL_Event e;
     bool      bQuit = false;

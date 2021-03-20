@@ -69,7 +69,7 @@ struct DeletionQueue {
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
-class VulkanEngine
+class VulkanRenderer
 {
   public:
     bool _isInitialized{false};

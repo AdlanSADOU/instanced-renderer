@@ -1,4 +1,4 @@
-# Vulkan_Renderer
+# Vulkan Renderer
 
 This is my main side project to learn about modern GPUs, how 3D Rendering works and acquire a working knowlegde of a new powerful graphics API, namely Vulkan.
 

@@ -1,10 +1,5 @@
 # Vulkan Renderer
-
-This is my main side project to learn about modern GPUs, how 3D Rendering works and acquire a working knowlegde of a new powerful graphics API, namely Vulkan.
-
-Please keep in mind that this is work in progress.
-Thus, code structure will change frequently and new functionnality will be added as I learn.
-
+Little project to explore Vulkan. 
 
 <img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="44%" height="44%">
 

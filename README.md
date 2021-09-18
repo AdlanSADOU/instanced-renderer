@@ -1,5 +1,4 @@
-# Vulkan Renderer
-Little project to explore Vulkan. 
+Little project to experiment with Vulkan. 
 
 <img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="44%" height="44%">
 

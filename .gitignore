@@ -1,18 +1,8 @@
-/*.obj
-*.pdb
-*.ilk
-*.exe
 
-build/*.obj
-build/*.pdb
-build/*.ilk
-
-build/sample.exe
-
-build/x64_Debug/sample.exe
-
+[Bb]uild/*.obj
+[Bb]uild/*.pdb
+[Bb]uild/*.ilk
+[Bb]uild/*.exe
 
 *.zip
-client/build/win_debug_x64/client.exe
-
 *.spv

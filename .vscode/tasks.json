@@ -22,6 +22,7 @@
                 "${workspaceFolder}/src/*.cpp",
                 "${workspaceFolder}/src/vkbootstrap/*.cpp",
                 "${workspaceFolder}/vendor/tinyobjloader/tiny_obj_loader.cc",
+
                 "/I",
                 "C:/VulkanSDK/1.2.135.0/Include", // VulkanSDK Include Path
                 "/I",
@@ -36,6 +37,8 @@
                 "${workspaceFolder}/src/vkbootstrap",
                 "/I",
                 "${workspaceFolder}/src/vma",
+
+                //
                 "/link",
                 "/verbose:incr",
                 "/time",
@@ -49,7 +52,7 @@
                 "/SUBSYSTEM:CONSOLE"
             ],
             "options": {
-                "cwd": "${workspaceFolder}"
+                "cwd": "${workspaceFolder}/build"
             },
             "problemMatcher": [
                 "$msCompile"

@@ -6,15 +6,15 @@
     "configurations": [
 
         {
-            "name": "Debug Client",
+            "name": "Debug",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}//build/win_debug_x64.exe",
+            "program": "${workspaceFolder}/build/win_debug_x64.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/",
             "environment": [],
-            "console":"externalTerminal",
+            "console":"newExternalWindow",
             // "preLaunchTask": "C/C++: x64 Debug Build"
         },
 

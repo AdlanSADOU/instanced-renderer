@@ -469,7 +469,7 @@ void VulkanRenderer::init_pipelines()
     //
     VkShaderModule vertexShader;
     if (!load_shader_module("../shaders/triangleMesh.vert.spv", &vertexShader)) {
-        std::cout << "Error when building the vertex shader module" << std::endl;
+        std::cout << "Error when building the vertex shader module. Did you compile the shaders?" << std::endl;
 
     } else {
         std::cout << "fragment shader succesfully loaded" << std::endl;
@@ -477,7 +477,7 @@ void VulkanRenderer::init_pipelines()
 
     VkShaderModule fragmentShader;
     if (!load_shader_module("../shaders/coloredTriangle.frag.spv", &fragmentShader)) {
-        std::cout << "Error when building the fragment shader module" << std::endl;
+        std::cout << "Error when building the fragment shader module. Did you compile the shaders?" << std::endl;
     } else {
         std::cout << "vertex fragment shader succesfully loaded" << std::endl;
     }

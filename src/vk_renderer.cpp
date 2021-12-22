@@ -17,10 +17,69 @@
 #include <iomanip>
 #include <iostream>
 
+struct SDL_Window *_window { nullptr };
+
+//
+// Vulkan Context
+//
+VkInstance               _instance;
+VkDebugUtilsMessengerEXT _debug_messenger;
+VkPhysicalDevice         _chosenGPU;
+VkDevice                 _device;
+VkSurfaceKHR             _surface;
+
+//
+// Swapchain
+//
+VkSwapchainKHR           _swapchain;
+VkFormat                 _swapchainImageFormat; // image format expected by the windowing system
+std::vector<VkImage>     _swapchainImages;
+std::vector<VkImageView> _swapchainImageViews;
+
+uint32_t _graphicsQueueFamily; // family of that queue
+VkQueue  _graphicsQueue; // queue we will submit to
+
+FrameData _frames[FRAME_OVERLAP];
+
+//
+// Descriptor sets
+//
+VkDescriptorSetLayout _globalSetLayout;
+VkDescriptorPool      _descriptorPool;
+
+//
+// RenderPass & Framebuffers
+//
+VkRenderPass               _renderPass; // created before renderpass
+std::vector<VkFramebuffer> _framebuffers; // these are created for a specific renderpass
+
+VkImageView    _depthImageView;
+AllocatedImage _depthImage;
+VkFormat       _depthFormat;
+
+DeletionQueue _mainDeletionQueue;
+
+VmaAllocator _allocator;
+
+// default array of renderable objects
+std::vector<RenderObject> _renderables;
+
+std::unordered_map<std::string, Material> _materials;
+std::unordered_map<std::string, Mesh>     _meshes;
+
+bool _isInitialized { false };
+int  _frameNumber { 0 };
+
+VkExtent2D _windowExtent { 1700, 900 };
+bool       _up = false, _down = false, _left = false, _right = false;
+bool       _W = false, _S = false, _A = false, _D = false;
+float      camera_x = 0, camera_y = 0, camera_z = 0;
+
 // we want to immediately abort when there is an error.
 //  In normal engines this would give an error message to the user
 //  or perform a dump of state.
 using namespace std;
+
 #define VK_CHECK(x)                                                     \
     do {                                                                \
         VkResult err = x;                                               \
@@ -30,7 +89,7 @@ using namespace std;
         }                                                               \
     } while (0)
 
-void VulkanRenderer::init()
+void init()
 {
     SDL_Init(SDL_INIT_VIDEO);
 
@@ -43,28 +102,7 @@ void VulkanRenderer::init()
                              _windowExtent.height,
                              window_flags);
 
-    init_vulkan();
-    init_swapchain();
-    init_commands();
-    init_default_renderpass();
-    init_framebuffers();
-    init_sync_structures();
-    init_descriptors();
-    init_pipelines();
-
-    load_meshes();
-
-    init_scene();
-
-    _isInitialized = true;
-}
-
-// #if defined(_DEBUG)
-// #undef _DEBUG
-// #endif // _DEBUG
-
-void VulkanRenderer::init_vulkan()
-{
+    // Vulkan Initialization
     vkb::InstanceBuilder builder;
 
     auto inst_ret = builder.set_app_name("Awesome Vulkan App")
@@ -117,10 +155,8 @@ void VulkanRenderer::init_vulkan()
     allocatorInfo.device         = _device;
     allocatorInfo.instance       = _instance;
     vmaCreateAllocator(&allocatorInfo, &_allocator);
-}
 
-void VulkanRenderer::init_swapchain()
-{
+    // Swapchain creation
     vkb::SwapchainBuilder swapchainBuilder { _chosenGPU, _device, _surface };
 
     vkb::Swapchain vkbSwapchain = swapchainBuilder
@@ -172,10 +208,6 @@ void VulkanRenderer::init_swapchain()
         vkDestroyImageView(_device, _depthImageView, nullptr);
         vmaDestroyImage(_allocator, _depthImage._image, _depthImage._allocation);
     });
-}
-
-void VulkanRenderer::init_commands()
-{
 
     //
     // CommandPools & CommandBuffers creation
@@ -198,11 +230,8 @@ void VulkanRenderer::init_commands()
             vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
         });
     }
-}
 
-void VulkanRenderer::init_default_renderpass()
-{
-
+    // Default renderpass
     //
     // Color attachment
     //
@@ -266,10 +295,6 @@ void VulkanRenderer::init_default_renderpass()
     _mainDeletionQueue.push_function([=]() {
         vkDestroyRenderPass(_device, _renderPass, nullptr);
     });
-}
-
-void VulkanRenderer::init_framebuffers()
-{
 
     //
     // Framebuffer initialization
@@ -287,7 +312,7 @@ void VulkanRenderer::init_framebuffers()
 
     // grab how many images we have in the swapchain
     const size_t swapchain_imagecount = _swapchainImages.size();
-    _framebuffers                       = std::vector<VkFramebuffer>(swapchain_imagecount);
+    _framebuffers                     = std::vector<VkFramebuffer>(swapchain_imagecount);
 
     // create framebuffers for each of the swapchain image views
     for (size_t i = 0; i < swapchain_imagecount; i++) {
@@ -307,11 +332,8 @@ void VulkanRenderer::init_framebuffers()
             vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
         });
     }
-}
-
-void VulkanRenderer::init_sync_structures()
-{
-
+    ////////////////////////////////////////////////////////////////
+    // Sync structures
     //
     // Fence creation
     //
@@ -343,45 +365,9 @@ void VulkanRenderer::init_sync_structures()
             vkDestroySemaphore(_device, _frames[i]._renderSemaphore, nullptr);
         });
     }
-}
 
-bool VulkanRenderer::load_shader_module(const char *filepath, VkShaderModule *outShaderModule)
-{
-    std::ifstream file(filepath, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) return false;
-
-    // find what the size of the file is by looking up the location of the cursor
-    // because the cursor is at the end, it gives the size directly in bytes
-    size_t fileSize = (size_t)file.tellg();
-
-    // spirv expects the buffer to be on uint32, so make sure to reserve an int vector big enough for the entire file
-    std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
-
-    file.seekg(0);
-    file.read((char *)buffer.data(), fileSize);
-    file.close();
-
-    // create a new shader module, using the buffer we loaded
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.pNext                    = nullptr;
-
-    // codeSize has to be in bytes, so multply the ints in the buffer by size of int to know the real size of the buffer
-    createInfo.codeSize = buffer.size() * sizeof(uint32_t);
-    createInfo.pCode    = buffer.data();
-
-    // check that the creation goes well.
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(_device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-        return false;
-    }
-    *outShaderModule = shaderModule;
-    return true;
-}
-
-void VulkanRenderer::init_descriptors()
-{
+    /////////////////////////////////////////////////////
+    // Descriptors
 
     // create a descriptor pool that will hold 10 uniform buffers
     std::vector<VkDescriptorPoolSize> sizes = {
@@ -461,10 +447,10 @@ void VulkanRenderer::init_descriptors()
 
         vkUpdateDescriptorSets(_device, 1, &setWrite, 0, nullptr);
     }
-}
 
-void VulkanRenderer::init_pipelines()
-{
+    //////////////////////////////////////////////////////
+    // Pipeline
+
     //
     // ShaderModule loading
     //
@@ -566,6 +552,55 @@ void VulkanRenderer::init_pipelines()
         vkDestroyPipeline(_device, pipeline, nullptr);
         vkDestroyPipelineLayout(_device, pipelineLayout, nullptr);
     });
+
+    load_meshes();
+
+    init_scene();
+
+    _isInitialized = true;
+}
+
+bool load_shader_module(const char *filepath, VkShaderModule *outShaderModule)
+{
+    std::ifstream file(filepath, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open()) return false;
+
+    // find what the size of the file is by looking up the location of the cursor
+    // because the cursor is at the end, it gives the size directly in bytes
+    size_t fileSize = (size_t)file.tellg();
+
+    // spirv expects the buffer to be on uint32, so make sure to reserve an int vector big enough for the entire file
+    std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
+
+    file.seekg(0);
+    file.read((char *)buffer.data(), fileSize);
+    file.close();
+
+    // create a new shader module, using the buffer we loaded
+    VkShaderModuleCreateInfo createInfo = {};
+    createInfo.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.pNext                    = nullptr;
+
+    // codeSize has to be in bytes, so multply the ints in the buffer by size of int to know the real size of the buffer
+    createInfo.codeSize = buffer.size() * sizeof(uint32_t);
+    createInfo.pCode    = buffer.data();
+
+    // check that the creation goes well.
+    VkShaderModule shaderModule;
+    if (vkCreateShaderModule(_device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+        return false;
+    }
+    *outShaderModule = shaderModule;
+    return true;
+}
+
+void init_descriptors()
+{
+}
+
+void init_pipelines()
+{
 }
 
 VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
@@ -628,7 +663,7 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
     }
 }
 
-void VulkanRenderer::load_meshes()
+void load_meshes()
 {
     Mesh _triangleMesh;
     _triangleMesh._vertices.resize(3);
@@ -652,7 +687,7 @@ void VulkanRenderer::load_meshes()
     _meshes["triangle"] = _triangleMesh;
 }
 
-void VulkanRenderer::create_mesh(Mesh &mesh)
+void create_mesh(Mesh &mesh)
 {
     // allocate vertex buffer
     VkBufferCreateInfo bufferInfo = {};
@@ -684,7 +719,7 @@ void VulkanRenderer::create_mesh(Mesh &mesh)
     });
 }
 
-Material *VulkanRenderer::create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name)
+Material *create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name)
 {
     Material mat;
     mat.pipeline       = pipeline;
@@ -693,7 +728,7 @@ Material *VulkanRenderer::create_material(VkPipeline pipeline, VkPipelineLayout 
     return &_materials[name];
 }
 
-Material *VulkanRenderer::get_material(const std::string &name)
+Material *get_material(const std::string &name)
 {
     // search for the object, and return nullpointer if not found
     auto it = _materials.find(name);
@@ -704,7 +739,7 @@ Material *VulkanRenderer::get_material(const std::string &name)
     }
 }
 
-Mesh *VulkanRenderer::get_mesh(const std::string &name)
+Mesh *get_mesh(const std::string &name)
 {
     auto it = _meshes.find(name);
     if (it == _meshes.end()) {
@@ -714,7 +749,7 @@ Mesh *VulkanRenderer::get_mesh(const std::string &name)
     }
 }
 
-void VulkanRenderer::draw_objects(VkCommandBuffer cmd, RenderObject *first, int count)
+void draw_objects(VkCommandBuffer cmd, RenderObject *first, int count)
 {
     // make a model view matrix for rendering the object
     // camera view
@@ -776,14 +811,14 @@ void VulkanRenderer::draw_objects(VkCommandBuffer cmd, RenderObject *first, int 
     }
 }
 
-void VulkanRenderer::init_scene()
+void init_scene()
 {
     RenderObject monkey;
     monkey.mesh            = get_mesh("monkey");
     monkey.material        = get_material("defaultmesh");
     monkey.transformMatrix = glm::mat4 { 1.0f };
 
-    int count              = 0;
+    int count = 0;
     _renderables.push_back(monkey);
 
     for (int x = -10; x <= 10; x++) {
@@ -805,7 +840,7 @@ void VulkanRenderer::init_scene()
     SDL_Log("%d objects", count);
 }
 
-RenderObject *VulkanRenderer::get_renderable(std::string name)
+RenderObject *get_renderable(std::string name)
 {
     for (size_t i = 0; i < _renderables.size(); i++) {
         if (_renderables[i].mesh == get_mesh(name))
@@ -814,12 +849,12 @@ RenderObject *VulkanRenderer::get_renderable(std::string name)
     return nullptr;
 }
 
-FrameData &VulkanRenderer::get_current_frame()
+FrameData &get_current_frame()
 {
     return _frames[_frameNumber % FRAME_OVERLAP];
 }
 
-AllocatedBuffer VulkanRenderer::create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
 {
     // allocate vertex buffer
     VkBufferCreateInfo bufferInfo = {};
@@ -846,7 +881,7 @@ AllocatedBuffer VulkanRenderer::create_buffer(size_t allocSize, VkBufferUsageFla
     return newBuffer;
 }
 
-void VulkanRenderer::cleanup()
+void cleanup()
 {
     if (_isInitialized) {
         vkWaitForFences(_device, 1, &_frames[0]._renderFence, true, 1000000000);
@@ -864,7 +899,7 @@ void VulkanRenderer::cleanup()
     }
 }
 
-void VulkanRenderer::draw()
+void draw()
 {
     // wait until the GPU has finished rendering the last frame. Timeout of 1 second
     VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
@@ -966,7 +1001,7 @@ void VulkanRenderer::draw()
     _frameNumber++;
 }
 
-void VulkanRenderer::run()
+void run()
 {
     SDL_Event e;
     bool      bQuit = false;

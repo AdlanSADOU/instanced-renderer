@@ -4,10 +4,6 @@
 #if !defined(VK_RENDERER)
 #define VK_RENDERER
 
-
-
-
-
 #include <deque>
 #include <functional>
 #include <glm/glm.hpp>
@@ -18,6 +14,8 @@
 
 #include <vk_types.h>
 
+#define SECONDS(value) (1000000000 * value)
+
 struct GPUCameraData
 {
     glm::mat4 view;
@@ -27,11 +25,11 @@ struct GPUCameraData
 
 struct FrameData
 {
-    VkSemaphore _presentSemaphore, _renderSemaphore;
-    VkFence     _renderFence;
+    VkSemaphore present_semaphore, render_semaphore;
+    VkFence     render_fence;
 
     VkCommandPool   _commandPool;
-    VkCommandBuffer _mainCommandBuffer;
+    VkCommandBuffer main_command_buffer;
 
     AllocatedBuffer cameraBuffer;
     VkDescriptorSet globalDescriptor;
@@ -78,24 +76,24 @@ struct DeletionQueue
     }
 };
 
-void load_meshes();
-void create_mesh(Mesh &mesh);
+static void load_meshes();
+static void create_mesh(Mesh &mesh);
 
 // create material and add it to the map
-Material       *create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name);
-Material       *get_material(const std::string &name);
-Mesh           *get_mesh(const std::string &name);
-RenderObject   *get_renderable(std::string name);
-bool            load_shader_module(const char *filepath, VkShaderModule *outShaderModule);
-FrameData      &get_current_frame();
-AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-void            draw_objects(VkCommandBuffer cmd, RenderObject *first, int count);
-void            init_scene();
+static Material     *create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name);
+static Material     *get_material(const std::string &name);
+static Mesh         *get_mesh(const std::string &name);
+static RenderObject *get_renderable(std::string name);
+static bool          load_shader_module(const char *filepath, VkShaderModule *outShaderModule);
+static FrameData    &frame_current_get();
+static void          create_buffer(AllocatedBuffer *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+static void          draw_objects(VkCommandBuffer cmd, RenderObject *first, int count);
+static void          init_scene();
 
-void init();
-void cleanup();
-void draw();
-void run();
+void vk_Init();
+void vk_Render();
+void UpdateAndRender();
+void vk_Cleanup();
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 

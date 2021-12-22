@@ -2,9 +2,10 @@
 
 int main(int argc, char *argv[])
 {
-    init();
-    run();
-    cleanup();
+    vk_Init();
+    vk_Render();
+    UpdateAndRender();
+    vk_Cleanup();
 
     return 0;
 }

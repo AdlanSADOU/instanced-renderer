@@ -13,7 +13,7 @@
                 "/DEBUG",
                 "/EHsc",
                 "/MDd",
-                "/W1",
+                "/W3",
                 // "-W4",
                 "/Zi",
                 "/MP",
@@ -24,7 +24,7 @@
                 "${workspaceFolder}/vendor/tinyobjloader/tiny_obj_loader.cc",
 
                 "/I",
-                "C:/VulkanSDK/1.2.135.0/Include", // VulkanSDK Include Path
+                "C:/VulkanSDK/1.2.198.1/Include", // VulkanSDK Include Path
                 "/I",
                 "${workspaceFolder}/vendor/SDL2/include",
                 "/I",
@@ -43,7 +43,7 @@
                 "/verbose:incr",
                 "/time",
                 "/LIBPATH:${workspaceFolder}/vendor/SDL2/lib/x64",
-                "/LIBPATH:C:/VulkanSDK/1.2.135.0/Lib", // path to your VulkanSDK installation
+                "/LIBPATH:C:/VulkanSDK/1.2.198.1/Lib", // path to your VulkanSDK installation
                 "vulkan-1.lib",
                 "SDL2.lib",
                 "SDL2main.lib",
@@ -87,7 +87,7 @@
                 "${workspaceFolder}/src/vkbootstrap/*.cpp",
                 "${workspaceFolder}/vendor/tinyobjloader/tiny_obj_loader.cc",
                 "/I",
-                "C:/VulkanSDK/1.2.135.0/Include", // VulkanSDK Include Path
+                "C:/VulkanSDK/1.2.198.1/Include", // VulkanSDK Include Path
                 "/I",
                 "${workspaceFolder}/vendor/SDL2/include",
                 "/I",
@@ -104,7 +104,7 @@
                 "/verbose:incr",
                 "/time",
                 "/LIBPATH:${workspaceFolder}/vendor/SDL2/lib/x64",
-                "/LIBPATH:C:/VulkanSDK/1.2.135.0/Lib", // path to your VulkanSDK installation
+                "/LIBPATH:C:/VulkanSDK/1.2.198.1/Lib", // path to your VulkanSDK installation
                 "vulkan-1.lib",
                 "SDL2.lib",
                 "SDL2main.lib",

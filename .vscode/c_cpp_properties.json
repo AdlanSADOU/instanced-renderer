@@ -6,9 +6,9 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/src/vkbootstrap/**",
                 "${workspaceFolder}/src/vma/**",
-                "${workspaceFolder}/vendor/SDL2/include/",
-                "${workspaceFolder}/vendor/glm/",
-                "C:/VulkanSDK/1.2.135.0/Include"
+                "${workspaceFolder}/vendor/SDL2/include/**",
+                "${workspaceFolder}/vendor/glm/**",
+                "C:/VulkanSDK/1.2.198.1/Include"
             ],
             "defines": [
                 "_DEBUG",

@@ -1,10 +1,6 @@
 ﻿
 #include "vk_renderer.h"
 
-#include <SDL.h>
-#include <SDL_vulkan.h>
-#include <glm/gtx/transform.hpp>
-
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
@@ -17,16 +13,17 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <time.h>
+
 
 SDL_Window *g_window = NULL;
 
 //
-// Vulkan Context
+// Vulkan initialization phase types
 //
 VkInstance               g_instance;
 VkDebugUtilsMessengerEXT g_debug_messenger;
 VkPhysicalDevice         g_chosen_gpu;
-VkDevice                 g_device;
 VkSurfaceKHR             g_surface;
 
 //
@@ -42,11 +39,15 @@ VkQueue  _graphicsQueue; // queue we will submit to
 
 FrameData g_frames[FRAME_OVERLAP];
 
+VkDevice              g_device;
+VkPipeline            g_default_pipeline;
+VkPipelineLayout      g_default_pipeline_layout;
+VkDescriptorSetLayout g_global_set_layout;
+
 //
 // Descriptor sets
 //
-VkDescriptorSetLayout g_global_set_layout;
-VkDescriptorPool      g_descriptor_pool;
+VkDescriptorPool g_descriptor_pool;
 
 //
 // RenderPass & Framebuffers
@@ -58,8 +59,7 @@ VkImageView    g_depth_image_view;
 AllocatedImage g_depth_image;
 VkFormat       g_depth_format;
 
-DeletionQueue g_main_deletion_queue;
-
+ReleaseQueue g_main_deletion_queue;
 VmaAllocator g_allocator;
 
 // default array of renderable objects
@@ -72,23 +72,11 @@ bool     g_is_initialized     = false;
 uint64_t g_frame_idx_inflight = 0;
 
 VkExtent2D g_window_extent { 1700, 900 };
-bool       _up = false, _down = false, _left = false, _right = false;
-bool       _W = false, _S = false, _A = false, _D = false;
-float      camera_x = 0, camera_y = 0, camera_z = 0;
 
 // we want to immediately abort when there is an error.
 //  In normal engines this would give an error message to the user
 //  or perform a dump of state.
 using namespace std;
-
-#define VK_CHECK(x)                                  \
-    do {                                             \
-        VkResult err = x;                            \
-        if (err) {                                   \
-            SDL_Log("Detected Vulkan error: ", err); \
-            abort();                                 \
-        }                                            \
-    } while (0)
 
 void vk_Init()
 {
@@ -112,7 +100,7 @@ void vk_Init()
 #else
                         .request_validation_layers(false)
 #endif // _DEBUG
-                        .require_api_version(1, 1, 0)
+                        .require_api_version(1, 2, 0)
                         .use_default_debug_messenger()
                         .build();
 
@@ -221,15 +209,15 @@ void vk_Init()
 
     for (int i = 0; i < FRAME_OVERLAP; i++) {
 
-        VK_CHECK(vkCreateCommandPool(g_device, &commandPoolInfo, NULL, &g_frames[i]._commandPool));
+        VK_CHECK(vkCreateCommandPool(g_device, &commandPoolInfo, NULL, &g_frames[i].command_pool));
 
         // allocate the default command buffer that we will use for rendering
-        VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(g_frames[i]._commandPool, 1);
+        VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(g_frames[i].command_pool, 1);
 
         VK_CHECK(vkAllocateCommandBuffers(g_device, &cmdAllocInfo, &g_frames[i].main_command_buffer));
 
         g_main_deletion_queue.push_function([=]() {
-            vkDestroyCommandPool(g_device, g_frames[i]._commandPool, NULL);
+            vkDestroyCommandPool(g_device, g_frames[i].command_pool, NULL);
         });
     }
 
@@ -387,14 +375,14 @@ void vk_Init()
     vkCreateDescriptorPool(g_device, &pool_info, NULL, &g_descriptor_pool);
 
     // information about the binding.
-    VkDescriptorSetLayoutBinding camBufferBinding = {};
-    camBufferBinding.binding                      = 0;
-    camBufferBinding.descriptorCount              = 1;
+    VkDescriptorSetLayoutBinding binding_descriptor_set_layout = {};
+    binding_descriptor_set_layout.binding                      = 0;
+    binding_descriptor_set_layout.descriptorCount              = 1;
     // it's a uniform buffer binding
-    camBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    binding_descriptor_set_layout.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
     // we use it from the vertex shader
-    camBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    binding_descriptor_set_layout.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     VkDescriptorSetLayoutCreateInfo setInfo = {};
     setInfo.sType                           = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -405,13 +393,13 @@ void vk_Init()
     // no flags
     setInfo.flags = 0;
     // point to the camera buffer binding
-    setInfo.pBindings = &camBufferBinding;
+    setInfo.pBindings = &binding_descriptor_set_layout;
 
     vkCreateDescriptorSetLayout(g_device, &setInfo, NULL, &g_global_set_layout);
 
     for (int i = 0; i < FRAME_OVERLAP; i++) {
 
-        create_buffer(&g_frames[i].cameraBuffer, sizeof(GPUCameraData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        create_Buffer(&g_frames[i].camera_buffer, sizeof(CameraData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         // allocate one descriptor set for each frame
         VkDescriptorSetAllocateInfo allocInfo = {};
@@ -424,16 +412,16 @@ void vk_Init()
         // using the global data layout
         allocInfo.pSetLayouts = &g_global_set_layout;
 
-        vkAllocateDescriptorSets(g_device, &allocInfo, &g_frames[i].globalDescriptor);
+        vkAllocateDescriptorSets(g_device, &allocInfo, &g_frames[i].global_descriptor);
 
         // information about the buffer we want to point at in the descriptor
-        VkDescriptorBufferInfo binfo;
+        VkDescriptorBufferInfo info_descriptor_buffer;
         // it will be the camera buffer
-        binfo.buffer = g_frames[i].cameraBuffer._buffer;
+        info_descriptor_buffer.buffer = g_frames[i].camera_buffer.buffer;
         // at 0 offset
-        binfo.offset = 0;
+        info_descriptor_buffer.offset = 0;
         // of the size of a camera data struct
-        binfo.range = sizeof(GPUCameraData);
+        info_descriptor_buffer.range = sizeof(CameraData);
 
         VkWriteDescriptorSet setWrite = {};
         setWrite.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -442,12 +430,12 @@ void vk_Init()
         // we are going to write into binding number 0
         setWrite.dstBinding = 0;
         // of the global descriptor
-        setWrite.dstSet = g_frames[i].globalDescriptor;
+        setWrite.dstSet = g_frames[i].global_descriptor;
 
         setWrite.descriptorCount = 1;
         // and the type is uniform buffer
         setWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        setWrite.pBufferInfo    = &binfo;
+        setWrite.pBufferInfo    = &info_descriptor_buffer;
 
         vkUpdateDescriptorSets(g_device, 1, &setWrite, 0, NULL);
     }
@@ -458,7 +446,7 @@ void vk_Init()
     // ShaderModule loading
     //
     VkShaderModule vertexShader;
-    if (!load_shader_module("../shaders/triangleMesh.vert.spv", &vertexShader)) {
+    if (!init_ShaderModule("../shaders/triangleMesh.vert.spv", &vertexShader)) {
         std::cout << "Error when building the vertex shader module. Did you compile the shaders?" << std::endl;
 
     } else {
@@ -466,7 +454,7 @@ void vk_Init()
     }
 
     VkShaderModule fragmentShader;
-    if (!load_shader_module("../shaders/coloredTriangle.frag.spv", &fragmentShader)) {
+    if (!init_ShaderModule("../shaders/coloredTriangle.frag.spv", &fragmentShader)) {
         std::cout << "Error when building the fragment shader module. Did you compile the shaders?" << std::endl;
     } else {
         std::cout << "vertex fragment shader succesfully loaded" << std::endl;
@@ -493,6 +481,7 @@ void vk_Init()
     pipeline_layout_info.pSetLayouts    = &g_global_set_layout;
 
     VK_CHECK(vkCreatePipelineLayout(g_device, &pipeline_layout_info, NULL, &pipelineLayout));
+    VK_CHECK(vkCreatePipelineLayout(g_device, &pipeline_layout_info, NULL, &g_default_pipeline_layout));
 
     /////
     // Pipeline creation
@@ -504,49 +493,50 @@ void vk_Init()
     //
     // connect the pipeline builder vertex input info to the one we get from Vertex
     VertexInputDescription vertexDescription = Vertex::get_vertex_description();
-    pipelineBuilder._vertexInputInfo         = vkinit::vertex_input_state_create_info();
+    pipelineBuilder.create_info_vertex_input = vkinit::vertex_input_state_create_info();
 
-    pipelineBuilder._vertexInputInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions    = vertexDescription.attributes.data();
-    pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)vertexDescription.attributes.size();
+    pipelineBuilder.create_info_vertex_input.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    pipelineBuilder.create_info_vertex_input.pVertexAttributeDescriptions    = vertexDescription.attributes.data();
+    pipelineBuilder.create_info_vertex_input.vertexAttributeDescriptionCount = (uint32_t)vertexDescription.attributes.size();
 
-    pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions    = vertexDescription.bindings.data();
-    pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = (uint32_t)vertexDescription.bindings.size();
+    pipelineBuilder.create_info_vertex_input.pVertexBindingDescriptions    = vertexDescription.bindings.data();
+    pipelineBuilder.create_info_vertex_input.vertexBindingDescriptionCount = (uint32_t)vertexDescription.bindings.size();
     // build the stage-create-info for both vertex and fragment stages. This lets the pipeline know the shader modules per stage
 
-    pipelineBuilder._shaderStages.push_back(
+    pipelineBuilder.create_info_shader_stages.push_back(
         vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertexShader));
-    pipelineBuilder._shaderStages.push_back(
+    pipelineBuilder.create_info_shader_stages.push_back(
         vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
     // input assembly is the configuration for drawing triangle lists, strips, or individual points.
     // we are just going to draw triangle list
-    pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipelineBuilder.create_info_input_assembly_state = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     // build viewport and scissor from the swapchain extents
-    pipelineBuilder._viewport.x        = 0.0f;
-    pipelineBuilder._viewport.y        = 0.0f;
-    pipelineBuilder._viewport.width    = (float)g_window_extent.width;
-    pipelineBuilder._viewport.height   = (float)g_window_extent.height;
-    pipelineBuilder._viewport.minDepth = 0.0f;
-    pipelineBuilder._viewport.maxDepth = 1.0f;
+    pipelineBuilder.viewport.x        = 0.0f;
+    pipelineBuilder.viewport.y        = 0.0f;
+    pipelineBuilder.viewport.width    = (float)g_window_extent.width;
+    pipelineBuilder.viewport.height   = (float)g_window_extent.height;
+    pipelineBuilder.viewport.minDepth = 0.0f;
+    pipelineBuilder.viewport.maxDepth = 1.0f;
 
-    pipelineBuilder._scissor.offset = { 0, 0 };
-    pipelineBuilder._scissor.extent = g_window_extent;
+    pipelineBuilder.scissor.offset = { 0, 0 };
+    pipelineBuilder.scissor.extent = g_window_extent;
     // configure the rasterizer to draw filled triangles
-    pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
+    pipelineBuilder.create_info_rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
     // we don't use multisampling, so just run the default one
-    pipelineBuilder._multisampling = vkinit::multisampling_state_create_info();
+    pipelineBuilder.create_info_multisample_state = vkinit::multisampling_state_create_info();
     // a single blend attachment with no blending and writing to RGBA
-    pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state();
+    pipelineBuilder.create_info_attachment_state_color_blend = vkinit::color_blend_attachment_state();
 
     // use the triangle layout we created
-    pipelineBuilder._pipelineLayout = pipelineLayout;
+    pipelineBuilder.create_info_pipeline_layout = pipelineLayout;
     // finally build the pipeline
-    pipeline = pipelineBuilder.build_pipeline(g_device, g_render_pass);
+    pipeline           = pipelineBuilder.buildPipeline(g_device, g_render_pass);
+    g_default_pipeline = pipelineBuilder.buildPipeline(g_device, g_render_pass);
 
     // Right now, we are assigning a pipeline to a material. So we don't have any options
     // for setting shaders or whatever else we might wanna customize in the future
-    // the @create_material function should probably create it's pipeline in a customizable way
-    create_material(pipeline, pipelineLayout, "defaultmesh");
+    // the @create_Material function should probably create it's pipeline in a customizable way
+    create_Material(pipeline, pipelineLayout, "defaultmesh");
 
     vkDestroyShaderModule(g_device, vertexShader, NULL);
     vkDestroyShaderModule(g_device, fragmentShader, NULL);
@@ -557,20 +547,23 @@ void vk_Init()
     });
 
     // todo(ad): these 2 calls are not part of the vulkan initialization phase
-    load_meshes();
-    init_scene();
+    init_Examples(g_device, g_chosen_gpu);
+    // init_Meshes();
+    // init_Scene();
 
     g_is_initialized = true;
 }
 
-void vk_Render()
+void vk_BeginPass()
 {
     // wait until the GPU has finished rendering the last frame. Timeout of 1 second
 
-    VkFence         *inflight_render_fence        = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].render_fence;
-    VkSemaphore     *inflight_present_semaphore   = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].present_semaphore;
-    VkSemaphore     *inflight_render_semaphore    = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].render_semaphore;
-    VkCommandBuffer *inflight_main_command_buffer = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].main_command_buffer;
+    VkFence         *inflight_render_fence          = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].render_fence;
+    VkSemaphore     *inflight_present_semaphore     = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].present_semaphore;
+    VkSemaphore     *inflight_render_semaphore      = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].render_semaphore;
+    VkCommandBuffer *inflight_main_command_buffer   = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].main_command_buffer;
+    VkDescriptorSet *inflight_global_descriptor_set = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].global_descriptor;
+    BufferObject    *camera_buffer                  = &g_frames[g_frame_idx_inflight % FRAME_OVERLAP].camera_buffer;
 
     VK_CHECK(vkWaitForFences(g_device, 1, inflight_render_fence, true, SECONDS(1)));
     VK_CHECK(vkResetFences(g_device, 1, inflight_render_fence));
@@ -623,7 +616,19 @@ void vk_Render()
 
     vkCmdBeginRenderPass(*inflight_main_command_buffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    draw_objects(*inflight_main_command_buffer, g_renderables.data(), (uint32_t)g_renderables.size());
+    draw_examples(inflight_main_command_buffer, inflight_global_descriptor_set, camera_buffer);
+    // draw_Renderables(*inflight_main_command_buffer, g_renderables.data(), (uint32_t)g_renderables.size());
+
+    /////////////////////////////////////////////////////////////////////
+    /// Examples
+
+    // vkCmdDrawIndexed(
+    // VkCommandBuffer                             commandBuffer,
+    // uint32_t                                    indexCount,
+    // uint32_t                                    instanceCount,
+    // uint32_t                                    firstIndex,
+    // int32_t                                     vertexOffset,
+    // uint32_t                                    firstInstance);
 
     ///
     // END renderpass & command buffer recording
@@ -672,67 +677,7 @@ void vk_Render()
     g_frame_idx_inflight++;
 }
 
-void UpdateAndRender()
-{
-    SDL_Event e;
-    bool      bQuit = false;
-
-    while (!bQuit) {
-
-        while (SDL_PollEvent(&e) != 0) {
-            SDL_Keycode key = e.key.keysym.sym;
-            if (e.type == SDL_QUIT) bQuit = true;
-
-            if (e.type == SDL_KEYUP) {
-                if (key == SDLK_ESCAPE) bQuit = true;
-
-                if (key == SDLK_UP) _up = false;
-                if (key == SDLK_DOWN) _down = false;
-                if (key == SDLK_LEFT) _left = false;
-                if (key == SDLK_RIGHT) _right = false;
-
-                if (key == SDLK_w) _W = false;
-                if (key == SDLK_s) _S = false;
-                if (key == SDLK_a) _A = false;
-                if (key == SDLK_d) _D = false;
-            }
-            if (e.type == SDL_KEYDOWN) {
-                if (key == SDLK_UP) _up = true;
-                if (key == SDLK_DOWN) _down = true;
-                if (key == SDLK_LEFT) _left = true;
-                if (key == SDLK_RIGHT) _right = true;
-
-                if (key == SDLK_w) _W = true;
-                if (key == SDLK_s) _S = true;
-                if (key == SDLK_a) _A = true;
-                if (key == SDLK_d) _D = true;
-            }
-        }
-
-        if (_up) camera_z += .1f;
-        if (_down) camera_z -= .1f;
-        if (_left) camera_x -= .1f;
-        if (_right) camera_x += .1f;
-
-        static float posX = 0;
-        static float posY = 0;
-
-        if (_W) posY += .3f;
-        if (_S) posY -= .3f;
-        if (_A) posX -= .3f;
-        if (_D) posX += .3f;
-
-        static RenderObject *monkey = get_renderable("monkey");
-
-        monkey->transformMatrix = glm::translate(monkey->transformMatrix, glm::vec3(posX, posY, 0));
-
-        posX = posY = 0;
-
-        vk_Render();
-    }
-}
-
-VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
+VkPipeline PipelineBuilder::buildPipeline(VkDevice device, VkRenderPass pass)
 {
     // make viewport state from our stored viewport and scissor.
     // at the moment we won't support multiple viewports or scissors
@@ -742,9 +687,9 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
     viewportState.pNext = NULL;
 
     viewportState.viewportCount = 1;
-    viewportState.pViewports    = &_viewport;
+    viewportState.pViewports    = &viewport;
     viewportState.scissorCount  = 1;
-    viewportState.pScissors     = &_scissor;
+    viewportState.pScissors     = &scissor;
 
     // setup dummy color blending. We aren't using transparent objects yet
     // the blending is just "no blend", but we do write to the color attachment
@@ -756,9 +701,9 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
     colorBlending.logicOpEnable   = VK_FALSE;
     colorBlending.logicOp         = VK_LOGIC_OP_COPY;
     colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments    = &_colorBlendAttachment;
+    colorBlending.pAttachments    = &create_info_attachment_state_color_blend;
 
-    _depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+    create_info_depth_stencil_state = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 
     // build the actual pipeline
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
@@ -766,16 +711,16 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.pNext = NULL;
 
-    pipelineInfo.stageCount          = (uint32_t)_shaderStages.size();
-    pipelineInfo.pStages             = _shaderStages.data();
-    pipelineInfo.pVertexInputState   = &_vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &_inputAssembly;
+    pipelineInfo.stageCount          = (uint32_t)create_info_shader_stages.size();
+    pipelineInfo.pStages             = create_info_shader_stages.data();
+    pipelineInfo.pVertexInputState   = &create_info_vertex_input;
+    pipelineInfo.pInputAssemblyState = &create_info_input_assembly_state;
     pipelineInfo.pViewportState      = &viewportState;
-    pipelineInfo.pRasterizationState = &_rasterizer;
-    pipelineInfo.pMultisampleState   = &_multisampling;
+    pipelineInfo.pRasterizationState = &create_info_rasterizer;
+    pipelineInfo.pMultisampleState   = &create_info_multisample_state;
     pipelineInfo.pColorBlendState    = &colorBlending;
-    pipelineInfo.pDepthStencilState  = &_depthStencil;
-    pipelineInfo.layout              = _pipelineLayout;
+    pipelineInfo.pDepthStencilState  = &create_info_depth_stencil_state;
+    pipelineInfo.layout              = create_info_pipeline_layout;
     pipelineInfo.renderPass          = pass;
     pipelineInfo.subpass             = 0;
     pipelineInfo.basePipelineHandle  = VK_NULL_HANDLE;
@@ -792,37 +737,37 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
     }
 }
 
-void load_meshes()
+void init_Meshes()
 {
-    Mesh _triangleMesh;
-    _triangleMesh._vertices.resize(3);
+    Mesh mesh_triangle;
+    mesh_triangle.vertices.resize(3);
 
-    _triangleMesh._vertices[0].position = { 0.2f, 0.2f, 0.0f };
-    _triangleMesh._vertices[1].position = { -0.2f, 0.2f, 0.0f };
-    _triangleMesh._vertices[2].position = { 0.f, -0.2f, 0.0f };
+    mesh_triangle.vertices[0].position = { 0.2f, 0.2f, 0.0f };
+    mesh_triangle.vertices[1].position = { -0.2f, 0.2f, 0.0f };
+    mesh_triangle.vertices[2].position = { 0.f, -0.2f, 0.0f };
 
-    _triangleMesh._vertices[0].color = { 0.f, 0.2f, 0.0f }; // pure green
-    _triangleMesh._vertices[1].color = { 0.f, 0.2f, 0.0f }; // pure green
-    _triangleMesh._vertices[2].color = { 0.f, 0.2f, 0.0f }; // pure green
+    mesh_triangle.vertices[0].color = { 0.f, 0.2f, 0.0f }; // pure green
+    mesh_triangle.vertices[1].color = { 0.f, 0.2f, 0.0f }; // pure green
+    mesh_triangle.vertices[2].color = { 0.f, 0.2f, 0.0f }; // pure green
     // we don't care about the vertex normals
 
-    create_mesh(_triangleMesh);
+    create_Mesh(mesh_triangle);
 
-    Mesh _monkeyMesh;
-    _monkeyMesh.load_from_obj("../assets/monkey_smooth.obj");
-    create_mesh(_monkeyMesh);
+    Mesh mesh_monkey;
+    mesh_monkey.loadFromObj("../assets/monkey_smooth.obj");
+    create_Mesh(mesh_monkey);
 
-    g_meshes["monkey"]   = _monkeyMesh;
-    g_meshes["triangle"] = _triangleMesh;
+    g_meshes["monkey"]   = mesh_monkey;
+    g_meshes["triangle"] = mesh_triangle;
 }
 
-void create_mesh(Mesh &mesh)
+void create_Mesh(Mesh &mesh)
 {
     // allocate vertex buffer
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     // this is the total size, in bytes, of the buffer we are allocating
-    bufferInfo.size = mesh._vertices.size() * sizeof(Vertex);
+    bufferInfo.size = mesh.vertices.size() * sizeof(Vertex);
     // this buffer is going to be used as a Vertex Buffer
     bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 
@@ -832,57 +777,27 @@ void create_mesh(Mesh &mesh)
 
     // allocate the buffer
     VK_CHECK(vmaCreateBuffer(g_allocator, &bufferInfo, &vmaallocInfo,
-        &mesh._vertexBuffer._buffer,
-        &mesh._vertexBuffer._allocation,
+        &mesh.vertex_buffer.buffer,
+        &mesh.vertex_buffer._allocation,
         NULL));
 
     // copy vertex data
     void *data;
-    vmaMapMemory(g_allocator, mesh._vertexBuffer._allocation, &data); // gives a ptr to data
-    memcpy(data, mesh._vertices.data(), mesh._vertices.size() * sizeof(Vertex)); // copies vertices into data
+    vmaMapMemory(g_allocator, mesh.vertex_buffer._allocation, &data); // gives a ptr to data
+    memcpy(data, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex)); // copies vertices into data
 
-    vmaUnmapMemory(g_allocator, mesh._vertexBuffer._allocation);
+    vmaUnmapMemory(g_allocator, mesh.vertex_buffer._allocation);
     // add the destruction of triangle mesh buffer to the deletion queue
     g_main_deletion_queue.push_function([=]() {
-        vmaDestroyBuffer(g_allocator, mesh._vertexBuffer._buffer, mesh._vertexBuffer._allocation);
+        vmaDestroyBuffer(g_allocator, mesh.vertex_buffer.buffer, mesh.vertex_buffer._allocation);
     });
 }
 
-Material *create_material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name)
-{
-    Material mat;
-    mat.pipeline       = pipeline;
-    mat.pipelineLayout = layout;
-    g_materials[name]  = mat;
-    return &g_materials[name];
-}
-
-Material *get_material(const std::string &name)
-{
-    // search for the object, and return nullpointer if not found
-    auto it = g_materials.find(name);
-    if (it == g_materials.end()) {
-        return NULL;
-    } else {
-        return &(*it).second;
-    }
-}
-
-Mesh *get_mesh(const std::string &name)
-{
-    auto it = g_meshes.find(name);
-    if (it == g_meshes.end()) {
-        return NULL;
-    } else {
-        return &(*it).second;
-    }
-}
-
-void init_scene()
+void init_Scene()
 {
     RenderObject monkey;
-    monkey.mesh            = get_mesh("monkey");
-    monkey.material        = get_material("defaultmesh");
+    monkey.mesh            = get_Mesh("monkey");
+    monkey.material        = get_Material("defaultmesh");
     monkey.transformMatrix = glm::mat4 { 1.0f };
 
     int count = 0;
@@ -893,8 +808,8 @@ void init_scene()
             for (int z = -10; z <= 10; z++) {
 
                 RenderObject tri;
-                tri.mesh              = get_mesh("triangle");
-                tri.material          = get_material("defaultmesh");
+                tri.mesh              = get_Mesh("triangle");
+                tri.material          = get_Material("defaultmesh");
                 glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(x, z, y));
                 glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(0.2, 0.2, 0.2));
                 tri.transformMatrix   = translation * scale;
@@ -907,128 +822,12 @@ void init_scene()
     SDL_Log("%d objects", count);
 }
 
-RenderObject *get_renderable(std::string name)
-{
-    for (size_t i = 0; i < g_renderables.size(); i++) {
-        if (g_renderables[i].mesh == get_mesh(name))
-            return &g_renderables[i];
-    }
-    return NULL;
-}
-
-static FrameData &frame_current_get()
+static FrameData &get_CurrentFrame()
 {
     return g_frames[g_frame_idx_inflight % FRAME_OVERLAP];
 }
 
-void create_buffer(AllocatedBuffer *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
-{
-    // allocate vertex buffer
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.pNext              = NULL;
-
-    bufferInfo.size  = allocSize;
-    bufferInfo.usage = usage;
-
-    VmaAllocationCreateInfo vmaallocInfo = {};
-    vmaallocInfo.usage                   = memoryUsage;
-
-    // AllocatedBuffer newBuffer;
-
-    // allocate the buffer
-    VK_CHECK(vmaCreateBuffer(g_allocator, &bufferInfo, &vmaallocInfo,
-        &newBuffer->_buffer,
-        &newBuffer->_allocation,
-        NULL));
-    g_main_deletion_queue.push_function([=]() {
-        vmaDestroyBuffer(g_allocator, newBuffer->_buffer, newBuffer->_allocation);
-    });
-
-    // return newBuffer;
-}
-
-void vk_Cleanup()
-{
-    if (g_is_initialized) {
-        vkWaitForFences(g_device, 1, &g_frames[0].render_fence, true, SECONDS(1));
-        vkWaitForFences(g_device, 1, &g_frames[1].render_fence, true, SECONDS(1));
-
-        g_main_deletion_queue.flush();
-
-        vmaDestroyAllocator(g_allocator);
-
-        vkDestroySurfaceKHR(g_instance, g_surface, NULL);
-        vkDestroyDevice(g_device, NULL);
-        vkb::destroy_debug_utils_messenger(g_instance, g_debug_messenger);
-        vkDestroyInstance(g_instance, NULL);
-        SDL_DestroyWindow(g_window);
-    }
-}
-
-static void draw_objects(VkCommandBuffer cmd, RenderObject *first, int count)
-{
-    // make a model view matrix for rendering the object
-    // camera view
-    glm::vec3 camPos = { camera_x, 0.f + camera_y, -30.f + camera_z };
-
-    glm::mat4 view = glm::translate(glm::mat4(1.f), camPos);
-    // camera projection
-    glm::mat4 projection = glm::perspective(glm::radians(60.f), 1700.f / 900.f, 0.1f, 200.0f);
-    projection[1][1] *= -1;
-
-    // fill a GPU camera data struct
-    GPUCameraData camData;
-    camData.projection = projection;
-    camData.view       = view;
-    camData.viewproj   = projection * view;
-
-    // and copy it to the buffer
-    void *data;
-    vmaMapMemory(g_allocator, frame_current_get().cameraBuffer._allocation, &data);
-
-    memcpy(data, &camData, sizeof(GPUCameraData));
-
-    vmaUnmapMemory(g_allocator, frame_current_get().cameraBuffer._allocation);
-
-    Mesh     *lastMesh     = NULL;
-    Material *lastMaterial = NULL;
-
-    for (int i = 0; i < count; i++) {
-        RenderObject &object = first[i];
-
-        // only bind the pipeline if it doesn't match with the already bound one
-        if (object.material != lastMaterial) {
-
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipeline);
-            lastMaterial = object.material;
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &frame_current_get().globalDescriptor, 0, NULL);
-        }
-
-        glm::mat4 model = object.transformMatrix;
-        // final render matrix, that we are calculating on the cpu
-        glm::mat4 mesh_matrix = projection * view * model;
-
-        MeshPushConstants constants;
-        constants.render_matrix = object.transformMatrix;
-
-        // upload the mesh constants to the GPU via pushconstants
-        vkCmdPushConstants(cmd, object.material->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
-
-        // only bind the mesh if it's a different one from last bind
-        if (object.mesh != lastMesh) {
-            // bind the mesh vertex buffer with offset 0
-            VkDeviceSize offset = 0;
-            vkCmdBindVertexBuffers(cmd, 0, 1, &object.mesh->_vertexBuffer._buffer, &offset);
-            lastMesh = object.mesh;
-        }
-        // we can now draw
-        uint32_t size = static_cast<uint32_t>(object.mesh->_vertices.size());
-        vkCmdDraw(cmd, size, 1, 0, 0);
-    }
-}
-
-bool load_shader_module(const char *filepath, VkShaderModule *outShaderModule)
+bool init_ShaderModule(const char *filepath, VkShaderModule *outShaderModule)
 {
     std::ifstream file(filepath, std::ios::ate | std::ios::binary);
 
@@ -1059,6 +858,94 @@ bool load_shader_module(const char *filepath, VkShaderModule *outShaderModule)
     if (vkCreateShaderModule(g_device, &createInfo, NULL, &shaderModule) != VK_SUCCESS) {
         return false;
     }
+
     *outShaderModule = shaderModule;
+
     return true;
 }
+
+void vk_Cleanup()
+{
+    if (g_is_initialized) {
+        vkWaitForFences(g_device, 1, &g_frames[0].render_fence, true, SECONDS(1));
+        vkWaitForFences(g_device, 1, &g_frames[1].render_fence, true, SECONDS(1));
+
+        g_main_deletion_queue.flush();
+
+        vmaDestroyAllocator(g_allocator);
+
+        vkDestroySurfaceKHR(g_instance, g_surface, NULL);
+        vkDestroyDevice(g_device, NULL);
+        vkb::destroy_debug_utils_messenger(g_instance, g_debug_messenger);
+        vkDestroyInstance(g_instance, NULL);
+        SDL_DestroyWindow(g_window);
+    }
+}
+
+// todo(ad): must be removed as we drop depedency on VmaAllocator
+void create_Buffer(BufferObject *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+{
+    // allocate vertex buffer
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.pNext              = NULL;
+
+    bufferInfo.size  = allocSize;
+    bufferInfo.usage = usage;
+
+    VmaAllocationCreateInfo vmaallocInfo = {};
+    vmaallocInfo.usage                   = memoryUsage;
+
+    // BufferObject newBuffer;
+
+    // allocate the buffer
+    VK_CHECK(vmaCreateBuffer(g_allocator, &bufferInfo, &vmaallocInfo, &newBuffer->buffer, &newBuffer->_allocation, NULL));
+
+    g_main_deletion_queue.push_function([=]() {
+        vmaDestroyBuffer(g_allocator, newBuffer->buffer, newBuffer->_allocation);
+    });
+
+    // return newBuffer;
+}
+
+///////////////////////////////////////
+// todo(ad): must rethink these
+Material *create_Material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name)
+{
+    Material mat;
+    mat.pipeline       = pipeline;
+    mat.pipelineLayout = layout;
+    g_materials[name]  = mat;
+    return &g_materials[name];
+}
+
+Material *get_Material(const std::string &name)
+{
+    // search for the object, and return nullpointer if not found
+    auto it = g_materials.find(name);
+    if (it == g_materials.end()) {
+        return NULL;
+    } else {
+        return &(*it).second;
+    }
+}
+
+Mesh *get_Mesh(const std::string &name)
+{
+    auto it = g_meshes.find(name);
+    if (it == g_meshes.end()) {
+        return NULL;
+    } else {
+        return &(*it).second;
+    }
+}
+
+RenderObject *get_Renderable(std::string name)
+{
+    for (size_t i = 0; i < g_renderables.size(); i++) {
+        if (g_renderables[i].mesh == get_Mesh(name))
+            return &g_renderables[i];
+    }
+    return NULL;
+}
+///////////////////////////////////////

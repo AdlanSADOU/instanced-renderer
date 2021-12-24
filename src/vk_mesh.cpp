@@ -1,6 +1,6 @@
 #include <iostream>
 #include <tiny_obj_loader.h>
-#include <vk_mesh.h>
+#include "vk_types.h"
 
 // Describe our vertex input to be specified when creating
 // vertex input pipeline state
@@ -47,7 +47,7 @@ VertexInputDescription Vertex::get_vertex_description()
     return description;
 }
 
-bool Mesh::load_from_obj(const char *filename)
+bool Mesh::loadFromObj(const char *filename)
 {
     //attrib will contain the vertex arrays of the file
     tinyobj::attrib_t attrib;
@@ -110,7 +110,7 @@ bool Mesh::load_from_obj(const char *filename)
                 //we are setting the vertex color as the vertex normal. This is just for display purposes
                 new_vert.color = new_vert.normal;
 
-                _vertices.push_back(new_vert);
+                vertices.push_back(new_vert);
             }
             index_offset += fv;
         }

@@ -4,7 +4,7 @@
 
 // Describe our vertex input to be specified when creating
 // vertex input pipeline state
-VertexInputDescription Vertex::get_vertex_description()
+VertexInputDescription Vertex::GetVertexDescription()
 {
     VertexInputDescription description;
 
@@ -47,7 +47,7 @@ VertexInputDescription Vertex::get_vertex_description()
     return description;
 }
 
-bool Mesh::loadFromObj(const char *filename)
+bool Mesh::LoadFromObj(const char *filename)
 {
     //attrib will contain the vertex arrays of the file
     tinyobj::attrib_t attrib;

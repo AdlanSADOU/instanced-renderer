@@ -14,7 +14,6 @@
                 "/EHsc",
                 "/MTd",
                 "/W3",
-                // "-W4",
                 "/Zi",
                 "/MP",
                 "/Fe:",
@@ -22,7 +21,6 @@
                 "${workspaceFolder}/src/*.cpp",
                 "${workspaceFolder}/src/vkbootstrap/*.cpp",
                 "${workspaceFolder}/vendor/tinyobjloader/tiny_obj_loader.cc",
-
                 "/I",
                 "C:/VulkanSDK/1.2.198.1/Include", // VulkanSDK Include Path
                 "/I",
@@ -37,7 +35,6 @@
                 "${workspaceFolder}/src/vkbootstrap",
                 "/I",
                 "${workspaceFolder}/src/vma",
-
                 //
                 "/link",
                 "/verbose:incr",
@@ -101,6 +98,7 @@
                 "/I",
                 "${workspaceFolder}/src/vma",
                 "/link",
+                "/INCREMENTAL:no",
                 "/verbose:incr",
                 "/time",
                 "/LIBPATH:${workspaceFolder}/vendor/SDL2/lib/x64",
@@ -110,11 +108,10 @@
                 "SDL2.lib",
                 "Shell32.lib", // for dragDrop
                 "Ole32.lib",
-
                 "/SUBSYSTEM:CONSOLE"
             ],
             "options": {
-                "cwd": "${workspaceFolder}"
+                "cwd": "${workspaceFolder}/build"
             },
             "problemMatcher": [
                 "$msCompile"

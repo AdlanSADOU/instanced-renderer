@@ -1,98 +1,87 @@
 #include "vk_renderer.h"
 #include "vk_types.h"
 
-extern VmaAllocator     g_allocator;
-extern VkPipeline       g_default_pipeline;
-extern VkPipelineLayout g_default_pipeline_layout;
-extern float            camera_x, camera_y, camera_z;
+extern VulkanRenderer vkr;
 
-BufferObject triangle_vertex_buffer;
-glm::mat4    triangle_transform_matrix = {};
+extern float camera_x, camera_y, camera_z;
+extern float pos_x, pos_y, pos_z;
 
 struct Triangle
 {
-    BufferObject buffer_object;
-    Vertex       vertices[3];
+    BufferObject buffer_object = {};
+    Vertex       vertices[3]   = {};
+    glm::mat4    transform_m4  = {};
 };
 
-Triangle triangle;
+Triangle triangle = {};
 
-void init_Examples(VkDevice device, VkPhysicalDevice gpu)
+#define TEST_TRIANGLES_COUNT 100
+Triangle test_triangles[TEST_TRIANGLES_COUNT];
+
+void InitExamples(VkDevice device, VkPhysicalDevice gpu)
 {
-    triangle.vertices[0] = { { 0.2f, 0.2f, 0.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-    triangle.vertices[1] = { { -0.2f, 0.2f, 0.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-    triangle.vertices[2] = { { 0.f, -0.2f, 0.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+    triangle.vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+    triangle.vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+    triangle.vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
 
-    /////////////////////////////////////////////////////////////
-    /// getting vertex data to gpu without vma
-    VkBufferCreateInfo create_info_vertex_buffer = {};
-    create_info_vertex_buffer.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info_vertex_buffer.sharingMode        = VkSharingMode::VK_SHARING_MODE_EXCLUSIVE;
-    create_info_vertex_buffer.size               = sizeof(triangle);
-    create_info_vertex_buffer.usage              = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    // VkBuffer vertex_buffer;
-    VK_CHECK(vkCreateBuffer(device, &create_info_vertex_buffer, NULL, &triangle_vertex_buffer.buffer));
-    if (!allocateBufferMemory(device, gpu, triangle_vertex_buffer.buffer, &triangle.buffer_object.device_memory))
-        printf("failed to allocate memory\n");
+    // for (size_t i = 0; i < TEST_TRIANGLES_COUNT; i++) {
+    //     test_triangles[i].vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+    //     test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+    //     test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+    // }
 
-    // bind what we just allocated
-    VK_CHECK(vkBindBufferMemory(device, triangle_vertex_buffer.buffer, triangle.buffer_object.device_memory, 0));
-
-    VkDeviceSize offset = 0;
-    void        *data;
-    VK_CHECK(vkMapMemory(device, triangle.buffer_object.device_memory, offset, VK_WHOLE_SIZE, 0, &data));
-    memcpy(data, &triangle.vertices, sizeof(triangle.vertices));
-    vkUnmapMemory(device, triangle.buffer_object.device_memory);
+    BufferCreate(&triangle.buffer_object, sizeof(triangle.vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    BufferFill(&triangle.vertices, sizeof(triangle.vertices), triangle.buffer_object.allocation);
 
     ////////////////////////////////////
-    glm::mat4 translation     = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0., 0., 0.));
-    glm::mat4 scale           = glm::scale(glm::mat4 { 1.0 }, glm::vec3(1., 1., 1.));
-    triangle_transform_matrix = translation * scale;
+    glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0., 0., 0.));
+    glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(1., 1., 1.));
+
+    triangle.transform_m4 = translation * scale;
 }
 
 // pipeline, piepeline_layout, descriptor_sets, shader --> custom to a mesh or defaults
 
-void draw_examples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *camera_buffer)
+void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *camera_buffer, double dt)
 {
     // Bindings
-    vkCmdBindPipeline(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_default_pipeline);
-    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_default_pipeline_layout, 0, 1, descriptor_set, 0, NULL);
+    vkCmdBindPipeline(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline);
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, descriptor_set, 0, NULL);
     VkDeviceSize offsets = { 0 };
-    vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangle_vertex_buffer.buffer, &offsets);
 
     // camera view
-    glm::vec3 camPos = { camera_x, 0.f + camera_y, -30.f + camera_z };
-    glm::mat4 view   = glm::translate(glm::mat4(1.f), camPos);
-    // camera projection
+    glm::vec3 cam_pos = { camera_x, 0.f + camera_y - 10, -30.f + camera_z };
+    glm::mat4 view    = glm::translate(glm::mat4(1.f), cam_pos);
+
+    view = glm::rotate(view, .80f, glm::vec3(1, 0, 0));
+
     glm::mat4 projection = glm::perspective(glm::radians(60.f), 1700.f / 900.f, 0.1f, 200.0f);
     projection[1][1] *= -1;
 
-    CameraData camData;
-    camData.projection = projection;
-    camData.view       = view;
-    camData.viewproj   = projection * view;
+    vkr.cam_data.projection = projection;
+    vkr.cam_data.view       = view;
+    vkr.cam_data.viewproj   = projection * view;
 
-    // copy it to the buffer
-    void *data;
-    vmaMapMemory(g_allocator, (*camera_buffer)._allocation, &data);
-    memcpy(data, &camData, sizeof(CameraData));
-    vmaUnmapMemory(g_allocator, (*camera_buffer)._allocation);
+    BufferFill(&vkr.cam_data, sizeof(vkr.cam_data), (*camera_buffer).allocation);
 
     // push constants
     // make a model view matrix for rendering the object
     // model matrix is specific to the "thing" we want to draw
     // so each model or triangle has its matrix so that it can be positioned on screen with respect to the camera position
-    glm::mat4 model = triangle_transform_matrix;
+    vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangle.buffer_object.buffer, &offsets);
+    glm::vec3 triangle_pos = { pos_x, 0, pos_z };
+    glm::mat4 model        = glm::translate(triangle.transform_m4, triangle_pos);
+
     // final render matrix, that we are calculating on the cpu
-    glm::mat4 mesh_matrix = projection * view * model;
+    // glm::mat4 mesh_matrix = projection * view * model;
 
     MeshPushConstants constants;
-    constants.render_matrix = triangle_transform_matrix;
+    constants.render_matrix = model;
 
     // upload the mesh constants to the GPU via pushconstants
-    vkCmdPushConstants(*cmd_buffer, g_default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+    vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
-    uint32_t size = static_cast<uint32_t>(sizeof(triangle.vertices));
+    uint32_t size = (sizeof(triangle.vertices));
     vkCmdDraw(*cmd_buffer, sizeof(triangle.vertices), 1, 0, 0);
 }
 
@@ -101,26 +90,24 @@ static void draw_Renderables(VkCommandBuffer cmd, RenderObject *first, int count
 {
     // make a model view matrix for rendering the object
     // camera view
-    glm::vec3 camPos; //= { camera_x, 0.f + camera_y, -30.f + camera_z };
+    glm::vec3 cam_pos; //= { camera_x, 0.f + camera_y, -30.f + camera_z };
 
-    glm::mat4 view = glm::translate(glm::mat4(1.f), camPos);
+    glm::mat4 view = glm::translate(glm::mat4(1.f), cam_pos);
     // camera projection
     glm::mat4 projection = glm::perspective(glm::radians(60.f), 1700.f / 900.f, 0.1f, 200.0f);
     projection[1][1] *= -1;
 
     // fill a GPU camera data struct
-    CameraData camData;
-    camData.projection = projection;
-    camData.view       = view;
-    camData.viewproj   = projection * view;
+    CameraData cam_data;
+    cam_data.projection = projection;
+    cam_data.view       = view;
+    cam_data.viewproj   = projection * view;
 
     // and copy it to the buffer
     void *data;
-    vmaMapMemory(g_allocator, get_CurrentFrame().camera_buffer._allocation, &data);
-
-    memcpy(data, &camData, sizeof(CameraData));
-
-    vmaUnmapMemory(g_allocator, get_CurrentFrame().camera_buffer._allocation);
+    vmaMapMemory(vkr.allocator, get_CurrentFrameData().camera_buffer.allocation, &data);
+    memcpy(data, &cam_data, sizeof(CameraData));
+    vmaUnmapMemory(vkr.allocator, get_CurrentFrameData().camera_buffer.allocation);
 
     Mesh     *lastMesh     = NULL;
     Material *lastMaterial = NULL;
@@ -133,7 +120,7 @@ static void draw_Renderables(VkCommandBuffer cmd, RenderObject *first, int count
 
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipeline);
             lastMaterial = object.material;
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &get_CurrentFrame().global_descriptor, 0, NULL);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &get_CurrentFrameData().global_descriptor, 0, NULL);
         }
 
         glm::mat4 model = object.transformMatrix;

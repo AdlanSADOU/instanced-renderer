@@ -7,6 +7,7 @@
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
 #include <vector>
+#include <deque>
 
 struct CameraData
 {
@@ -22,7 +23,7 @@ struct BufferObject
 
     // there's still some places left where we use the vma allocator
     // vma dependency drop in progress
-    VmaAllocation _allocation;
+    VmaAllocation allocation;
 };
 
 struct FrameData
@@ -45,7 +46,7 @@ struct MeshPushConstants
 struct AllocatedImage
 {
     VkImage       _image;
-    VmaAllocation _allocation;
+    VmaAllocation allocation;
 };
 
 struct VertexInputDescription
@@ -68,7 +69,7 @@ struct Vertex
     glm::vec3 normal;
     glm::vec3 color;
 
-    static VertexInputDescription get_vertex_description();
+    static VertexInputDescription GetVertexDescription();
 };
 
 struct Mesh
@@ -77,7 +78,7 @@ struct Mesh
     BufferObject        vertex_buffer;
     BufferObject        index_buffer;
 
-    bool loadFromObj(const char *filename);
+    bool LoadFromObj(const char *filename);
 };
 
 struct RenderObject

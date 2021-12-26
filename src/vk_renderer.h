@@ -38,11 +38,19 @@ struct ReleaseQueue
     }
 };
 
+struct Camera
+{
+    glm::mat4    view       = {};
+    glm::mat4    projection = {};
+    glm::mat4    viewproj   = {};
+    BufferObject camera_buffer[FRAME_OVERLAP];
+};
+
 struct VulkanRenderer
 {
     SDL_Window *window = NULL;
-    CameraData cam_data;
-
+    CameraData  cam_data;
+    Camera camera = {};
     //
     // Vulkan initialization phase types
     //
@@ -131,6 +139,8 @@ FrameData           &get_CurrentFrameData();
 static Mesh         *get_Mesh(const std::string &name);
 static Material     *get_Material(const std::string &name);
 static RenderObject *get_Renderable(std::string name);
+
+static VertexInputDescription GetVertexDescription();
 
 static bool InitShaderModule(const char *filepath, VkShaderModule *outShaderModule);
 static void init_Scene();

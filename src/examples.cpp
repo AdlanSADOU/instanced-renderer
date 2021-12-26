@@ -1,6 +1,9 @@
 #include "vk_renderer.h"
 #include "vk_types.h"
 
+#define DRAW_ONE_TRIANGLE_PER_BUFFER 0
+#define DRAW_TRIANGLE_BATCH 1
+
 extern VulkanRenderer vkr;
 
 extern float camera_x, camera_y, camera_z;
@@ -8,15 +11,21 @@ extern float pos_x, pos_y, pos_z;
 
 struct Triangle
 {
-    BufferObject buffer_object = {};
     Vertex       vertices[3]   = {};
+    BufferObject buffer_object = {};
     glm::mat4    transform_m4  = {};
 };
 
 Triangle triangle = {};
 
-#define TEST_TRIANGLES_COUNT 100
+#if DRAW_ONE_TRIANGLE_PER_BUFFER
+#define TEST_TRIANGLES_COUNT 10
 Triangle test_triangles[TEST_TRIANGLES_COUNT];
+#endif
+
+#if DRAW_TRIANGLE_BATCH
+
+#endif
 
 void InitExamples(VkDevice device, VkPhysicalDevice gpu)
 {
@@ -24,37 +33,56 @@ void InitExamples(VkDevice device, VkPhysicalDevice gpu)
     triangle.vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
     triangle.vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
 
-    // for (size_t i = 0; i < TEST_TRIANGLES_COUNT; i++) {
-    //     test_triangles[i].vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-    //     test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-    //     test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-    // }
+    // got them into a buffer for now, we'll se if this does it
+    BufferCreate(&triangle.buffer_object, sizeof(Vertex) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    BufferFill(&triangle.vertices, (sizeof(Vertex) * 3), triangle.buffer_object.allocation);
 
-    BufferCreate(&triangle.buffer_object, sizeof(triangle.vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    BufferFill(&triangle.vertices, sizeof(triangle.vertices), triangle.buffer_object.allocation);
-
-    ////////////////////////////////////
+    //////////////////////////////////
     glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0., 0., 0.));
     glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(1., 1., 1.));
 
     triangle.transform_m4 = translation * scale;
+
+#if DRAW_ONE_TRIANGLE_PER_BUFFER
+    // gotta get this somehow into a vertex buffer
+    for (size_t i = 0; i < TEST_TRIANGLES_COUNT; i++) {
+        test_triangles[i].vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+        test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+        test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+
+        BufferCreate(&test_triangles[i].buffer_object, sizeof(Vertex) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        BufferFill(&test_triangles->vertices, sizeof(Vertex) * 3, test_triangles[i].buffer_object.allocation);
+
+        static int j = 0;
+        if ((i % 10) == 0) j++;
+
+        glm::mat4 translation          = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0.+i*.1, 0.+j*.1, 0.));
+        glm::mat4 scale                = glm::scale(glm::mat4 { 1.0 }, glm::vec3(.2, .2, .2));
+        test_triangles[i].transform_m4 = translation * scale;
+    }
+#endif // DRAW_ONE_TRIANGLE_PER_BUFFER
+
+#if DRAW_TRIANGLE_BATCH
+
+#endif //DRAW_TRIANGLE_BATCH
 }
 
 // pipeline, piepeline_layout, descriptor_sets, shader --> custom to a mesh or defaults
 
+///////////////////////////////////////////////////////////////
+/// Mesh rendering
 void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *camera_buffer, double dt)
 {
     // Bindings
     vkCmdBindPipeline(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline);
     vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, descriptor_set, 0, NULL);
-    VkDeviceSize offsets = { 0 };
 
     // camera view
-    glm::vec3 cam_pos = { camera_x, 0.f + camera_y - 10, -30.f + camera_z };
-    glm::mat4 view    = glm::translate(glm::mat4(1.f), cam_pos);
+    glm::vec3 cam_pos     = { camera_x, 0.f + camera_y - 10, -30.f + camera_z };
+    glm::mat4 translation = glm::translate(glm::mat4(1.f), cam_pos);
+    glm::mat4 rotation    = glm::rotate(glm::mat4(1.f), .66f, glm::vec3(1, 0, 0));
 
-    view = glm::rotate(view, .80f, glm::vec3(1, 0, 0));
-
+    glm::mat4 view       = rotation * translation;
     glm::mat4 projection = glm::perspective(glm::radians(60.f), 1700.f / 900.f, 0.1f, 200.0f);
     projection[1][1] *= -1;
 
@@ -68,21 +96,41 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
     // make a model view matrix for rendering the object
     // model matrix is specific to the "thing" we want to draw
     // so each model or triangle has its matrix so that it can be positioned on screen with respect to the camera position
-    vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangle.buffer_object.buffer, &offsets);
-    glm::vec3 triangle_pos = { pos_x, 0, pos_z };
-    glm::mat4 model        = glm::translate(triangle.transform_m4, triangle_pos);
+    {
+        VkDeviceSize offsets = { 0 };
+        vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangle.buffer_object.buffer, &offsets);
+        glm::vec3 triangle_pos = { pos_x, 0, pos_z };
+        glm::mat4 model        = glm::translate(triangle.transform_m4, triangle_pos);
 
-    // final render matrix, that we are calculating on the cpu
-    // glm::mat4 mesh_matrix = projection * view * model;
+        // final render matrix, that we are calculating on the cpu
+        // glm::mat4 mesh_matrix = projection * view * model;
+        MeshPushConstants constants;
+        constants.render_matrix = model;
+        vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
-    MeshPushConstants constants;
-    constants.render_matrix = model;
+        uint32_t vertex_count = sizeof(triangle.vertices) / sizeof(triangle.vertices[0]);
+        vkCmdDraw(*cmd_buffer, vertex_count, 1, 0, 0);
+    }
 
-    // upload the mesh constants to the GPU via pushconstants
-    vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+#if DRAW_ONE_TRIANGLE_PER_BUFFER
 
-    uint32_t size = (sizeof(triangle.vertices));
-    vkCmdDraw(*cmd_buffer, sizeof(triangle.vertices), 1, 0, 0);
+    for (size_t i = 0; i < TEST_TRIANGLES_COUNT; i++) {
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &test_triangles[i].buffer_object.buffer, &offset);
+
+        glm::vec3 triangle_pos = { pos_x, 0, pos_z };
+        glm::mat4 model        = glm::translate(test_triangles[i].transform_m4, triangle_pos);
+
+        // final render matrix, that we are calculating on the cpu
+        // glm::mat4 mesh_matrix = projection * view * model;
+        MeshPushConstants constants = {};
+        constants.render_matrix     = model;
+        vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+
+        uint32_t vertex_count = sizeof(test_triangles->vertices)/sizeof(test_triangles->vertices[0]);
+        vkCmdDraw(*cmd_buffer, vertex_count, 1, 0, 0);
+    }
+#endif // DRAW_ONE_TRIANGLE_PER_BUFFER
 }
 
 // misc

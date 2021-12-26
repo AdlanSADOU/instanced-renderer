@@ -11,7 +11,6 @@ float pos_x = 0;
 float pos_y = 0;
 float pos_z = 0;
 
-
 float camera_speed = 40.f;
 float player_speed = 40.f;
 

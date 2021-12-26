@@ -3,12 +3,14 @@ Launching Vulkan Application:
 - Executable Path: D:\dev\CPP\vulkan-ex-newshit\build\win_debug_x64.exe
 - Working Directory: D:\dev\CPP\vulkan-ex-newshit\build
 - Log file: D:\dev\CPP\vulkan-ex-newshit\build\win_debug_x64.txt
-ERROR: loader_create_instance_chain: Failed to find 'vkGetInstanceProcAddr' in layer C:\Program Files (x86)\Overwolf\0.187.1.13\.\ow-graphics-vulkan.dll
-UNASSIGNED-khronos-validation-createinstance-status-message(INFO / SPEC): msgNum: -671457468 - Validation Information: [ UNASSIGNED-khronos-validation-createinstance-status-message ] Object 0: handle = 0x29a400ad020, type = VK_OBJECT_TYPE_INSTANCE; | MessageID = 0xd7fa5f44 | Khronos Validation Layer Active:
+UNASSIGNED-khronos-validation-createinstance-status-message(INFO / SPEC): msgNum: -671457468 - Validation Information: [ UNASSIGNED-khronos-validation-createinstance-status-message ] Object 0: handle = 0x2e3e14aaf70, type = VK_OBJECT_TYPE_INSTANCE; | MessageID = 0xd7fa5f44 | Khronos Validation Layer Active:
     Settings File: Found at C:\Users\adlsa\AppData\Local\LunarG\vkconfig\override\vk_layer_settings.txt specified by VkConfig application override.
-    Current Enables: VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT, VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT.
-    Current Disables: VK_VALIDATION_FEATURE_DISABLE_OBJECT_LIFETIMES_EXT, VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT, VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT, VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS_EXT, VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT.
+    Current Enables: None.
+    Current Disables: VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT.
 
     Objects: 1
-        [0] 0x29a400ad020, type: 1, name: NULL
+        [0] 0x2e3e14aaf70, type: 1, name: NULL
+fragment shader succesfully loaded
+vertex fragment shader succesfully loaded
+Assertion failed: allocator && allocation && ppData, file D:\dev\CPP\vulkan-ex-newshit\src\vma\vk_mem_alloc.h, line 18413
 Process terminated

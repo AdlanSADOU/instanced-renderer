@@ -41,3 +41,4 @@ bool allocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer
         return true;
     return false;
 }
+

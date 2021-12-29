@@ -40,17 +40,22 @@ struct ReleaseQueue
 
 struct Camera
 {
-    glm::mat4    view       = {};
-    glm::mat4    projection = {};
-    glm::mat4    viewproj   = {};
-    BufferObject camera_buffer[FRAME_OVERLAP];
+    struct Data
+    {
+        glm::mat4 view       = {};
+        glm::mat4 projection = {};
+        glm::mat4 viewproj   = {};
+    } data {};
+
+    BufferObject UBO[FRAME_OVERLAP];
 };
 
 struct VulkanRenderer
 {
     SDL_Window *window = NULL;
-    CameraData  cam_data;
-    Camera camera = {};
+    Camera      camera = {};
+
+    BufferObject instance_buffer_test;
     //
     // Vulkan initialization phase types
     //
@@ -74,17 +79,17 @@ struct VulkanRenderer
     VkDevice              device;
     VkPipeline            default_pipeline;
     VkPipelineLayout      default_pipeline_layout;
-    VkDescriptorSetLayout global_set_layout;
 
     //
     // Descriptor sets
     //
+    VkDescriptorSetLayout global_set_layout;
     VkDescriptorPool descriptor_pool;
 
     //
     // RenderPass & Framebuffers
     //
-    VkRenderPass               render_pass; // created before renderpass
+    VkRenderPass               render_pass;
     std::vector<VkFramebuffer> framebuffers; // these are created for a specific renderpass
 
     VkImageView    depth_image_view;
@@ -122,13 +127,13 @@ struct VulkanRenderer
 struct PipelineBuilder
 {
     std::vector<VkPipelineShaderStageCreateInfo> create_info_shader_stages;
-    VkPipelineVertexInputStateCreateInfo         create_info_vertex_input;
+    VkPipelineVertexInputStateCreateInfo         create_info_vertex_input_state;
     VkPipelineInputAssemblyStateCreateInfo       create_info_input_assembly_state;
-    VkPipelineRasterizationStateCreateInfo       create_info_rasterizer;
-    VkPipelineColorBlendAttachmentState          create_info_attachment_state_color_blend;
     VkPipelineMultisampleStateCreateInfo         create_info_multisample_state;
     VkPipelineDepthStencilStateCreateInfo        create_info_depth_stencil_state;
-    VkPipelineLayout                             create_info_pipeline_layout;
+    VkPipelineColorBlendAttachmentState          attachment_state_color_blend;
+    VkPipelineRasterizationStateCreateInfo       rasterization_state;
+    VkPipelineLayout                             pipeline_layout;
     VkViewport                                   viewport;
     VkRect2D                                     scissor;
 
@@ -162,8 +167,8 @@ void UpdateAndRender();
 void vk_Cleanup();
 
 // temporary examples
-void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *camera_buffer, double dt);
-void InitExamples(VkDevice device, VkPhysicalDevice chosen_gpu);
+void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *buffer, double dt);
+void InitExamples();
 
 // Helper functions
 bool     allocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);

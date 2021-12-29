@@ -1,7 +1,13 @@
 # Vulkan 1.2
 
-[Vulkan Resouces - Specs](https://www.vulkan.org/learn#key-resources)
-[Mike Bailey's Vulkan Page](http://web.engr.oregonstate.edu/~mjb/vulkan/)
+## Some great resources
+
+- [Awesome Vulkan](https://github.com/vinjn/awesome-vulkan)
+- [Vulkan Resouces - Specs](https://www.vulkan.org/learn#key-resources)
+- [Mike Bailey's Vulkan Page](http://web.engr.oregonstate.edu/~mjb/vulkan/)
+- [Vulkanised 2021](https://www.khronos.org/events/vulkanised-2021)
+- [Writing an efficient vulkan renderer - A.Kapoulkine](https://zeux.io/2020/02/27/writing-an-efficient-vulkan-renderer/)
+
 ## quick notes
 
 use case:

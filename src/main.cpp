@@ -16,12 +16,28 @@ float player_speed = 40.f;
 
 void UpdateAndRender();
 
+// #ifdef _WIN32
+
+// #if defined(NO_CONSOLE) && defined(_WIN32)
+// int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
+// {
+//     return SDL_main(__argc, __argv);
+// }
+// #else
+// int main(int argc, char **argv)
+// {
+//     return SDL_main(argc, argv);
+// }
+// #endif
+
+// #endif
+
 int main(int argc, char *argv[])
 {
     vk_Init();
 
     // todo(ad): these 2 calls are not part of the vulkan initialization phase
-    InitExamples(vkr.device, vkr.chosen_gpu);
+    InitExamples();
     // InitMeshes();
     // init_Scene();
 
@@ -40,9 +56,12 @@ double dt_averaged                = 0;
 
 void UpdateAndRender()
 {
-
     SDL_Event e;
-    bool      bQuit = false;
+
+    bool bQuit = false;
+
+
+
 
     while (!bQuit) {
         uint64_t start = SDL_GetPerformanceCounter();
@@ -89,12 +108,17 @@ void UpdateAndRender()
         if (_D) pos_x += player_speed * (float)dt_averaged;
 
         // static RenderObject *monkey = get_Renderable("monkey");
-
         // monkey->transformMatrix = glm::translate(monkey->transformMatrix, glm::vec3(pos_x, pos_y, 0));
-
         // pos_x = pos_y = 0;
 
+
+
+
         VulkanUpdateAndRender(dt_averaged);
+
+
+
+
 
         static double acc = 0;
         if ((acc += dt_averaged) > 1) {
@@ -112,6 +136,6 @@ void UpdateAndRender()
         for (uint64_t i = 0; i < MAX_DT_SAMPLES; i++) {
             sum += dt_samples[i];
         }
-        dt_averaged = sum / MAX_DT_SAMPLES;
+        dt_averaged = dt_samples[0]; // sum / MAX_DT_SAMPLES;
     }
 }

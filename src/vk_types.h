@@ -9,26 +9,20 @@
 #include <vector>
 #include <deque>
 
-struct CameraData
+struct InstanceData
 {
-    glm::mat4 view       = {};
-    glm::mat4 projection = {};
-    glm::mat4 viewproj   = {};
+    glm::mat4 tranform_matrix;
 };
 
 struct BufferObject
 {
     VkBuffer       buffer;
     VkDeviceMemory device_memory;
-
-    // there's still some places left where we use the vma allocator
-    // vma dependency drop in progress
-    VmaAllocation allocation;
+    VmaAllocation  allocation;
 };
 
 struct FrameData
 {
-    BufferObject    camera_buffer       = {};
     VkSemaphore     present_semaphore   = {};
     VkSemaphore     render_semaphore    = {};
     VkFence         render_fence        = {};

@@ -1,4 +1,6 @@
-Little project to experiment with Vulkan. 
+This is a project I use to learn and experiment Vulkan.
+
+The code might be very rough at some places, but overall I'd say, I don't bother with OOP, and while learning/exploring, I write very procedural code, only factoring out things that repeat often, like buffer creation.
 
 <img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="44%" height="44%">
 

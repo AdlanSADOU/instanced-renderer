@@ -16,6 +16,9 @@
 #include <vk_mem_alloc.h>
 #include <vk_types.h>
 
+
+#define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
+
 #define FRAME_OVERLAP 2
 
 struct ReleaseQueue
@@ -72,7 +75,10 @@ struct VulkanRenderer
     std::vector<VkImageView> swapchain_image_views;
 
     uint32_t graphics_queue_family; // family of that queue
-    VkQueue  graphicsQueue; // queue we will submit to
+    uint32_t present_queue_family; // family of that queue
+    VkQueue  graphics_queue_idx; // queue we will submit to
+    VkQueue  present_queue_idx; // queue we will submit to
+    VkBool32 is_present_queue_separate;
 
     FrameData frames[FRAME_OVERLAP];
 
@@ -83,7 +89,7 @@ struct VulkanRenderer
     //
     // Descriptor sets
     //
-    VkDescriptorSetLayout global_set_layout;
+    VkDescriptorSetLayout global_desc_set_layout;
     VkDescriptorPool descriptor_pool;
 
     //

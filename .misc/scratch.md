@@ -118,3 +118,10 @@ buffer has to be dynamic now
 sizeof(Vertex) = 108 = (3*(3*4) * 3)
 triange_count = 8^3
 
+vkCmdDrawIndirect: buffer + offset + (stride * index)
+VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
+
+  uint32_t    vertexCount;
+    uint32_t    instanceCount;
+    uint32_t    firstVertex;
+    uint32_t    firstInstance;

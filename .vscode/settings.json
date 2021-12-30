@@ -75,6 +75,7 @@
         "unordered_set": "cpp",
         "valarray": "cpp",
         "xhash": "cpp",
-        "shared_mutex": "cpp"
+        "shared_mutex": "cpp",
+        "optional": "cpp"
     },
 }

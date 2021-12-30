@@ -3,13 +3,12 @@
 
 // mutually exclusive
 #define EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER       0
-#define EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH 1
-#define EXAMPLE_DRAW_INDIRECT_CUBE_BATCH 0
+#define EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH 0
+#define EXAMPLE_DRAW_INDIRECT_CUBE_BATCH           1
+
 extern VulkanRenderer vkr;
 
 extern float pos_x, pos_y, pos_z;
-
-#define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
 
 
 
@@ -25,7 +24,7 @@ Triangle triangle = {};
 
 
 
-#define SIDE_LENGTH          32
+#define SIDE_LENGTH          8
 #define TEST_TRIANGLES_COUNT (SIDE_LENGTH * SIDE_LENGTH * SIDE_LENGTH)
 
 #if EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER
@@ -46,6 +45,13 @@ BufferObject triangles_vbo                      = {};
 
 
 #if EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
+struct JustATriange
+{
+    Vertex vertices[3] = {};
+} test_triangles[TEST_TRIANGLES_COUNT]          = {};
+glm::mat4    transform_m4[TEST_TRIANGLES_COUNT] = {};
+BufferObject triangles_vbo                      = {};
+BufferObject indirect_commands_buffer           = {};
 #endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
 
 void InitExamples()
@@ -88,25 +94,6 @@ void InitExamples()
 
 
 #if EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH
-    // wee need an instance_buffer (VkBuffer | vkBindVertexBuffers()) to store InstanceData
-    // then vkCmdDrawIndexed()
-    int x = 0, y = 0, z = 0;
-
-    // for (size_t i = 0; i < TEST_TRIANGLES_COUNT; i++) {
-
-    //     test_triangles[i].vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
-    //     test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
-    //     test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
-
-    //     glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0. + x, -10. + y, 0. + z));
-    //     glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(.1, .1, .1));
-
-    //     transform_m4[i] = translation * scale;
-
-    //     if (x++ == TEST_TRIANGLES_COUNT / 4) x = 0, y++;
-    //     if (y == TEST_TRIANGLES_COUNT / 4) y = 0, z++;
-    //     if (z == TEST_TRIANGLES_COUNT / 4) z = 0;
-    // }
 
     for (size_t z = 0; z < SIDE_LENGTH; z++) {
         for (size_t y = 0; y < SIDE_LENGTH; y++) {
@@ -136,9 +123,42 @@ void InitExamples()
 
 
 #if EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
-VkDrawIndirectCommand
-#endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
 
+    for (size_t z = 0; z < SIDE_LENGTH; z++) {
+        for (size_t y = 0; y < SIDE_LENGTH; y++) {
+            for (size_t x = 0; x < SIDE_LENGTH; x++) {
+
+                static int i = 0;
+
+                test_triangles[i].vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
+                test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
+                test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
+
+                glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0. + x * .5, -10. + y * .5, 0. + z * .5));
+                glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(.1, .1, .1));
+                transform_m4[i]       = translation * scale;
+
+                i++;
+                if (i == TEST_TRIANGLES_COUNT) break;
+            }
+        }
+    }
+
+    BufferCreate(&triangles_vbo, sizeof(test_triangles), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    BufferFill(&test_triangles, sizeof(test_triangles), triangles_vbo.allocation);
+
+    VkDrawIndirectCommand draw_indirect_command[] = {
+        {ARR_COUNT(test_triangles),1,0,0,},
+        {ARR_COUNT(test_triangles),1,sizeof(JustATriange),0,},
+        {ARR_COUNT(test_triangles),1,0,0,},
+        {ARR_COUNT(test_triangles),1,0,0,},
+    };
+
+    VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+    BufferCreate(&indirect_commands_buffer, sizeof(draw_indirect_command), usage, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    BufferFill(&draw_indirect_command, sizeof(draw_indirect_command), indirect_commands_buffer.allocation);
+
+#endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
 }
 
 
@@ -229,13 +249,21 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
 
         vkCmdDraw(*cmd_buffer, 3, 1, 0, 0);
     }
+#endif
 
 
 #if EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
-        // vkCmdDrawIndirect(*cmd_buffer, triangles_vbo.buffer/* this has to be a buffer filled with VkDrawIndirectCommand */, offset, 1, sizeof(VkDrawIndirectCommand));
-#endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
 
-#endif
+    VkDeviceSize offsets = 0;
+    vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangles_vbo.buffer, &offsets);
+    MeshPushConstants constants = {};
+
+    glm::mat4 model         = transform_m4[0];
+    constants.render_matrix = model;
+    vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+
+    vkCmdDrawIndirect(*cmd_buffer, indirect_commands_buffer.buffer, 0, 4, sizeof(VkDrawIndirectCommand));
+#endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
 }
 
 

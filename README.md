@@ -22,7 +22,7 @@ Just something that works well for me.
 - ```stb_image```: single header lib for image (texture) loading
 - ```tinyobjloader```: .obj 3D assets loading
 - ```vma``` : Vulkan Memory Allocator by GPUOpen
-- ```vkb``` : Instance, device, swapchain create (this dependency will soon be dropped)
+
 ## Sources:
 - Excellent resource and a great read with some words of wisdom: [**I'm graphics and so can you** blog series by **Dustin Land** from idTech](https://www.fasterthan.life/blog/2017/7/11/i-am-graphics-and-so-can-you-part-1)
 - Get the big picture: [Vulkan in 30 minutes](https://renderdoc.org/vulkan-in-30-minutes.html)

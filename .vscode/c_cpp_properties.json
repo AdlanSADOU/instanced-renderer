@@ -4,11 +4,10 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/src/vkbootstrap/**",
                 "${workspaceFolder}/src/vma/**",
                 "${workspaceFolder}/vendor/SDL2/include/**",
                 "${workspaceFolder}/vendor/glm/**",
-                "C:/VulkanSDK/1.2.198.1/Include"
+                "${workspaceFolder}/vendor/Vulkan/1.2.198.1/Include/**",
             ],
             "defines": [
                 "_DEBUG",

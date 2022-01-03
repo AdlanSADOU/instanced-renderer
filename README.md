@@ -7,6 +7,7 @@ You wont find a ``Game`` class with a ``game.run`` method, because there is only
 
 From my limited experience, I find that making everything a class only makes it harder to to keep track of the code and thus hurts its maintenance.
 For that reason I write very procedural code with minimal indirection, only factoring things out that I intend to reuse, i.e buffer creation.
+
 In general, I think it is way easier and more natural to first solve the problem at hand, get a better idea of the overall code and then let abstractions arise naturally and not try and force it upfront without any problem domain knowledge.
 
 Just something that works well for me.

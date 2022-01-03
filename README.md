@@ -2,7 +2,7 @@ This is a project I use to learn and experiment Vulkan.
 
 ## TLDR; 
 The code might be rough at some places.
-I don't use with OOP while learning/exploring. More generally, I do not "Orient" code around objects in the Object Oriented sense.
+I don't do OOP while learning/exploring. More generally, I do not "Orient" code around objects in the Object Oriented sense.
 You wont find a ``Game`` class with a ``game.run`` method, because there is only ever one instance of the game, we just call into it, so it does not need to be a class. In contrast. I might have a Sprite class, because that is resusable.
 
 From my limited experience, I find that making everything a class only makes it harder to to keep track of the code and thus hurts its maintenance.

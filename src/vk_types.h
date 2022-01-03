@@ -14,11 +14,15 @@ struct InstanceData
     glm::mat4 tranform_matrix;
 };
 
+struct ModelData
+{
+    glm::mat4 transform;
+};
+
 struct BufferObject
 {
-    VkBuffer       buffer;
-    VkDeviceMemory device_memory;
-    VmaAllocation  allocation;
+    VkBuffer      buffer;
+    VmaAllocation allocation;
 };
 
 struct FrameData
@@ -29,6 +33,7 @@ struct FrameData
     VkCommandPool   command_pool        = {};
     VkCommandBuffer main_command_buffer = {};
     VkDescriptorSet global_descriptor   = {};
+    VkDescriptorSet model_descriptor    = {};
 };
 
 struct MeshPushConstants

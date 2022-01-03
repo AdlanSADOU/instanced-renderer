@@ -9,7 +9,7 @@
             "name": "Debug",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/win_debug_x64.exe",
+            "program": "${workspaceFolder}/build/vkgame.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/",
@@ -18,44 +18,7 @@
             // "preLaunchTask": "C/C++: x64 Debug Build"
         },
 
-        {
-            "name": "Release Client",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/client/build/win_release_x64/client.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/client/build/win_release_x64/",
-            "environment": [],
-            "externalConsole": true,
-            // "preLaunchTask": "C/C++: x64 Debug Build"
-        },
 
-        {
-            "name": "[Old]Debug Client",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/client/build/win_debug_old_x64/client.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/client/build/x64_Debug_old/",
-            "environment": [],
-            "externalConsole": true,
-            // "preLaunchTask": "C/C++: x64 Debug Build"
-        },
-
-        {
-            "name": "Server",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/server/build/x64_Debug/server.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/server/build/x64_Debug/",
-            "environment": [],
-            "externalConsole": true,
-            // "preLaunchTask": "C/C++: x64 Debug Build"
-        }
     ],
     // "compounds": [
     //     {

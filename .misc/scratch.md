@@ -117,11 +117,39 @@ buffer has to be dynamic now
 
 sizeof(Vertex) = 108 = (3*(3*4) * 3)
 triange_count = 8^3
+-----
 
 vkCmdDrawIndirect: buffer + offset + (stride * index)
+stride[22 ] * (drawCount[10] - 1) + offset[24] + sizeof(VkDrawIndirectCommand)[16] = 196
+
 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
 
   uint32_t    vertexCount;
     uint32_t    instanceCount;
     uint32_t    firstVertex;
     uint32_t    firstInstance;
+
+gl_VertexIndex (or gl_VertexID)
+
+I'm doing a vkCmdDrawIndirect with a buffer of 8 * 3 vertices(8 triangles)
+
+I have an array of 8 model matrices for each triangle, but I don't know how to get that array into the vertex shader and index it there for each triangle
+
+I'd like to be able to index these in the vertex shader to apply the corresponding model matrix
+
+I believe I could do something like this in the shader if I could somehow push the matrix array: model_array[gl_VertexIndex % 3]
+
+transform_m4 size = 512
+transform_m4[0] size = 64
+
+push constants size limit = 128
+
+So this would be a good fit for Storage Buffers I believe, since I would like this to scale to n number of models
+
+Since descriptor sets are a way to get data into shaders
+that's where we'll declare our storage buffer for the model matrices
+
+The basic idea of using descriptor sets is to group your shader bindings by update frequency. So in your rendering loop you would have 1 descriptor set for per-camera params(e.g. projection and view), one for per-material params(e.g. different textures and values like specularity), one for per-object params(e.g. its transforms).
+
+
+For each set n that is statically used by the VkPipeline ?:

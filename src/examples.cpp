@@ -3,8 +3,8 @@
 
 // mutually exclusive
 #define EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER       0
-#define EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH 0
-#define EXAMPLE_DRAW_INDIRECT_CUBE_BATCH           1
+#define EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH 1
+#define EXAMPLE_DRAW_INDIRECT_CUBE_BATCH           0
 
 extern VulkanRenderer vkr;
 
@@ -48,10 +48,12 @@ BufferObject triangles_vbo                      = {};
 struct JustATriange
 {
     Vertex vertices[3] = {};
-} test_triangles[TEST_TRIANGLES_COUNT]          = {};
-glm::mat4    transform_m4[TEST_TRIANGLES_COUNT] = {};
-BufferObject triangles_vbo                      = {};
-BufferObject indirect_commands_buffer           = {};
+} test_triangles[TEST_TRIANGLES_COUNT]        = {};
+ModelData    model_data[TEST_TRIANGLES_COUNT] = {};
+BufferObject triangles_vbo                    = {};
+BufferObject triangles_ibo                    = {};
+BufferObject indirect_commands_buffer         = {};
+
 #endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
 
 void InitExamples()
@@ -60,8 +62,8 @@ void InitExamples()
     triangle.vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
     triangle.vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
 
-    BufferCreate(&triangle.buffer_object, sizeof(triangle.vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    BufferFill(&triangle.vertices, sizeof(triangle.vertices), triangle.buffer_object.allocation);
+    CreateBuffer(&triangle.buffer_object, sizeof(triangle.vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    AllocateFillBuffer(&triangle.vertices, sizeof(triangle.vertices), triangle.buffer_object.allocation);
 
     glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0., 2., 0.));
     glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(1., 1., 1.));
@@ -77,8 +79,8 @@ void InitExamples()
         test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
         test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
 
-        BufferCreate(&test_triangles[i].buffer_object, sizeof(Vertex) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        BufferFill(&test_triangles->vertices, sizeof(Vertex) * 3, test_triangles[i].buffer_object.allocation);
+        CreateBuffer(&test_triangles[i].buffer_object, sizeof(Vertex) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        AllocateFillBuffer(&test_triangles->vertices, sizeof(Vertex) * 3, test_triangles[i].buffer_object.allocation);
 
         static int j = 0;
         if ((i % 10) == 0) j++;
@@ -115,14 +117,22 @@ void InitExamples()
         }
     }
 
-    BufferCreate(&triangles_vbo, sizeof(test_triangles), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    BufferFill(&test_triangles, sizeof(test_triangles), triangles_vbo.allocation);
+    CreateBuffer(&triangles_vbo, sizeof(test_triangles), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    AllocateFillBuffer(&test_triangles, sizeof(test_triangles), triangles_vbo.allocation);
 
 
 #endif // EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH
 
 
 #if EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
+    std::vector<VkDrawIndexedIndirectCommand> draw_indirect_commands;
+
+    uint32_t indices[] = {
+        0, 1, 2
+    };
+
+    CreateBuffer(&triangles_ibo, sizeof(indices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    AllocateFillBuffer(&indices, sizeof(indices), triangles_ibo.allocation);
 
     for (size_t z = 0; z < SIDE_LENGTH; z++) {
         for (size_t y = 0; y < SIDE_LENGTH; y++) {
@@ -134,9 +144,10 @@ void InitExamples()
                 test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
                 test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
 
-                glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0. + x * .5, -10. + y * .5, 0. + z * .5));
-                glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(.1, .1, .1));
-                transform_m4[i]       = translation * scale;
+                glm::mat4 translation   = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0. + x * .5, -0. + y * .5, 0. + z * .5));
+                glm::mat4 scale         = glm::scale(glm::mat4 { 1.0 }, glm::vec3(.1, .1, .1));
+                model_data[i].transform = translation * scale;
+
 
                 i++;
                 if (i == TEST_TRIANGLES_COUNT) break;
@@ -144,19 +155,28 @@ void InitExamples()
         }
     }
 
-    BufferCreate(&triangles_vbo, sizeof(test_triangles), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    BufferFill(&test_triangles, sizeof(test_triangles), triangles_vbo.allocation);
+    CreateBuffer(&triangles_vbo, sizeof(test_triangles), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    AllocateFillBuffer(&test_triangles, sizeof(test_triangles), triangles_vbo.allocation);
 
-    VkDrawIndirectCommand draw_indirect_command[] = {
-        {ARR_COUNT(test_triangles),1,0,0,},
-        {ARR_COUNT(test_triangles),1,sizeof(JustATriange),0,},
-        {ARR_COUNT(test_triangles),1,0,0,},
-        {ARR_COUNT(test_triangles),1,0,0,},
-    };
+    // for (size_t i = 0; i < 1; i++)
+    {
+        VkDrawIndexedIndirectCommand draw_indirect_command = {
+            // .vertexCount   = 3,//ARR_COUNT(test_triangles) * 3,
+            // .instanceCount = 1,
+            // .firstVertex   = 0,
+            // .firstInstance = 0,
+            .indexCount    = 3,
+            .instanceCount = 1,
+            .firstIndex    = 0,
+            .vertexOffset  = (uint32_t)sizeof(JustATriange),
+            .firstInstance = 0,
+        };
+        draw_indirect_commands.push_back(draw_indirect_command);
+    }
 
     VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    BufferCreate(&indirect_commands_buffer, sizeof(draw_indirect_command), usage, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    BufferFill(&draw_indirect_command, sizeof(draw_indirect_command), indirect_commands_buffer.allocation);
+    CreateBuffer(&indirect_commands_buffer, draw_indirect_commands.size() * sizeof(VkDrawIndirectCommand), usage, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    AllocateFillBuffer(draw_indirect_commands.data(), draw_indirect_commands.size() * sizeof(VkDrawIndirectCommand), indirect_commands_buffer.allocation);
 
 #endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
 }
@@ -172,23 +192,26 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
 {
     // Bindings
     vkCmdBindPipeline(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline);
-    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, descriptor_set, 0, NULL);
+
+    const uint32_t dynamic_offsets = 0;
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, &vkr.frames[vkr.frame_idx_inflight].global_descriptor, 0, NULL);
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.frames[vkr.frame_idx_inflight].model_descriptor, 0, NULL);
 
     {
         // push constants
         // make a model view matrix for rendering the object
         // model matrix is specific to the "thing" we want to draw
         // so each model or triangle has its matrix so that it can be positioned on screen with respect to the camera position
+
         VkDeviceSize offsets = { 0 };
         vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangle.buffer_object.buffer, &offsets);
-        glm::vec3 triangle_pos = { pos_x, 0, pos_z };
-        glm::mat4 model        = glm::translate(triangle.transform_m4, triangle_pos);
 
-        // final render matrix, that we are calculating on the cpu
-        // glm::mat4 mesh_matrix = projection * view * model;
+        glm::vec3         triangle_pos = { pos_x, 0, pos_z };
+        glm::mat4         model        = glm::translate(triangle.transform_m4, triangle_pos);
         MeshPushConstants constants;
         constants.render_matrix = model;
         vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+
 
         vkCmdDraw(*cmd_buffer, ARR_COUNT(triangle.vertices), 1, 0, 0);
     }
@@ -252,17 +275,43 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
 #endif
 
 
+
+
+
 #if EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
 
     VkDeviceSize offsets = 0;
     vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangles_vbo.buffer, &offsets);
-    MeshPushConstants constants = {};
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.frames[vkr.frame_idx_inflight].model_descriptor, 0, NULL);
+    vkCmdBindIndexBuffer(*cmd_buffer, triangles_ibo.buffer, 0, VkIndexType::VK_INDEX_TYPE_UINT32);
 
-    glm::mat4 model         = transform_m4[0];
-    constants.render_matrix = model;
-    vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+    // static int i = 0;
+    // MeshPushConstants constants = {};
+    // glm::mat4 model         = triangle_transforms[i++ % 8];
+    // constants.render_matrix = model;
+    // vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
-    vkCmdDrawIndirect(*cmd_buffer, indirect_commands_buffer.buffer, 0, 4, sizeof(VkDrawIndirectCommand));
+
+    // void *data;
+    // vmaMapMemory(vkr.allocator, vkr.triangle_SSBO[vkr.frame_idx_inflight].allocation, &data);
+    // vmaUnmapMemory(vkr.allocator, vkr.triangle_SSBO[vkr.frame_idx_inflight].allocation);
+    // std::vector<VkDrawIndirectCommand> draw_indirect_commands;
+    // for (uint32_t i = 0; i < 1; i++) {
+    //     VkDrawIndirectCommand draw_indirect_command = {
+    //         .vertexCount   = ARR_COUNT(test_triangles) * 3,
+    //         .instanceCount = 1,
+    //         .firstVertex   = 0,
+    //         .firstInstance = 0,
+    //     };
+    //     draw_indirect_commands.push_back(draw_indirect_command);
+    // }
+
+    AllocateFillBuffer(&model_data, sizeof(model_data), vkr.triangle_SSBO[vkr.frame_idx_inflight].allocation);
+
+    vkCmdDrawIndexedIndirect(*cmd_buffer, indirect_commands_buffer.buffer, sizeof(JustATriange) * 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+    // vkCmdDrawIndexedIndirect(*   cmd_buffer, &indirect_commands_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
+    // vkCmdDraw(cmd_buffer, ARR_COUNT(test_triangles) * 3, 1, 0, )
+    // https://vkguide.dev/docs/chapter-4/storage_buffers/
 #endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
 }
 

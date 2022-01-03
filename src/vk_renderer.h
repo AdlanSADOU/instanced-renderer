@@ -55,10 +55,10 @@ struct Camera
 
 struct VulkanRenderer
 {
-    SDL_Window *window = NULL;
-    Camera      camera = {};
-
-    BufferObject instance_buffer_test;
+    SDL_Window  *window = NULL;
+    Camera       camera = {};
+    FrameData    frames[FRAME_OVERLAP];
+    BufferObject triangle_SSBO[FRAME_OVERLAP];
     //
     // Vulkan initialization phase types
     //
@@ -80,17 +80,17 @@ struct VulkanRenderer
     VkQueue  present_queue_idx; // queue we will submit to
     VkBool32 is_present_queue_separate;
 
-    FrameData frames[FRAME_OVERLAP];
 
-    VkDevice              device;
-    VkPipeline            default_pipeline;
-    VkPipelineLayout      default_pipeline_layout;
+    VkDevice         device;
+    VkPipeline       default_pipeline;
+    VkPipelineLayout default_pipeline_layout;
 
     //
     // Descriptor sets
     //
-    VkDescriptorSetLayout global_desc_set_layout;
-    VkDescriptorPool descriptor_pool;
+    VkDescriptorPool      descriptor_pool;
+    VkDescriptorSetLayout global_set_layout;
+    VkDescriptorSetLayout model_set_layout;
 
     //
     // RenderPass & Framebuffers
@@ -116,7 +116,7 @@ struct VulkanRenderer
     bool     is_initialized     = false;
     uint64_t frame_idx_inflight = 0;
 
-    VkExtent2D window_extent { 1700, 900 };
+    VkExtent2D window_extent { 1280, 720 };
 };
 
 #define VK_CHECK(x)                                    \
@@ -161,8 +161,8 @@ static void InitMeshes();
 static Material *create_Material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name);
 
 static void CreateMesh(Mesh &mesh);
-void        BufferCreate(BufferObject *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-void        BufferFill(void *src, size_t size, VmaAllocation allocation);
+void        CreateBuffer(BufferObject *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+void        AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation);
 
 static void draw_Renderables(VkCommandBuffer cmd, RenderObject *first, int count);
 
@@ -177,7 +177,8 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
 void InitExamples();
 
 // Helper functions
-bool     allocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
-uint32_t findProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
-
+bool     AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
+uint32_t FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
+VkResult CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
+VkResult AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
 #endif // VK_RENDERER

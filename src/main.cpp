@@ -1,5 +1,6 @@
 #include <vk_renderer.h>
 #include <string>
+#include <thread>
 
 extern VulkanRenderer vkr;
 
@@ -49,7 +50,7 @@ int main(int argc, char *argv[])
 
 float seconds = 0;
 
-const uint64_t MAX_DT_SAMPLES = 100;
+const uint64_t MAX_DT_SAMPLES = 256;
 
 double dt_samples[MAX_DT_SAMPLES] = {};
 double dt_averaged                = 0;
@@ -136,6 +137,7 @@ void UpdateAndRender()
         for (uint64_t i = 0; i < MAX_DT_SAMPLES; i++) {
             sum += dt_samples[i];
         }
-        dt_averaged = dt_samples[0]; // sum / MAX_DT_SAMPLES;
+        dt_averaged = sum / MAX_DT_SAMPLES;
+
     }
 }

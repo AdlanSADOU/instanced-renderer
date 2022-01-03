@@ -1,15 +1,9 @@
 ﻿
 #include "vk_renderer.h"
-
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
-
 #include <vk_initializers.h>
 #include <vk_types.h>
-
-// todo(ad): this dependency needs to be dropped at some point
-// #include <VkBootstrap.h>
-
 #include <fstream>
 
 VulkanRenderer vkr;
@@ -20,23 +14,29 @@ void vk_Init()
     SDL_Init(SDL_INIT_VIDEO);
 
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
-    vkr.window                   = SDL_CreateWindow(
-                          "Vulkan Engine",
-                          SDL_WINDOWPOS_UNDEFINED,
-                          SDL_WINDOWPOS_UNDEFINED,
-                          vkr.window_extent.width,
-                          vkr.window_extent.height,
-                          window_flags);
+
+    vkr.window = SDL_CreateWindow(
+        "Vulkan Engine",
+        SDL_WINDOWPOS_UNDEFINED,
+        SDL_WINDOWPOS_UNDEFINED,
+        vkr.window_extent.width,
+        vkr.window_extent.height,
+        window_flags);
 
 
 
 
+
+    VkValidationFeatureEnableEXT enabled_validation_feature[] = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT };
+    VkValidationFeaturesEXT      validation_features          = {};
+    validation_features.sType                                 = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+    validation_features.enabledValidationFeatureCount         = ARR_COUNT(enabled_validation_feature);
+    validation_features.pEnabledValidationFeatures            = enabled_validation_feature;
 
     uint32_t supported_extension_properties_count;
     vkEnumerateInstanceExtensionProperties(NULL, &supported_extension_properties_count, NULL);
     std::vector<VkExtensionProperties> supported_extention_properties(supported_extension_properties_count);
     vkEnumerateInstanceExtensionProperties(NULL, &supported_extension_properties_count, supported_extention_properties.data());
-
 
     uint32_t required_extensions_count;
     SDL_Vulkan_GetInstanceExtensions(vkr.window, &required_extensions_count, NULL);
@@ -55,17 +55,17 @@ void vk_Init()
     application_info.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
     application_info.pEngineName        = "engine name";
     application_info.engineVersion      = VK_MAKE_VERSION(0, 1, 0);
-    application_info.apiVersion         = VK_API_VERSION_1_0;
+    application_info.apiVersion         = VK_API_VERSION_1_2;
 
     VkInstanceCreateInfo create_info_instance = {};
     create_info_instance.sType                = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    create_info_instance.pNext                = NULL;
-    create_info_instance.flags                = 0;
-    create_info_instance.pApplicationInfo     = &application_info;
 #if _DEBUG
+    create_info_instance.pNext               = &validation_features;
     create_info_instance.enabledLayerCount   = ARR_COUNT(validation_layers);
     create_info_instance.ppEnabledLayerNames = validation_layers;
 #endif
+    create_info_instance.flags                   = 0;
+    create_info_instance.pApplicationInfo        = &application_info;
     create_info_instance.enabledExtensionCount   = required_extensions_count;
     create_info_instance.ppEnabledExtensionNames = required_instance_extensions;
     VK_CHECK(vkCreateInstance(&create_info_instance, NULL, &vkr.instance));
@@ -101,7 +101,6 @@ void vk_Init()
     // for each queue family idx, try to find one that supports presenting
     uint32_t queue_family_properties_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(vkr.chosen_gpu, &queue_family_properties_count, NULL);
-
     VkQueueFamilyProperties *queue_family_properties = new VkQueueFamilyProperties[queue_family_properties_count];
     vkGetPhysicalDeviceQueueFamilyProperties(vkr.chosen_gpu, &queue_family_properties_count, queue_family_properties);
 
@@ -145,10 +144,32 @@ void vk_Init()
     vkr.present_queue_family      = present_queue_family_idx;
     vkr.is_present_queue_separate = (graphics_queue_family_idx != present_queue_family_idx);
 
-
     const float queue_priorities[] = {
         { 1.0 }
     };
+
+
+
+
+
+    /////////////////////////////
+    /// Device
+    VkPhysicalDeviceFeatures supported_gpu_features = {};
+    vkGetPhysicalDeviceFeatures(vkr.chosen_gpu, &supported_gpu_features);
+
+    // todo(ad): not used right now
+    uint32_t device_properties_count = 0;
+    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkr.chosen_gpu, NULL, &device_properties_count, NULL));
+    VkExtensionProperties *device_extension_properties = new VkExtensionProperties[device_properties_count];
+    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkr.chosen_gpu, NULL, &device_properties_count, device_extension_properties));
+
+    const char *enabled_device_extension_names[] = {
+        "VK_KHR_swapchain",
+    };
+
+    VkPhysicalDeviceVulkan11Features gpu_vulkan_11_features = {};
+    gpu_vulkan_11_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+    gpu_vulkan_11_features.shaderDrawParameters = VK_TRUE;
 
     VkDeviceQueueCreateInfo create_info_device_queue = {};
     create_info_device_queue.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -158,32 +179,16 @@ void vk_Init()
     create_info_device_queue.queueCount              = 1;
     create_info_device_queue.pQueuePriorities        = queue_priorities;
 
-
-
-
-    uint32_t device_properties_count = 0;
-    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkr.chosen_gpu, NULL, &device_properties_count, NULL));
-    VkExtensionProperties *device_extension_properties = new VkExtensionProperties[device_properties_count];
-    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkr.chosen_gpu, NULL, &device_properties_count, device_extension_properties));
-
-    VkPhysicalDeviceFeatures supported_gpu_features = {};
-    vkGetPhysicalDeviceFeatures(vkr.chosen_gpu, &supported_gpu_features);
-
-    const char *enabled_extension_names[] = {
-        "VK_KHR_swapchain",
-    };
-
-
     VkDeviceCreateInfo create_info_device   = {};
     create_info_device.sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    create_info_device.pNext                = NULL;
+    create_info_device.pNext                = &gpu_vulkan_11_features;
     create_info_device.flags                = 0;
     create_info_device.queueCreateInfoCount = 1;
     create_info_device.pQueueCreateInfos    = &create_info_device_queue;
     // create_info_device.enabledLayerCount       = ; // deprecated and ignored
     // create_info_device.ppEnabledLayerNames     = ; // deprecated and ignored
-    create_info_device.enabledExtensionCount   = ARR_COUNT(enabled_extension_names);
-    create_info_device.ppEnabledExtensionNames = enabled_extension_names;
+    create_info_device.enabledExtensionCount   = ARR_COUNT(enabled_device_extension_names);
+    create_info_device.ppEnabledExtensionNames = enabled_device_extension_names;
     create_info_device.pEnabledFeatures        = &supported_gpu_features;
 
     VK_CHECK(vkCreateDevice(vkr.chosen_gpu, &create_info_device, NULL, &vkr.device));
@@ -194,65 +199,12 @@ void vk_Init()
         // todo(ad): get seperate present queue
     }
 
-    // Vulkan Initialization
-    //     vkb::InstanceBuilder builder;
-
-    //     auto inst_ret = builder.set_app_name("Awesome Vulkan App")
-    // #if defined(_DEBUG)
-    //                         .request_validation_layers(true)
-    // #else
-    //                         .request_validation_layers(false)
-    // #endif // _DEBUG
-    //                         .require_api_version(1, 1, 0)
-    //                         .use_default_debug_messenger()
-    //                         .build();
-
-    //     //
-    //     // Instance / Surface / Physical Device selection
-    //     //
-    //     vkb::Instance vkb_inst = inst_ret.value();
-    //     vkr.instance           = vkb_inst.instance;
-    //     vkr.debug_messenger    = vkb_inst.debug_messenger;
-
-
-
-    //     vkb::PhysicalDeviceSelector selector { vkb_inst };
-    //     vkb::PhysicalDevice         physicalDevice = selector
-
-    //                                              .set_minimum_version(1, 1)
-    //                                              .set_surface(vkr.surface)
-    //                                              .select()
-    //                                              .value();
 
 
 
 
-    //     //
-    //     // Device
-    //     //
-    //     vkb::DeviceBuilder deviceBuilder { physicalDevice };
-    //     vkb::Device        vkbDevice = deviceBuilder.build().value();
-
-    //     vkr.device     = vkbDevice.device;
-    //     vkr.chosen_gpu = physicalDevice.physical_device;
-
-
-
-
-
-    //     //
-    //     // Graphics queue
-    //     //
-    //     vkr.graphics_queue_idx         = vkbDevice.get_queue(vkb::QueueType::graphics).value();
-    //     vkr.graphics_queue_family = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
-
-
-
-
-
-    //
-    // Allocator
-    //
+    ///////////////////////////
+    /// VMA Allocator
     VmaAllocatorCreateInfo allocatorInfo = {};
 
     allocatorInfo.physicalDevice = vkr.chosen_gpu;
@@ -263,39 +215,22 @@ void vk_Init()
 
 
 
-    // todo(ad):
-    ///////////////////////////////////////////
-    // Swapchain creation
-    // todo(ad): relying on vkb (vkbootstrap) for now
-    // vkb::SwapchainBuilder swapchainBuilder { vkr.chosen_gpu, vkr.device, vkr.surface };
-    // vkb::Swapchain        vkbSwapchain = swapchainBuilder
-    //                                   .use_default_format_selection()
-    //                                   // use vsync present mode
-    //                                   .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
-    //                                   .set_desired_extent(vkr.window_extent.width, vkr.window_extent.height)
-    //                                   .build()
-    //                                   .value();
 
-    // vkr.swapchain              = vkbSwapchain.swapchain;
-    // vkr.swapchain_images       = vkbSwapchain.get_images().value();
-    // vkr.swapchain_image_views = vkbSwapchain.get_image_views().value();
-    // vkr.swapchain_image_format = vkbSwapchain.image_format;
-
-
-
-    VkSurfaceCapabilitiesKHR surface_capabilities;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vkr.chosen_gpu, vkr.surface, &surface_capabilities);
-
+    ////////////////////////////////////////////
+    /// Swapchain
     uint32_t surface_format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(vkr.chosen_gpu, vkr.surface, &surface_format_count, NULL);
     std::vector<VkSurfaceFormatKHR> surface_formats(surface_format_count);
     vkGetPhysicalDeviceSurfaceFormatsKHR(vkr.chosen_gpu, vkr.surface, &surface_format_count, surface_formats.data());
 
+    // todo(ad): .presentMode arbitrarily set right now, we need to check what the OS supports and pick one
     uint32_t present_modes_count = 0;
     vkGetPhysicalDeviceSurfacePresentModesKHR(vkr.chosen_gpu, vkr.surface, &present_modes_count, NULL);
     std::vector<VkPresentModeKHR> present_modes(present_modes_count);
     vkGetPhysicalDeviceSurfacePresentModesKHR(vkr.chosen_gpu, vkr.surface, &present_modes_count, present_modes.data());
 
+    VkSurfaceCapabilitiesKHR surface_capabilities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vkr.chosen_gpu, vkr.surface, &surface_capabilities);
 
     VkSwapchainCreateInfoKHR create_info_swapchain = {};
     create_info_swapchain.sType                    = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -321,10 +256,16 @@ void vk_Init()
 
     vkCreateSwapchainKHR(vkr.device, &create_info_swapchain, NULL, &vkr.swapchain);
 
+    vkr.release_queue.push_function([=]() {
+        vkDestroySwapchainKHR(vkr.device, vkr.swapchain, NULL);
+    });
 
 
 
 
+
+    //////////////////////////////////////
+    /// Swapchain Images acquisition
     uint32_t swapchain_image_count = 0;
     vkGetSwapchainImagesKHR(vkr.device, vkr.swapchain, &swapchain_image_count, NULL);
     vkr.swapchain_images.resize(swapchain_image_count);
@@ -356,11 +297,8 @@ void vk_Init()
 
 
 
-
-    vkr.release_queue.push_function([=]() {
-        vkDestroySwapchainKHR(vkr.device, vkr.swapchain, NULL);
-    });
-
+    ///////////////////////////////////
+    /// Depth Image
     // depth image size will match the window
     VkExtent3D depthImageExtent = {
         vkr.window_extent.width,
@@ -369,12 +307,10 @@ void vk_Init()
     };
 
     vkr.depth_format = VK_FORMAT_D32_SFLOAT; // hardcoding the depth format to 32 bit float
-
     // the depth image will be an image with the format we selected and Depth Attachment usage flag
     VkImageCreateInfo create_info_depth_image = vkinit::image_create_info(vkr.depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, depthImageExtent);
 
-    // for the depth image, we want to allocate it from GPU local memory
-    VmaAllocationCreateInfo create_info_depth_image_allocation = {};
+    VmaAllocationCreateInfo create_info_depth_image_allocation = {}; // for the depth image, we want to allocate it from GPU local memory
     create_info_depth_image_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
     create_info_depth_image_allocation.requiredFlags           = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
@@ -385,8 +321,6 @@ void vk_Init()
 
     VK_CHECK(vkCreateImageView(vkr.device, &dview_info, NULL, &vkr.depth_image_view));
 
-    // add to deletion queues
-    // this is dandy and all, but...
     vkr.release_queue.push_function([=]() {
         vkDestroyImageView(vkr.device, vkr.depth_image_view, NULL);
         vmaDestroyImage(vkr.allocator, vkr.depth_image._image, vkr.depth_image.allocation);
@@ -559,77 +493,60 @@ void vk_Init()
 
     /////////////////////////////////////////////////////
     // Descriptors
-    // create a descriptor pool that will hold 10 uniform buffers
     std::vector<VkDescriptorPoolSize> sizes = {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 },
 
     };
 
     ////////////////////////////
-    /// Descriptor Set pool
+    /// Set Pool
     VkDescriptorPoolCreateInfo pool_info = {};
     pool_info.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.flags                      = 0;
-    pool_info.maxSets                    = 2; // max times we can vkAllocateDescriptorSets
+    pool_info.maxSets                    = 4; // max times we can vkAllocateDescriptorSets
     pool_info.poolSizeCount              = (uint32_t)sizes.size();
     pool_info.pPoolSizes                 = sizes.data();
     vkCreateDescriptorPool(vkr.device, &pool_info, NULL, &vkr.descriptor_pool);
 
 
+
+
+
+    /////////////////////////
+    /// Set 0
     VkDescriptorSetLayoutBinding desc_set_layout_binding_UBO = {};
-    desc_set_layout_binding_UBO.binding                      = 0;
-    desc_set_layout_binding_UBO.descriptorCount              = 1;
-    desc_set_layout_binding_UBO.descriptorType               = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    desc_set_layout_binding_UBO.stageFlags                   = VK_SHADER_STAGE_VERTEX_BIT;
 
+    desc_set_layout_binding_UBO.binding         = 0;
+    desc_set_layout_binding_UBO.descriptorCount = 1;
+    desc_set_layout_binding_UBO.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    desc_set_layout_binding_UBO.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
 
-    // _TEST
-    VkDescriptorSetLayoutBinding desc_set_layout_binding_TEST = {};
-    desc_set_layout_binding_TEST.binding                      = 1;
-    desc_set_layout_binding_TEST.descriptorCount              = 1;
-    desc_set_layout_binding_TEST.descriptorType               = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    desc_set_layout_binding_TEST.stageFlags                   = VK_SHADER_STAGE_VERTEX_BIT;
-
+    // Storage buffer binding for model matrices array
+    // used by vkCmdDarIndirect
 
     std::vector<VkDescriptorSetLayoutBinding> desc_set_layout_bindings;
     desc_set_layout_bindings.push_back(desc_set_layout_binding_UBO);
-    desc_set_layout_bindings.push_back(desc_set_layout_binding_TEST);
-
-
-    VkDescriptorSetLayoutCreateInfo create_info_desc_set_layout = {};
-    create_info_desc_set_layout.sType                           = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    create_info_desc_set_layout.pNext                           = NULL;
-    create_info_desc_set_layout.bindingCount                    = (uint32_t)desc_set_layout_bindings.size();
-    create_info_desc_set_layout.flags                           = 0;
-    create_info_desc_set_layout.pBindings                       = desc_set_layout_bindings.data(); // point to the camera buffer binding
-    vkCreateDescriptorSetLayout(vkr.device, &create_info_desc_set_layout, NULL, &vkr.global_desc_set_layout);
+    CreateDescriptorSetLayout(vkr.device, NULL, &vkr.global_set_layout, desc_set_layout_bindings.data(), (uint32_t)desc_set_layout_bindings.size());
 
 
 
-    // BufferCreate(&vkr.instance_buffer_test, sizeof(InstanceData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-    // VkDescriptorSetAllocateInfo allocInfo_test = {};
-    // allocInfo_test.pNext                       = NULL;
-    // allocInfo_test.sType                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    // allocInfo_test.descriptorPool              = vkr.descriptor_pool;
-    // allocInfo_test.descriptorSetCount          = 1;
-    // allocInfo_test.pSetLayouts                 = &vkr.global_desc_set_layout;
-    // vkAllocateDescriptorSets(vkr.device, &allocInfo_test, &vkr.instance_set_test);
 
-    // VkDescriptorBufferInfo info_descriptor_buffer;
-    // info_descriptor_buffer.buffer = vkr.instance_buffer_test.buffer;
-    // info_descriptor_buffer.offset = 0;
-    // info_descriptor_buffer.range  = sizeof(InstanceData);
+    //////////////////////////
+    /// Set 1
+    VkDescriptorSetLayoutBinding desc_set_layout_binding_storage_buffer = {};
 
-    // VkWriteDescriptorSet set_write_test = {};
-    // set_write_test.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    // set_write_test.pNext                = NULL;
-    // set_write_test.dstBinding           = 1; // we are going to write into binding number 1
-    // set_write_test.dstSet               = vkr.instance_set_test;
-    // set_write_test.descriptorCount      = 1;
-    // set_write_test.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
-    // set_write_test.pBufferInfo          = &info_descriptor_buffer;
-    // vkUpdateDescriptorSets(vkr.device, 1, &set_write_test, 0, NULL);
+    desc_set_layout_binding_storage_buffer.binding         = 0;
+    desc_set_layout_binding_storage_buffer.descriptorCount = 1;
+    desc_set_layout_binding_storage_buffer.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    desc_set_layout_binding_storage_buffer.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
+
+    std::vector<VkDescriptorSetLayoutBinding> desc_set1_layout_bindings;
+    desc_set1_layout_bindings.push_back(desc_set_layout_binding_storage_buffer);
+    CreateDescriptorSetLayout(vkr.device, NULL, &vkr.model_set_layout, desc_set1_layout_bindings.data(), (uint32_t)desc_set1_layout_bindings.size());
+
+
 
 
 
@@ -637,38 +554,54 @@ void vk_Init()
     /// Allocate sets for each camera buffer, we have a camera buffer for each framebuffer
     for (int i = 0; i < FRAME_OVERLAP; i++) {
 
-        BufferCreate(&vkr.camera.UBO[i], sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-
-
         //////////////////////////
         //// Set allocation
         // allocate one descriptor set for each frame
-        VkDescriptorSetAllocateInfo allocInfo = {};
-        allocInfo.pNext                       = NULL;
-        allocInfo.sType                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool              = vkr.descriptor_pool;
-        allocInfo.descriptorSetCount          = 1;
-        allocInfo.pSetLayouts                 = &vkr.global_desc_set_layout;
-        vkAllocateDescriptorSets(vkr.device, &allocInfo, &vkr.frames[i].global_descriptor);
+
+        AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.global_set_layout, &vkr.frames[i].global_descriptor);
+        AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.model_set_layout, &vkr.frames[i].model_descriptor);
+
+
+        CreateBuffer(&vkr.camera.UBO[i], sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        CreateBuffer(&vkr.triangle_SSBO[i], sizeof(glm::mat4) * 100000, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        VkDescriptorBufferInfo info_descriptor_camera_buffer;
+        VkDescriptorBufferInfo info_descriptor_model_buffer;
+
+
+        { // todo(ad): function
+            info_descriptor_camera_buffer.buffer = vkr.camera.UBO[i].buffer;
+            info_descriptor_camera_buffer.offset = 0;
+            info_descriptor_camera_buffer.range  = sizeof(Camera::Data);
+
+            VkWriteDescriptorSet write_camera_buffer = {};
+            write_camera_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write_camera_buffer.pNext                = NULL;
+            write_camera_buffer.dstBinding           = 0; // we are going to write into binding number 0
+            write_camera_buffer.dstSet               = vkr.frames[i].global_descriptor; // of the global descriptor
+            write_camera_buffer.descriptorCount      = 1;
+            write_camera_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
+            write_camera_buffer.pBufferInfo          = &info_descriptor_camera_buffer;
+            vkUpdateDescriptorSets(vkr.device, 1, &write_camera_buffer, 0, NULL);
 
 
 
 
-        VkDescriptorBufferInfo info_descriptor_buffer;
-        info_descriptor_buffer.buffer = vkr.camera.UBO[i].buffer;
-        info_descriptor_buffer.offset = 0;
-        info_descriptor_buffer.range  = sizeof(Camera::Data);
 
-        VkWriteDescriptorSet setWrite = {};
-        setWrite.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        setWrite.pNext                = NULL;
-        setWrite.dstBinding           = 0; // we are going to write into binding number 0
-        setWrite.dstSet               = vkr.frames[i].global_descriptor; // of the global descriptor
-        setWrite.descriptorCount      = 1;
-        setWrite.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
-        setWrite.pBufferInfo          = &info_descriptor_buffer;
-        vkUpdateDescriptorSets(vkr.device, 1, &setWrite, 0, NULL);
+            info_descriptor_model_buffer.buffer = vkr.triangle_SSBO[i].buffer;
+            info_descriptor_model_buffer.offset = 0;
+            info_descriptor_model_buffer.range  = sizeof(glm::mat4) * 100000;
+
+            VkWriteDescriptorSet write_model_buffer = {};
+            write_model_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write_model_buffer.pNext                = NULL;
+            write_model_buffer.dstBinding           = 0; // we are going to write into binding number 0
+            write_model_buffer.dstSet               = vkr.frames[i].model_descriptor; // of the global descriptor
+            write_model_buffer.descriptorCount      = 1;
+            write_model_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // and the type is uniform buffer
+            write_model_buffer.pBufferInfo          = &info_descriptor_model_buffer;
+            vkUpdateDescriptorSets(vkr.device, 1, &write_model_buffer, 0, NULL);
+        }
     }
 
 
@@ -711,8 +644,15 @@ void vk_Init()
     VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info(); // build the pipeline layout that controls the inputs/outputs of the shader
     pipeline_layout_info.pushConstantRangeCount     = 1;
     pipeline_layout_info.pPushConstantRanges        = &push_constant;
-    pipeline_layout_info.setLayoutCount             = 1;
-    pipeline_layout_info.pSetLayouts                = &vkr.global_desc_set_layout;
+
+
+    VkDescriptorSetLayout set_layouts[] = {
+        vkr.global_set_layout,
+        vkr.model_set_layout
+    };
+
+    pipeline_layout_info.setLayoutCount = 2;
+    pipeline_layout_info.pSetLayouts    = set_layouts;
 
     VkPipelineLayout pipelineLayout;
     VK_CHECK(vkCreatePipelineLayout(vkr.device, &pipeline_layout_info, NULL, &pipelineLayout));
@@ -726,7 +666,7 @@ void vk_Init()
     /////
     // Depth attachment
     // connect the pipeline builder vertex input info to the one we get from Vertex
-    VertexInputDescription vertexDescription = GetVertexDescription();
+    VertexInputDescription vertexDescription = GetVertexDescription(); // horseshit, make this a useful function with arguments
 
     pipelineBuilder.create_info_vertex_input_state                                 = vkinit::vertex_input_state_create_info();
     pipelineBuilder.create_info_vertex_input_state.pVertexAttributeDescriptions    = vertexDescription.attributes.data();
@@ -782,6 +722,10 @@ void vk_Init()
     vkr.is_initialized = true;
 }
 
+
+
+
+/////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 /// Rendering
 VkFence         *g_inflight_render_fence;
@@ -816,7 +760,7 @@ void VulkanUpdateAndRender(double dt)
 
 
     VkClearValue clear_value;
-    clear_value.color = {{ .1f, .1f, .1f } };
+    clear_value.color = { { .1f, .1f, .1f } };
 
     // float flash       = abs(sin(vkr.frame_idx_inflight / 120.f));
     // clear_value.color = { { 0.0f, 0.0f, flash, 1.0f } };
@@ -849,14 +793,14 @@ void VulkanUpdateAndRender(double dt)
     glm::mat4 translation = glm::translate(glm::mat4(1.f), cam_pos);
     glm::mat4 rotation    = glm::rotate(glm::mat4(1.f), .66f, glm::vec3(1, 0, 0));
     glm::mat4 view        = rotation * translation;
-    glm::mat4 projection  = glm::perspective(glm::radians(60.f), 1700.f / 900.f, 0.1f, 200.0f);
+    glm::mat4 projection  = glm::perspective(glm::radians(60.f), (float)vkr.window_extent.width / (float)vkr.window_extent.height, 0.1f, 200.0f);
     projection[1][1] *= -1;
 
     vkr.camera.data.projection = projection;
     vkr.camera.data.view       = view;
     vkr.camera.data.viewproj   = projection * view;
 
-    BufferFill(&vkr.camera, sizeof(Camera::Data), (*buffer).allocation);
+    AllocateFillBuffer(&vkr.camera, sizeof(Camera::Data), (*buffer).allocation);
 
 
 
@@ -924,6 +868,7 @@ void VulkanUpdateAndRender(double dt)
     VK_CHECK(vkQueuePresentKHR(vkr.graphics_queue_idx, &presentInfo));
 
     vkr.frame_idx_inflight++;
+    vkr.frame_idx_inflight = vkr.frame_idx_inflight % FRAME_OVERLAP;
 }
 
 
@@ -1123,7 +1068,7 @@ void vk_Cleanup()
         // vkr.default_pipeline_layout
         vkDestroyPipelineLayout(vkr.device, vkr.default_pipeline_layout, NULL);
         vkDestroyPipeline(vkr.device, vkr.default_pipeline, NULL);
-        vkDestroyDescriptorSetLayout(vkr.device, vkr.global_desc_set_layout, NULL);
+        vkDestroyDescriptorSetLayout(vkr.device, vkr.global_set_layout, NULL);
         vkDestroyDescriptorPool(vkr.device, vkr.descriptor_pool, NULL);
         vkDestroyDevice(vkr.device, NULL);
 
@@ -1137,7 +1082,7 @@ void vk_Cleanup()
 
 
 
-void BufferCreate(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
+void CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
 {
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1161,7 +1106,7 @@ void BufferCreate(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlag
 
 
 
-void BufferFill(void *src, size_t size, VmaAllocation allocation)
+void AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)
 {
     void *data;
     VK_CHECK(vmaMapMemory(vkr.allocator, allocation, &data));

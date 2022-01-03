@@ -1,7 +1,15 @@
 This is a project I use to learn and experiment Vulkan.
 
-The code might be very rough at some places, but overall I'd say, I don't bother with OOP, and while learning/exploring, I write very procedural code with minimal indirection, only factoring out things that repeat often, like buffer creation.
+## TLDR; 
+The code might be rough at some places.
+I don't use with OOP while learning/exploring. More generally, I do not "Orient" code around objects in the Object Oriented sense.
+You wont find a ``Game`` class with a ``game.run`` method, because there is only ever one instance of the game, we just call into it, so it does not need to be a class. In contrast. I might have a Sprite class, because that is resusable.
 
+From my limited experience, I find that making everything a class only makes it harder to to keep track of the code and thus hurts its maintenance.
+For that reason I write very procedural code with minimal indirection, only factoring things out that I intend to reuse, i.e buffer creation.
+In general, I think it is way easier and more natural to first solve the problem at hand, get a better idea of the overall code and then let objects arise naturally.
+
+--- 
 <img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="44%" height="44%">
 
 

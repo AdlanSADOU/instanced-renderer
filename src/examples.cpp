@@ -3,7 +3,7 @@
 
 // mutually exclusive
 #define EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER       0
-#define EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH 1
+#define EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH 0
 #define EXAMPLE_DRAW_INDIRECT_CUBE_BATCH           0
 
 extern VulkanRenderer vkr;
@@ -20,8 +20,30 @@ struct Triangle
     glm::mat4    transform_m4  = {};
 };
 
-Triangle triangle = {};
+struct Quad
+{
+    struct Data
+    {
+        Vertex vertices[4] = {
+            { { -1.f, -1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
+            { { -1.0f, 1.f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
+            { { 1.0f, 1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
+            { { -1.0f, -1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } }
+        };
 
+        uint16_t indices[6] = {
+            0, 1, 2,
+            // 2, 1, 3
+            2,3,1
+        };
+    } data;
+
+    BufferObject buffer_object = {};
+    glm::mat4    transform_m4  = {};
+};
+
+Triangle triangle = {};
+Quad     quad;
 
 
 #define SIDE_LENGTH          8
@@ -58,16 +80,14 @@ BufferObject indirect_commands_buffer         = {};
 
 void InitExamples()
 {
-    triangle.vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-    triangle.vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-    triangle.vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
 
-    CreateBuffer(&triangle.buffer_object, sizeof(triangle.vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    AllocateFillBuffer(&triangle.vertices, sizeof(triangle.vertices), triangle.buffer_object.allocation);
+    VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    CreateBuffer(&quad.buffer_object, sizeof(quad.data), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    AllocateFillBuffer(&quad.data, sizeof(quad.data), quad.buffer_object.allocation);
 
     glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0., 2., 0.));
     glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(1., 1., 1.));
-    triangle.transform_m4 = translation * scale;
+    quad.transform_m4     = translation * scale;
 
 
 
@@ -203,8 +223,10 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
         // model matrix is specific to the "thing" we want to draw
         // so each model or triangle has its matrix so that it can be positioned on screen with respect to the camera position
 
-        VkDeviceSize offsets = { 0 };
-        vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangle.buffer_object.buffer, &offsets);
+        VkBuffer buffers[] = {quad.buffer_object.buffer, quad.buffer_object.buffer};
+        VkDeviceSize offsets[] = { 0, offsetof(Quad, data.indices) };
+        vkCmdBindVertexBuffers(*cmd_buffer, 0, 2, buffers, offsets);
+        vkCmdBindIndexBuffer(*cmd_buffer, quad.buffer_object.buffer, sizeof(quad.data.vertices), VK_INDEX_TYPE_UINT16);
 
         glm::vec3         triangle_pos = { pos_x, 0, pos_z };
         glm::mat4         model        = glm::translate(triangle.transform_m4, triangle_pos);
@@ -213,7 +235,8 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
         vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
 
-        vkCmdDraw(*cmd_buffer, ARR_COUNT(triangle.vertices), 1, 0, 0);
+        // vkCmdDraw(*cmd_buffer, ARR_COUNT(triangle.vertices), 1, 0, 0);
+        vkCmdDrawIndexed(*cmd_buffer, 6, 2, 0, 0, 0);
     }
 
 

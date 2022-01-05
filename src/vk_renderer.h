@@ -161,8 +161,9 @@ static void InitMeshes();
 static Material *create_Material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name);
 
 static void CreateMesh(Mesh &mesh);
-void        CreateBuffer(BufferObject *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-void        AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation);
+
+VkResult CreateBuffer(BufferObject *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation);
 
 static void draw_Renderables(VkCommandBuffer cmd, RenderObject *first, int count);
 

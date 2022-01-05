@@ -1082,7 +1082,7 @@ void vk_Cleanup()
 
 
 
-void CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
+VkResult CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
 {
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1095,7 +1095,7 @@ void CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlag
     vmaallocInfo.usage                   = memory_usage;
 
     // bind buffer buffer to allocation
-    VK_CHECK(vmaCreateBuffer(vkr.allocator, &bufferInfo, &vmaallocInfo, &dst_buffer->buffer, &dst_buffer->allocation, NULL));
+    return vmaCreateBuffer(vkr.allocator, &bufferInfo, &vmaallocInfo, &dst_buffer->buffer, &dst_buffer->allocation, NULL);
 
     vkr.release_queue.push_function([=]() {
         vmaDestroyBuffer(vkr.allocator, dst_buffer->buffer, dst_buffer->allocation);
@@ -1106,12 +1106,14 @@ void CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlag
 
 
 
-void AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)
+VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)
 {
     void *data;
-    VK_CHECK(vmaMapMemory(vkr.allocator, allocation, &data));
+    VkResult result = (vmaMapMemory(vkr.allocator, allocation, &data));
     memcpy(data, src, size);
     vmaUnmapMemory(vkr.allocator, allocation);
+
+    return result;
 }
 
 

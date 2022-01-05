@@ -153,3 +153,10 @@ The basic idea of using descriptor sets is to group your shader bindings by upda
 
 
 For each set n that is statically used by the VkPipeline ?:
+
+
+---
+
+VkBuffer buffers[] = { myBuffer, myBuffer, myBuffer, ... };
+VkDeviceSize offsets[] = { 0x1000, 0x2000, 0x3000, ... };
+vkCmdBindVertexBuffers(commandBuffer, 0, 3, buffers, offsets);

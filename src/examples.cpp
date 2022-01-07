@@ -24,23 +24,40 @@ struct Quad
 {
     struct Data
     {
-        Vertex vertices[4] = {
+        Vertex vertices[6] = {
             { { -1.f, -1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
             { { -1.0f, 1.f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
             { { 1.0f, 1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
-            { { -1.0f, -1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } }
+            // { { -1.0f, -1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
+            // { { 1.0f, 1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
+            // { { 1.0f, -1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
         };
 
-        uint16_t indices[6] = {
-            0, 1, 2,
-            // 2, 1, 3
-            2,3,1
-        };
+        // uint16_t indices[6] = {
+        //     0, 1, 2,
+        //     // 2, 1, 3
+        //     2, 3, 1
+        // };
     } data;
 
-    BufferObject buffer_object = {};
-    glm::mat4    transform_m4  = {};
+    glm::mat4 transform_m4 = {};
 };
+BufferObject quads_bo = {};
+
+std::vector<Quad> quads;
+
+struct Instances
+{
+    std::vector<InstanceData> data {
+        { { 0, 0, 0 }, { 0, 0, 0 } },
+        { { 6, 6, 0 }, { 0, 0, 0 } },
+
+    };
+
+    BufferObject bo;
+};
+
+Instances instances;
 
 Triangle triangle = {};
 Quad     quad;
@@ -77,18 +94,30 @@ BufferObject triangles_ibo                    = {};
 BufferObject indirect_commands_buffer         = {};
 
 #endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
-
-void InitExamples()
+void *instances_data_ptr;
+void  InitExamples()
 {
+    quads.push_back(quad);
+    quads.push_back(quad);
 
-    VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    CreateBuffer(&quad.buffer_object, sizeof(quad.data), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    AllocateFillBuffer(&quad.data, sizeof(quad.data), quad.buffer_object.allocation);
+    {
+        VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        CreateBuffer(&quads_bo, quads.size() * sizeof(Quad::Data), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        AllocateFillBuffer(quads.data(), quads.size() * sizeof(Quad::Data), quads_bo.allocation);
+    }
+    {
+        VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        CreateBuffer(&instances.bo, instances.data.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        // AllocateFillBuffer(instances.data.data(), instances.data.size() * sizeof(InstanceData), instances.bo.allocation);
 
-    glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0., 2., 0.));
-    glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(1., 1., 1.));
-    quad.transform_m4     = translation * scale;
+        vmaMapMemory(vkr.allocator, instances.bo.allocation, &instances_data_ptr);
+        memcpy(instances_data_ptr, instances.data.data(), instances.data.size() * sizeof(InstanceData));
+    }
 
+
+    // glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0., 2., 0.));
+    // glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(1., 1., 1.));
+    // quad.transform_m4     = translation * scale;
 
 
 
@@ -215,7 +244,6 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
 
     const uint32_t dynamic_offsets = 0;
     vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, &vkr.frames[vkr.frame_idx_inflight].global_descriptor, 0, NULL);
-    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.frames[vkr.frame_idx_inflight].model_descriptor, 0, NULL);
 
     {
         // push constants
@@ -223,20 +251,25 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
         // model matrix is specific to the "thing" we want to draw
         // so each model or triangle has its matrix so that it can be positioned on screen with respect to the camera position
 
-        VkBuffer buffers[] = {quad.buffer_object.buffer, quad.buffer_object.buffer};
-        VkDeviceSize offsets[] = { 0, offsetof(Quad, data.indices) };
-        vkCmdBindVertexBuffers(*cmd_buffer, 0, 2, buffers, offsets);
-        vkCmdBindIndexBuffer(*cmd_buffer, quad.buffer_object.buffer, sizeof(quad.data.vertices), VK_INDEX_TYPE_UINT16);
+        VkBuffer     buffers[] = { quads_bo.buffer };
+        VkDeviceSize offsets[] = { 0, /*offsetof(Quad, data.indices) */ };
+        vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, buffers, offsets);
+        // vkCmdBindIndexBuffer(*cmd_buffer, quad.buffer_object.buffer, sizeof(quad.data.vertices), VK_INDEX_TYPE_UINT16);
+        vkCmdBindVertexBuffers(*cmd_buffer, 1, 1, &instances.bo.buffer, offsets);
 
-        glm::vec3         triangle_pos = { pos_x, 0, pos_z };
-        glm::mat4         model        = glm::translate(triangle.transform_m4, triangle_pos);
+
+        // glm::vec3 quad_pos = { pos_x, 0, pos_z };
+        glm::mat4 model = glm::translate(quad.transform_m4, { 0, 0, 0 });
+
         MeshPushConstants constants;
         constants.render_matrix = model;
         vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
 
+        instances.data[1].pos = { pos_x, 0, pos_z };
+        memcpy(instances_data_ptr, instances.data.data(), instances.data.size() * sizeof(InstanceData));
 
-        // vkCmdDraw(*cmd_buffer, ARR_COUNT(triangle.vertices), 1, 0, 0);
-        vkCmdDrawIndexed(*cmd_buffer, 6, 2, 0, 0, 0);
+        vkCmdDraw(*cmd_buffer, ARR_COUNT(quad.data.vertices), quads.size(), 0, 0);
+        // vkCmdDrawIndexed(*cmd_buffer, 6, 2, 0, 0, 0);
     }
 
 

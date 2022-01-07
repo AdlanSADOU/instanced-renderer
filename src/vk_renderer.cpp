@@ -168,8 +168,8 @@ void vk_Init()
     };
 
     VkPhysicalDeviceVulkan11Features gpu_vulkan_11_features = {};
-    gpu_vulkan_11_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-    gpu_vulkan_11_features.shaderDrawParameters = VK_TRUE;
+    gpu_vulkan_11_features.sType                            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+    gpu_vulkan_11_features.shaderDrawParameters             = VK_TRUE;
 
     VkDeviceQueueCreateInfo create_info_device_queue = {};
     create_info_device_queue.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -495,7 +495,6 @@ void vk_Init()
     // Descriptors
     std::vector<VkDescriptorPoolSize> sizes = {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 },
 
     };
 
@@ -529,27 +528,6 @@ void vk_Init()
     desc_set_layout_bindings.push_back(desc_set_layout_binding_UBO);
     CreateDescriptorSetLayout(vkr.device, NULL, &vkr.global_set_layout, desc_set_layout_bindings.data(), (uint32_t)desc_set_layout_bindings.size());
 
-
-
-
-
-    //////////////////////////
-    /// Set 1
-    VkDescriptorSetLayoutBinding desc_set_layout_binding_storage_buffer = {};
-
-    desc_set_layout_binding_storage_buffer.binding         = 0;
-    desc_set_layout_binding_storage_buffer.descriptorCount = 1;
-    desc_set_layout_binding_storage_buffer.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    desc_set_layout_binding_storage_buffer.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
-
-    std::vector<VkDescriptorSetLayoutBinding> desc_set1_layout_bindings;
-    desc_set1_layout_bindings.push_back(desc_set_layout_binding_storage_buffer);
-    CreateDescriptorSetLayout(vkr.device, NULL, &vkr.model_set_layout, desc_set1_layout_bindings.data(), (uint32_t)desc_set1_layout_bindings.size());
-
-
-
-
-
     /////////////////////////////////////
     /// Allocate sets for each camera buffer, we have a camera buffer for each framebuffer
     for (int i = 0; i < FRAME_OVERLAP; i++) {
@@ -559,14 +537,11 @@ void vk_Init()
         // allocate one descriptor set for each frame
 
         AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.global_set_layout, &vkr.frames[i].global_descriptor);
-        AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.model_set_layout, &vkr.frames[i].model_descriptor);
 
 
         CreateBuffer(&vkr.camera.UBO[i], sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        CreateBuffer(&vkr.triangle_SSBO[i], sizeof(glm::mat4) * 100000, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         VkDescriptorBufferInfo info_descriptor_camera_buffer;
-        VkDescriptorBufferInfo info_descriptor_model_buffer;
 
 
         { // todo(ad): function
@@ -583,24 +558,6 @@ void vk_Init()
             write_camera_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
             write_camera_buffer.pBufferInfo          = &info_descriptor_camera_buffer;
             vkUpdateDescriptorSets(vkr.device, 1, &write_camera_buffer, 0, NULL);
-
-
-
-
-
-            info_descriptor_model_buffer.buffer = vkr.triangle_SSBO[i].buffer;
-            info_descriptor_model_buffer.offset = 0;
-            info_descriptor_model_buffer.range  = sizeof(glm::mat4) * 100000;
-
-            VkWriteDescriptorSet write_model_buffer = {};
-            write_model_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write_model_buffer.pNext                = NULL;
-            write_model_buffer.dstBinding           = 0; // we are going to write into binding number 0
-            write_model_buffer.dstSet               = vkr.frames[i].model_descriptor; // of the global descriptor
-            write_model_buffer.descriptorCount      = 1;
-            write_model_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // and the type is uniform buffer
-            write_model_buffer.pBufferInfo          = &info_descriptor_model_buffer;
-            vkUpdateDescriptorSets(vkr.device, 1, &write_model_buffer, 0, NULL);
         }
     }
 
@@ -648,10 +605,9 @@ void vk_Init()
 
     VkDescriptorSetLayout set_layouts[] = {
         vkr.global_set_layout,
-        vkr.model_set_layout
     };
 
-    pipeline_layout_info.setLayoutCount = 2;
+    pipeline_layout_info.setLayoutCount = 1;
     pipeline_layout_info.pSetLayouts    = set_layouts;
 
     VkPipelineLayout pipelineLayout;
@@ -1108,7 +1064,7 @@ VkResult CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsage
 
 VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)
 {
-    void *data;
+    void    *data;
     VkResult result = (vmaMapMemory(vkr.allocator, allocation, &data));
     memcpy(data, src, size);
     vmaUnmapMemory(vkr.allocator, allocation);
@@ -1190,32 +1146,58 @@ VertexInputDescription GetVertexDescription()
     description.bindings.push_back(mainBinding);
 
     // Position will be stored at Location 0
-    VkVertexInputAttributeDescription positionAttribute = {};
+    {
+        VkVertexInputAttributeDescription positionAttribute = {};
 
-    positionAttribute.binding  = 0;
-    positionAttribute.location = 0;
-    positionAttribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
-    positionAttribute.offset   = offsetof(Vertex, position);
+        positionAttribute.binding  = 0;
+        positionAttribute.location = 0;
+        positionAttribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
+        positionAttribute.offset   = offsetof(Vertex, position);
 
-    // Normal will be stored at Location 1
-    VkVertexInputAttributeDescription normalAttribute = {};
+        // Normal will be stored at Location 1
+        VkVertexInputAttributeDescription normalAttribute = {};
 
-    normalAttribute.binding  = 0;
-    normalAttribute.location = 1;
-    normalAttribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
-    normalAttribute.offset   = offsetof(Vertex, normal);
+        normalAttribute.binding  = 0;
+        normalAttribute.location = 1;
+        normalAttribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
+        normalAttribute.offset   = offsetof(Vertex, normal);
 
-    // Color will be stored at Location 2
-    VkVertexInputAttributeDescription colorAttribute = {};
+        // Color will be stored at Location 2
+        VkVertexInputAttributeDescription colorAttribute = {};
 
-    colorAttribute.binding  = 0;
-    colorAttribute.location = 2;
-    colorAttribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
-    colorAttribute.offset   = offsetof(Vertex, color);
+        colorAttribute.binding  = 0;
+        colorAttribute.location = 2;
+        colorAttribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
+        colorAttribute.offset   = offsetof(Vertex, color);
 
-    description.attributes.push_back(positionAttribute);
-    description.attributes.push_back(normalAttribute);
-    description.attributes.push_back(colorAttribute);
+        description.attributes.push_back(positionAttribute);
+        description.attributes.push_back(normalAttribute);
+        description.attributes.push_back(colorAttribute);
+    }
+
+    {
+        VkVertexInputAttributeDescription position_attribute = {};
+        position_attribute.binding                           = 1;
+        position_attribute.location                          = 3;
+        position_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        position_attribute.offset                            = offsetof(InstanceData, pos);
+
+        VkVertexInputAttributeDescription rotation_attribute = {};
+        rotation_attribute.binding                           = 1;
+        rotation_attribute.location                          = 4;
+        rotation_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        rotation_attribute.offset                            = offsetof(InstanceData, rot);
+
+        description.attributes.push_back(position_attribute);
+        description.attributes.push_back(rotation_attribute);
+    }
+
+    // InstanceData
+    VkVertexInputBindingDescription instance_data_binding = {};
+    instance_data_binding.binding                         = 1;
+    instance_data_binding.stride                          = sizeof(InstanceData);
+    instance_data_binding.inputRate                       = VK_VERTEX_INPUT_RATE_INSTANCE;
+    description.bindings.push_back(instance_data_binding);
 
     return description;
 }

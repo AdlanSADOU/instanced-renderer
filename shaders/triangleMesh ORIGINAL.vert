@@ -1,11 +1,8 @@
-#version 450
+#version 460
 
 layout (location = 0) in vec3 vPosition;
 layout (location = 1) in vec3 vNormal;
 layout (location = 2) in vec3 vColor;
-
-layout (location = 3) in vec3 iPos;
-layout (location = 4) in vec3 iRot;
 
 layout (location = 0) out vec3 outColor;
 
@@ -15,6 +12,10 @@ layout(set = 0, binding = 0) uniform  CameraBuffer {
 	mat4 viewproj;
 } cameraData;
 
+//layout(std140, set = 1, binding = 0) readonly buffer ModelBuffer {
+//	mat4 transform[];
+//} model_data;
+
 layout (push_constant) uniform constants
 {
 	vec4 data;
@@ -23,11 +24,10 @@ layout (push_constant) uniform constants
 
 void main()
 {
+    // mat4 modelMatrix = model_data.transform[gl_VertexIndex];
 
-    vec4 vertex_pos = vec4(vPosition, 1.0);
-    vec4 pos = vec4(vertex_pos.xyz + iPos, 1.0);
-
-	mat4 tranformMatrix = (cameraData.viewproj  ) ;
-	gl_Position = tranformMatrix * pos;
+	mat4 tranformMatrix = (cameraData.viewproj * PushConstants.render_matrix);
+	// mat4 tranformMatrix = (cameraData.viewproj * modelMatrix );
+	gl_Position = tranformMatrix * vec4(vPosition, 1.0f);
 	outColor = vColor;
 }

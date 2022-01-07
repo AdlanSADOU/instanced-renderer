@@ -11,7 +11,10 @@
 
 struct InstanceData
 {
-    glm::mat4 tranform_matrix;
+    // glm::mat4 tranform_matrix;
+    glm::vec3 pos;
+    glm::vec3 rot;
+    // uint32_t id;
 };
 
 struct ModelData

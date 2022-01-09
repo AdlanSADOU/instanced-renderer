@@ -23,6 +23,7 @@
                 "/I","${workspaceFolder}/vendor/Vulkan/1.2.198.1/Include", // your VULKAN SDK path
                 "/I","${workspaceFolder}/vendor/SDL2/include",
                 "/I","${workspaceFolder}/vendor/glm",
+                "/I","${workspaceFolder}/vendor/stb_image",
                 // "/I","${workspaceFolder}/vendor/tinyobjloader",
                 "/I", "${workspaceFolder}/src",
                 "/I","${workspaceFolder}/src/vma",
@@ -78,6 +79,7 @@
                 "/I","${workspaceFolder}/vendor/Vulkan/1.2.198.1/Include", // VulkanSDK Include Path
                 "/I","${workspaceFolder}/vendor/SDL2/include",
                 "/I","${workspaceFolder}/vendor/glm",
+                "/I","${workspaceFolder}/vendor/stb_image",
                 // "/I", "${workspaceFolder}/vendor/tinyobjloader",
                 "/I","${workspaceFolder}/src",
                 "/I","${workspaceFolder}/src/vma",

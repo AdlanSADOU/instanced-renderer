@@ -14,7 +14,7 @@ struct InstanceData
     // glm::mat4 tranform_matrix;
     glm::vec3 pos;
     glm::vec3 rot;
-    // uint32_t id;
+    int32_t   tex_idx;
 };
 
 struct ModelData
@@ -35,8 +35,8 @@ struct FrameData
     VkFence         render_fence        = {};
     VkCommandPool   command_pool        = {};
     VkCommandBuffer main_command_buffer = {};
-    VkDescriptorSet global_descriptor   = {};
-    VkDescriptorSet model_descriptor    = {};
+    VkDescriptorSet set_global          = {};
+    VkDescriptorSet set_model           = {};
 };
 
 struct MeshPushConstants
@@ -70,6 +70,7 @@ struct Vertex
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec3 color;
+    glm::vec2 tex_uv;
 };
 
 struct Mesh
@@ -86,4 +87,14 @@ struct RenderObject
     Mesh     *mesh            = {};
     Material *material        = {};
     glm::mat4 transformMatrix = {};
+};
+
+////////////////////////////
+// todo(ad): cleanup
+
+enum ECommandPoolType
+{
+    Graphics,
+    Transfer,
+    Present
 };

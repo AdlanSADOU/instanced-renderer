@@ -333,9 +333,7 @@ void vk_Init()
     //////////////////////////////////////////////////////
     // CommandPools & CommandBuffers creation
     // create a command pool for commands submitted to the graphics queue.
-    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
-        vkr.graphics_queue_family,
-        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(vkr.graphics_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     for (int i = 0; i < FRAME_OVERLAP; i++) {
 
@@ -495,7 +493,8 @@ void vk_Init()
     // Descriptors
     std::vector<VkDescriptorPoolSize> sizes = {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4 },
-
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1 },
     };
 
     ////////////////////////////
@@ -515,18 +514,15 @@ void vk_Init()
     /////////////////////////
     /// Set 0
     VkDescriptorSetLayoutBinding desc_set_layout_binding_UBO = {};
+    desc_set_layout_binding_UBO.binding                      = 0;
+    desc_set_layout_binding_UBO.descriptorCount              = 1;
+    desc_set_layout_binding_UBO.descriptorType               = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    desc_set_layout_binding_UBO.stageFlags                   = VK_SHADER_STAGE_VERTEX_BIT;
 
-    desc_set_layout_binding_UBO.binding         = 0;
-    desc_set_layout_binding_UBO.descriptorCount = 1;
-    desc_set_layout_binding_UBO.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    desc_set_layout_binding_UBO.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
-
-    // Storage buffer binding for model matrices array
-    // used by vkCmdDarIndirect
-
-    std::vector<VkDescriptorSetLayoutBinding> desc_set_layout_bindings;
-    desc_set_layout_bindings.push_back(desc_set_layout_binding_UBO);
-    CreateDescriptorSetLayout(vkr.device, NULL, &vkr.global_set_layout, desc_set_layout_bindings.data(), (uint32_t)desc_set_layout_bindings.size());
+    /// layout > Camera UBO
+    std::vector<VkDescriptorSetLayoutBinding> global_set_layout_bindings;
+    global_set_layout_bindings.push_back(desc_set_layout_binding_UBO);
+    CreateDescriptorSetLayout(vkr.device, NULL, &vkr.set_layout_global, global_set_layout_bindings.data(), (uint32_t)global_set_layout_bindings.size());
 
     /////////////////////////////////////
     /// Allocate sets for each camera buffer, we have a camera buffer for each framebuffer
@@ -536,7 +532,7 @@ void vk_Init()
         //// Set allocation
         // allocate one descriptor set for each frame
 
-        AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.global_set_layout, &vkr.frames[i].global_descriptor);
+        AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.set_layout_global, &vkr.frames[i].set_global);
 
 
         CreateBuffer(&vkr.camera.UBO[i], sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -553,7 +549,7 @@ void vk_Init()
             write_camera_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             write_camera_buffer.pNext                = NULL;
             write_camera_buffer.dstBinding           = 0; // we are going to write into binding number 0
-            write_camera_buffer.dstSet               = vkr.frames[i].global_descriptor; // of the global descriptor
+            write_camera_buffer.dstSet               = vkr.frames[i].set_global; // of the global descriptor
             write_camera_buffer.descriptorCount      = 1;
             write_camera_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
             write_camera_buffer.pBufferInfo          = &info_descriptor_camera_buffer;
@@ -564,14 +560,70 @@ void vk_Init()
 
 
 
+    // Sampler
+    VkSamplerCreateInfo ci_sampler = {};
+    ci_sampler.sType               = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    ci_sampler.minFilter           = VK_FILTER_NEAREST;
+    ci_sampler.magFilter           = VK_FILTER_NEAREST;
+    ci_sampler.addressModeU        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    ci_sampler.addressModeV        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    ci_sampler.addressModeW        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    ci_sampler.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    VK_CHECK(vkCreateSampler(vkr.device, &ci_sampler, NULL, &vkr.sampler));
+
+
+    /// Set 1
+    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampler = {};
+    desc_set_layout_binding_sampler.binding                      = 0;
+    desc_set_layout_binding_sampler.descriptorCount              = 1;
+    desc_set_layout_binding_sampler.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLER;
+    desc_set_layout_binding_sampler.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampled_image = {};
+    desc_set_layout_binding_sampled_image.binding                      = 1;
+    desc_set_layout_binding_sampled_image.descriptorCount              = 1; // texture count
+    desc_set_layout_binding_sampled_image.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    desc_set_layout_binding_sampled_image.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    /// layout > array of textures & sampler
+    std::vector<VkDescriptorSetLayoutBinding> array_of_textures_set_layout_bindings;
+    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampler);
+    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampled_image);
+    CreateDescriptorSetLayout(vkr.device, NULL, &vkr.set_layout_array_of_textures, array_of_textures_set_layout_bindings.data(), (uint32_t)array_of_textures_set_layout_bindings.size());
+
+    VkDescriptorSetAllocateInfo desc_alloc_info = {};
+    desc_alloc_info.sType                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    desc_alloc_info.descriptorPool              = vkr.descriptor_pool;
+    desc_alloc_info.descriptorSetCount          = 1;
+    desc_alloc_info.pSetLayouts                 = &vkr.set_layout_array_of_textures;
+    VK_CHECK(vkAllocateDescriptorSets(vkr.device, &desc_alloc_info, &vkr.set_array_of_textures));
+
 
     //////////////////////////////////////////////////////
     // Pipeline
 
+
+
+
+
+    // Right now, we are assigning a pipeline to a material. So we don't have any options
+    // for setting shaders or whatever else we might wanna customize in the future
+    // the @create_Material function should probably create it's pipeline in a customizable way
+    // create_Material(pipeline, pipelineLayout, "defaultmesh");
+
+
+
+
+
+    vkr.is_initialized = true;
+}
+
+void CreatePipeline()
+{
     //////
     // ShaderModule loading
     VkShaderModule vertexShader;
-    if (!InitShaderModule("../shaders/triangleMesh.vert.spv", &vertexShader)) {
+    if (!InitShaderModule("./shaders/triangleMesh.vert.spv", &vertexShader)) {
         printf("Error when building the vertex shader module. Did you compile the shaders?\n");
 
     } else {
@@ -579,22 +631,17 @@ void vk_Init()
     }
 
     VkShaderModule fragmentShader;
-    if (!InitShaderModule("../shaders/coloredTriangle.frag.spv", &fragmentShader)) {
+    if (!InitShaderModule("./shaders/textureArray.frag.spv", &fragmentShader)) {
         printf("Error when building the fragment shader module. Did you compile the shaders?\n");
     } else {
         printf("vertex fragment shader succesfully loaded\n");
     }
-
-
 
     // this is where we provide the vertex shader with our matrices
     VkPushConstantRange push_constant;
     push_constant.offset     = 0;
     push_constant.size       = sizeof(MeshPushConstants);
     push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-
-
 
     ///////
     // PipelineLayout
@@ -603,12 +650,13 @@ void vk_Init()
     pipeline_layout_info.pPushConstantRanges        = &push_constant;
 
 
-    VkDescriptorSetLayout set_layouts[] = {
-        vkr.global_set_layout,
+    std::vector<VkDescriptorSetLayout> set_layouts = {
+        vkr.set_layout_global,
+        vkr.set_layout_array_of_textures,
     };
 
-    pipeline_layout_info.setLayoutCount = 1;
-    pipeline_layout_info.pSetLayouts    = set_layouts;
+    pipeline_layout_info.setLayoutCount = (uint32_t)set_layouts.size();
+    pipeline_layout_info.pSetLayouts    = set_layouts.data();
 
     VkPipelineLayout pipelineLayout;
     VK_CHECK(vkCreatePipelineLayout(vkr.device, &pipeline_layout_info, NULL, &pipelineLayout));
@@ -659,14 +707,6 @@ void vk_Init()
 
 
 
-    // Right now, we are assigning a pipeline to a material. So we don't have any options
-    // for setting shaders or whatever else we might wanna customize in the future
-    // the @create_Material function should probably create it's pipeline in a customizable way
-    create_Material(pipeline, pipelineLayout, "defaultmesh");
-
-
-
-
     vkDestroyShaderModule(vkr.device, vertexShader, NULL);
     vkDestroyShaderModule(vkr.device, fragmentShader, NULL);
 
@@ -674,11 +714,7 @@ void vk_Init()
         vkDestroyPipeline(vkr.device, pipeline, NULL);
         vkDestroyPipelineLayout(vkr.device, pipelineLayout, NULL);
     });
-
-    vkr.is_initialized = true;
 }
-
-
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -698,7 +734,7 @@ void VulkanUpdateAndRender(double dt)
     g_inflight_present_semaphore     = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].present_semaphore;
     g_inflight_render_semaphore      = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].render_semaphore;
     g_inflight_main_command_buffer   = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].main_command_buffer;
-    g_inflight_global_descriptor_set = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].global_descriptor;
+    g_inflight_global_descriptor_set = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].set_global;
 
     buffer = &vkr.camera.UBO[vkr.frame_idx_inflight % FRAME_OVERLAP];
 
@@ -852,10 +888,14 @@ VkPipeline PipelineBuilder::BuildPipeline(VkDevice device, VkRenderPass pass)
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.pNext = NULL;
 
-    colorBlending.logicOpEnable   = VK_FALSE;
-    colorBlending.logicOp         = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments    = &attachment_state_color_blend;
+    colorBlending.logicOpEnable     = VK_FALSE;
+    colorBlending.logicOp           = VK_LOGIC_OP_COPY;
+    colorBlending.pAttachments      = &attachment_state_color_blend;
+    colorBlending.attachmentCount   = 1;
+    colorBlending.blendConstants[0] = 0.0;
+    colorBlending.blendConstants[1] = 0.0;
+    colorBlending.blendConstants[2] = 0.0;
+    colorBlending.blendConstants[3] = 0.0;
 
     create_info_depth_stencil_state = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 
@@ -1024,7 +1064,7 @@ void vk_Cleanup()
         // vkr.default_pipeline_layout
         vkDestroyPipelineLayout(vkr.device, vkr.default_pipeline_layout, NULL);
         vkDestroyPipeline(vkr.device, vkr.default_pipeline, NULL);
-        vkDestroyDescriptorSetLayout(vkr.device, vkr.global_set_layout, NULL);
+        vkDestroyDescriptorSetLayout(vkr.device, vkr.set_layout_global, NULL);
         vkDestroyDescriptorPool(vkr.device, vkr.descriptor_pool, NULL);
         vkDestroyDevice(vkr.device, NULL);
 
@@ -1032,44 +1072,6 @@ void vk_Cleanup()
         vkDestroyInstance(vkr.instance, NULL);
         SDL_DestroyWindow(vkr.window);
     }
-}
-
-
-
-
-
-VkResult CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
-{
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.pNext              = NULL;
-
-    bufferInfo.size  = alloc_size;
-    bufferInfo.usage = usage;
-
-    VmaAllocationCreateInfo vmaallocInfo = {};
-    vmaallocInfo.usage                   = memory_usage;
-
-    // bind buffer buffer to allocation
-    return vmaCreateBuffer(vkr.allocator, &bufferInfo, &vmaallocInfo, &dst_buffer->buffer, &dst_buffer->allocation, NULL);
-
-    vkr.release_queue.push_function([=]() {
-        vmaDestroyBuffer(vkr.allocator, dst_buffer->buffer, dst_buffer->allocation);
-    });
-}
-
-
-
-
-
-VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)
-{
-    void    *data;
-    VkResult result = (vmaMapMemory(vkr.allocator, allocation, &data));
-    memcpy(data, src, size);
-    vmaUnmapMemory(vkr.allocator, allocation);
-
-    return result;
 }
 
 
@@ -1138,58 +1140,68 @@ VertexInputDescription GetVertexDescription()
 
     // we will have just 1 vertex buffer binding, with a per-vertex rate
     VkVertexInputBindingDescription mainBinding = {};
-
-    mainBinding.binding   = 0;
-    mainBinding.stride    = sizeof(Vertex);
-    mainBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
+    mainBinding.binding                         = 0;
+    mainBinding.stride                          = sizeof(Vertex);
+    mainBinding.inputRate                       = VK_VERTEX_INPUT_RATE_VERTEX;
     description.bindings.push_back(mainBinding);
 
     // Position will be stored at Location 0
     {
-        VkVertexInputAttributeDescription positionAttribute = {};
-
-        positionAttribute.binding  = 0;
-        positionAttribute.location = 0;
-        positionAttribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
-        positionAttribute.offset   = offsetof(Vertex, position);
+        VkVertexInputAttributeDescription position_attribute = {};
+        position_attribute.binding                           = 0;
+        position_attribute.location                          = 0;
+        position_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        position_attribute.offset                            = offsetof(Vertex, position);
 
         // Normal will be stored at Location 1
-        VkVertexInputAttributeDescription normalAttribute = {};
-
-        normalAttribute.binding  = 0;
-        normalAttribute.location = 1;
-        normalAttribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
-        normalAttribute.offset   = offsetof(Vertex, normal);
+        VkVertexInputAttributeDescription normal_attribute = {};
+        normal_attribute.binding                           = 0;
+        normal_attribute.location                          = 1;
+        normal_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        normal_attribute.offset                            = offsetof(Vertex, normal);
 
         // Color will be stored at Location 2
-        VkVertexInputAttributeDescription colorAttribute = {};
+        VkVertexInputAttributeDescription color_attribute = {};
+        color_attribute.binding                           = 0;
+        color_attribute.location                          = 2;
+        color_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        color_attribute.offset                            = offsetof(Vertex, color);
 
-        colorAttribute.binding  = 0;
-        colorAttribute.location = 2;
-        colorAttribute.format   = VK_FORMAT_R32G32B32_SFLOAT;
-        colorAttribute.offset   = offsetof(Vertex, color);
+        VkVertexInputAttributeDescription tex_uv_attribute = {};
+        tex_uv_attribute.binding                           = 0;
+        tex_uv_attribute.location                          = 3;
+        tex_uv_attribute.format                            = VK_FORMAT_R32G32_SFLOAT;
+        tex_uv_attribute.offset                            = offsetof(Vertex, tex_uv);
 
-        description.attributes.push_back(positionAttribute);
-        description.attributes.push_back(normalAttribute);
-        description.attributes.push_back(colorAttribute);
+
+        description.attributes.push_back(position_attribute);
+        description.attributes.push_back(normal_attribute);
+        description.attributes.push_back(color_attribute);
+        description.attributes.push_back(tex_uv_attribute);
     }
 
     {
         VkVertexInputAttributeDescription position_attribute = {};
         position_attribute.binding                           = 1;
-        position_attribute.location                          = 3;
+        position_attribute.location                          = 4;
         position_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
         position_attribute.offset                            = offsetof(InstanceData, pos);
 
         VkVertexInputAttributeDescription rotation_attribute = {};
         rotation_attribute.binding                           = 1;
-        rotation_attribute.location                          = 4;
+        rotation_attribute.location                          = 5;
         rotation_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
         rotation_attribute.offset                            = offsetof(InstanceData, rot);
 
+        VkVertexInputAttributeDescription tex_idx_attribute = {};
+        tex_idx_attribute.binding                           = 1;
+        tex_idx_attribute.location                          = 6;
+        tex_idx_attribute.format                            = VK_FORMAT_R32_SINT;
+        tex_idx_attribute.offset                            = offsetof(InstanceData, tex_idx);
+
         description.attributes.push_back(position_attribute);
         description.attributes.push_back(rotation_attribute);
+        description.attributes.push_back(tex_idx_attribute);
     }
 
     // InstanceData
@@ -1201,4 +1213,36 @@ VertexInputDescription GetVertexDescription()
 
     return description;
 }
+
+
+VkResult CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
+{
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.pNext              = NULL;
+
+    bufferInfo.size  = alloc_size;
+    bufferInfo.usage = usage;
+
+    VmaAllocationCreateInfo vmaallocInfo = {};
+    vmaallocInfo.usage                   = memory_usage;
+
+    // bind buffer to allocation
+    return vmaCreateBuffer(vkr.allocator, &bufferInfo, &vmaallocInfo, &dst_buffer->buffer, &dst_buffer->allocation, NULL);
+
+    vkr.release_queue.push_function([=]() {
+        vmaDestroyBuffer(vkr.allocator, dst_buffer->buffer, dst_buffer->allocation);
+    });
+}
+
+VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)
+{
+    void    *data;
+    VkResult result = (vmaMapMemory(vkr.allocator, allocation, &data));
+    memcpy(data, src, size);
+    vmaUnmapMemory(vkr.allocator, allocation);
+
+    return result;
+}
+
 ///////////////////////////////////////

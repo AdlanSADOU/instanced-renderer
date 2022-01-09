@@ -16,7 +16,6 @@
 #include <vk_mem_alloc.h>
 #include <vk_types.h>
 
-
 #define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
 
 #define FRAME_OVERLAP 2
@@ -89,9 +88,13 @@ struct VulkanRenderer
     // Descriptor sets
     //
     VkDescriptorPool      descriptor_pool;
-    VkDescriptorSetLayout global_set_layout;
-    VkDescriptorSetLayout model_set_layout;
+    VkDescriptorSetLayout set_layout_global;
 
+    uint32_t                           MAX_TEXTURES_COUNT = 10;
+    VkDescriptorSetLayout              set_layout_array_of_textures;
+    VkDescriptorSet                    set_array_of_textures;
+    std::vector<VkDescriptorImageInfo> descriptor_image_infos;
+    VkSampler                          sampler;
     //
     // RenderPass & Framebuffers
     //
@@ -177,8 +180,12 @@ void vk_Cleanup();
 void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *buffer, double dt);
 void InitExamples();
 
+void CreatePipeline();
 // Helper functions
-bool     AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
+bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
+bool AllocateImageMemory(VkDevice device, VkPhysicalDevice gpu, VkImage image, VkDeviceMemory *memory);
+bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
+
 uint32_t FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
 VkResult CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
 VkResult AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);

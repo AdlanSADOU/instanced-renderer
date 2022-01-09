@@ -1,5 +1,6 @@
 #include "vk_renderer.h"
 #include "vk_types.h"
+#include <vk_texture.h>
 
 // mutually exclusive
 #define EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER       0
@@ -25,12 +26,12 @@ struct Quad
     struct Data
     {
         Vertex vertices[6] = {
-            { { -1.f, -1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
-            { { -1.0f, 1.f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
-            { { 1.0f, 1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
-            // { { -1.0f, -1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
-            // { { 1.0f, 1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
-            // { { 1.0f, -1.0f, 0.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } },
+            { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.2f, .6f, .2f }, { -1.0f, +1.0f } }, // bot-left 1
+            { { -1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.2f, .6f, .2f }, { -1.0f, -1.0f } }, // top-left
+            { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.2f, .6f, .2f }, { +1.0f, -1.0f } }, // top-right 1
+            { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.2f, .6f, .2f }, { -1.0f, +1.0f } }, // bot-left 2
+            { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.2f, .6f, .2f }, { +1.0f, -1.0f } }, // top-right 2
+            { { +1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.2f, .6f, .2f }, { +1.0f, +1.0f } }, // bot-right
         };
 
         // uint16_t indices[6] = {
@@ -48,13 +49,8 @@ std::vector<Quad> quads;
 
 struct Instances
 {
-    std::vector<InstanceData> data {
-        { { 0, 0, 0 }, { 0, 0, 0 } },
-        { { 6, 6, 0 }, { 0, 0, 0 } },
-
-    };
-
-    BufferObject bo;
+    std::vector<InstanceData> data;
+    BufferObject              bo;
 };
 
 Instances instances;
@@ -94,11 +90,22 @@ BufferObject triangles_ibo                    = {};
 BufferObject indirect_commands_buffer         = {};
 
 #endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
-void *instances_data_ptr;
-void  InitExamples()
+void        *instances_data_ptr;
+TextureAsset texture_asset;
+
+void InitExamples()
 {
     quads.push_back(quad);
     quads.push_back(quad);
+
+    InstanceData quad1_idata;
+    quad1_idata.pos     = { 0, 0, 0 };
+    quad1_idata.tex_idx = 0;
+    InstanceData quad2_idata;
+    quad1_idata.pos = { 4, 0, 0 };
+
+    instances.data.push_back(quad1_idata);
+    instances.data.push_back(quad2_idata);
 
     {
         VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -114,11 +121,46 @@ void  InitExamples()
         memcpy(instances_data_ptr, instances.data.data(), instances.data.size() * sizeof(InstanceData));
     }
 
+    // descriptorImageInfos requires VkImageView(s) which requires VkImage(s) backing actual texture data
+    // we need to finish texture loading in vk_texture.h
+    // we must be able to load textures whenever necessary
 
-    // glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0., 2., 0.));
-    // glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(1., 1., 1.));
-    // quad.transform_m4     = translation * scale;
+    CreateTextureAsset(&texture_asset, "./assets/texture.png", &vkr);
 
+    VkDescriptorImageInfo desc_image_image_info = {};
+    desc_image_image_info.sampler               = NULL;
+    desc_image_image_info.imageLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    desc_image_image_info.imageView             = texture_asset.view;
+    vkr.descriptor_image_infos.push_back(desc_image_image_info);
+
+
+    VkWriteDescriptorSet setWrites[2];
+
+    VkDescriptorImageInfo samplerInfo = {};
+    samplerInfo.sampler               = vkr.sampler;
+    setWrites[0]                      = {};
+    setWrites[0].sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    setWrites[0].dstBinding           = 0;
+    setWrites[0].dstArrayElement      = 0;
+    setWrites[0].descriptorType       = VK_DESCRIPTOR_TYPE_SAMPLER;
+    setWrites[0].descriptorCount      = 1;
+    setWrites[0].dstSet               = vkr.set_array_of_textures;
+    setWrites[0].pBufferInfo          = 0;
+    setWrites[0].pImageInfo           = &samplerInfo;
+
+    setWrites[1]                 = {};
+    setWrites[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    setWrites[1].dstBinding      = 1;
+    setWrites[1].dstArrayElement = 0;
+    setWrites[1].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    setWrites[1].descriptorCount = (uint32_t)vkr.descriptor_image_infos.size();
+    setWrites[1].pBufferInfo     = 0;
+    setWrites[1].dstSet          = vkr.set_array_of_textures;
+    setWrites[1].pImageInfo      = vkr.descriptor_image_infos.data();
+
+    vkUpdateDescriptorSets(vkr.device, 2, setWrites, 0, NULL);
+
+    CreatePipeline();
 
 
 
@@ -243,7 +285,8 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
     vkCmdBindPipeline(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline);
 
     const uint32_t dynamic_offsets = 0;
-    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, &vkr.frames[vkr.frame_idx_inflight].global_descriptor, 0, NULL);
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, &vkr.frames[vkr.frame_idx_inflight].set_global, 0, NULL);
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.set_array_of_textures, 0, NULL);
 
     {
         // push constants
@@ -268,7 +311,7 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
         instances.data[1].pos = { pos_x, 0, pos_z };
         memcpy(instances_data_ptr, instances.data.data(), instances.data.size() * sizeof(InstanceData));
 
-        vkCmdDraw(*cmd_buffer, ARR_COUNT(quad.data.vertices), quads.size(), 0, 0);
+        vkCmdDraw(*cmd_buffer, ARR_COUNT(quad.data.vertices), (uint32_t)quads.size(), 0, 0);
         // vkCmdDrawIndexed(*cmd_buffer, 6, 2, 0, 0, 0);
     }
 
@@ -338,7 +381,7 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
 
     VkDeviceSize offsets = 0;
     vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangles_vbo.buffer, &offsets);
-    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.frames[vkr.frame_idx_inflight].model_descriptor, 0, NULL);
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.frames[vkr.frame_idx_inflight].set_model, 0, NULL);
     vkCmdBindIndexBuffer(*cmd_buffer, triangles_ibo.buffer, 0, VkIndexType::VK_INDEX_TYPE_UINT32);
 
     // static int i = 0;
@@ -399,7 +442,7 @@ static void draw_Renderables(VkCommandBuffer cmd, RenderObject *first, int count
 
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipeline);
             lastMaterial = object.material;
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &get_CurrentFrameData().global_descriptor, 0, NULL);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &get_CurrentFrameData().set_global, 0, NULL);
         }
 
         glm::mat4 model = object.transformMatrix;

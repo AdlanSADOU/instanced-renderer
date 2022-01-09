@@ -12,7 +12,7 @@
             "program": "${workspaceFolder}/build/vkgame.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build/",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "console":"newExternalWindow",
             // "preLaunchTask": "C/C++: x64 Debug Build"

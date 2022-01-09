@@ -3,11 +3,11 @@
 layout (location = 0) in vec3 vPosition;
 layout (location = 1) in vec3 vNormal;
 layout (location = 2) in vec3 vColor;
+layout (location = 3) in vec2 vTexUV;
 
-layout (location = 3) in vec3 iPos;
-layout (location = 4) in vec3 iRot;
-
-layout (location = 0) out vec3 outColor;
+layout (location = 4) in vec3 iPos;
+layout (location = 5) in vec3 iRot;
+layout (location = 6) in int  iTexIdx;
 
 layout(set = 0, binding = 0) uniform  CameraBuffer {
 	mat4 view;
@@ -21,6 +21,12 @@ layout (push_constant) uniform constants
 	mat4 render_matrix;
 } PushConstants;
 
+
+layout (location = 0) out vec3 outColor;
+layout (location = 1) out vec2 outTexUV;
+layout (location = 2) out int  outTexIdx;
+
+
 void main()
 {
 
@@ -30,4 +36,6 @@ void main()
 	mat4 tranformMatrix = (cameraData.viewproj  ) ;
 	gl_Position = tranformMatrix * pos;
 	outColor = vColor;
+    outTexIdx = iTexIdx;
+    outTexUV = vTexUV;
 }

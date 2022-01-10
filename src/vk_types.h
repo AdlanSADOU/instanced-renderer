@@ -9,17 +9,24 @@
 #include <vector>
 #include <deque>
 
-struct InstanceData
+struct Vertex
 {
-    // glm::mat4 tranform_matrix;
-    glm::vec3 pos;
-    glm::vec3 rot;
-    int32_t   tex_idx;
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec3 color;
+    glm::vec2 tex_uv;
 };
 
-struct ModelData
+struct Quad
 {
-    glm::mat4 transform;
+    Vertex vertices[6] = {
+        { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }, // bot-left 1
+        { { -1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } }, // top-left
+        { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }, // top-right 1
+        { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }, // bot-left 2
+        { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }, // top-right 2
+        { { +1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } }, // bot-right
+    };
 };
 
 struct BufferObject
@@ -27,6 +34,27 @@ struct BufferObject
     VkBuffer      buffer;
     VmaAllocation allocation;
 };
+
+struct InstanceData
+{
+    // glm::mat4 tranform_matrix;
+    glm::vec3 pos;
+    glm::vec3 rot;
+    glm::vec3 scale;
+    int32_t   tex_idx;
+};
+
+struct Instances
+{
+    std::vector<InstanceData> data;
+    BufferObject              bo;
+};
+
+struct ModelData
+{
+    glm::mat4 transform;
+};
+
 
 struct FrameData
 {
@@ -37,6 +65,7 @@ struct FrameData
     VkCommandBuffer main_command_buffer = {};
     VkDescriptorSet set_global          = {};
     VkDescriptorSet set_model           = {};
+    uint32_t        idx_swapchain_image;
 };
 
 struct MeshPushConstants
@@ -65,13 +94,6 @@ struct Material
     VkPipelineLayout pipelineLayout;
 };
 
-struct Vertex
-{
-    glm::vec3 position;
-    glm::vec3 normal;
-    glm::vec3 color;
-    glm::vec2 tex_uv;
-};
 
 struct Mesh
 {

@@ -15,4 +15,4 @@ v16
 .vs/vulkan-ex/project-colors.json
 .vs/slnx.sqlite
 
-.vs
+.vs/*

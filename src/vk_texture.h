@@ -16,7 +16,8 @@ struct TextureAsset
 
     uint32_t width;
     uint32_t height;
-    uint32_t numChannels;
+    uint32_t num_channels;
+    uint32_t array_index;
 };
 
 static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath, VulkanRenderer *vkr)
@@ -31,10 +32,10 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
     size_t imageSize = tex_width * tex_height * 4;
 
 
-    texture_asset->width       = tex_width;
-    texture_asset->height      = tex_height;
-    texture_asset->numChannels = texChannels;
-    texture_asset->format      = VK_FORMAT_R8G8B8A8_UNORM;
+    texture_asset->width        = tex_width;
+    texture_asset->height       = tex_height;
+    texture_asset->num_channels = texChannels;
+    texture_asset->format       = VK_FORMAT_R8G8B8A8_UNORM;
 
 
     VkImageCreateInfo ci_image = {};
@@ -49,15 +50,13 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
     ci_image.tiling            = VK_IMAGE_TILING_OPTIMAL; // 0
     ci_image.sharingMode       = VK_SHARING_MODE_EXCLUSIVE; // 0
     ci_image.initialLayout     = VK_IMAGE_LAYOUT_UNDEFINED; // 0
-    VK_CHECK(vkCreateImage(vkr->device, &ci_image, NULL, &texture_asset->image));
-    if (!AllocateImageMemory(vkr->allocator, texture_asset->image, &texture_asset->allocation, VMA_MEMORY_USAGE_GPU_ONLY))
-        SDL_Log("failed to allocate image memory");
-    // if (!AllocateImageMemory(vkr->device, vkr->chosen_gpu, texture_asset->image, &texture_asset->memory))
 
-    // can be deferred
-    vmaBindImageMemory(vkr->allocator, texture_asset->allocation, texture_asset->image);
-    // VK_CHECK(vkBindImageMemory(vkr->device, texture_asset->image, texture_asset->memory, 0));
-    // can be deferred
+    VmaAllocationCreateInfo ci_allocation = {};
+    ci_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VK_CHECK(vmaCreateImage(vkr->allocator, &ci_image, &ci_allocation, &texture_asset->image, &texture_asset->allocation, NULL));
+
+
     VkImageViewCreateInfo ci_image_view = {};
     ci_image_view.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     ci_image_view.image                 = texture_asset->image;
@@ -68,8 +67,17 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
     VK_CHECK(vkCreateImageView(vkr->device, &ci_image_view, NULL, &texture_asset->view));
 
 
+    VmaAllocationCreateInfo vmaallocInfo = {};
+    vmaallocInfo.usage                   = VMA_MEMORY_USAGE_CPU_ONLY;
+
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.pNext              = NULL;
+    bufferInfo.size               = imageSize;
+    bufferInfo.usage              = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
     BufferObject staging_buffer;
-    VK_CHECK(CreateBuffer(&staging_buffer, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
+    VK_CHECK(vmaCreateBuffer(vkr->allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer, &staging_buffer.allocation, NULL));
 
     void *staging_data;
     vmaMapMemory(vkr->allocator, staging_buffer.allocation, &staging_data);
@@ -118,7 +126,8 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
     buffer_image_copy.imageExtent       = { (uint32_t)tex_width, (uint32_t)tex_height, 1 };
     vkCmdCopyBufferToImage(vkr->frames[0].main_command_buffer, staging_buffer.buffer, texture_asset->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_image_copy);
 
-    // another image layout transfer
+
+    // Image layout transfer to SHADER_READ_ONLY_OPTIMAL
     VkImageMemoryBarrier image_memory_barrier_from_transfer_to_shader_read = {};
     image_memory_barrier_from_transfer_to_shader_read.sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     image_memory_barrier_from_transfer_to_shader_read.srcAccessMask        = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -138,20 +147,32 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
 
 
     // Submit command buffer and copy data from staging buffer to a vertex buffer
-    VkSubmitInfo submit_info         = {};
-    submit_info.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO; // VkStructureType              sType
-    submit_info.pNext                = nullptr; // const void                  *pNext
-    submit_info.waitSemaphoreCount   = 0; // uint32_t                     waitSemaphoreCount
-    submit_info.pWaitSemaphores      = nullptr; // const VkSemaphore           *pWaitSemaphores
-    submit_info.pWaitDstStageMask    = nullptr; // const VkPipelineStageFlags  *pWaitDstStageMask;
-    submit_info.commandBufferCount   = 1; // uint32_t                     commandBufferCount
-    submit_info.pCommandBuffers      = &vkr->frames[0].main_command_buffer; // const VkCommandBuffer       *pCommandBuffers
-    submit_info.signalSemaphoreCount = 0; // uint32_t                     signalSemaphoreCount
-    submit_info.pSignalSemaphores    = nullptr; // const VkSemaphore           *pSignalSemaphores
+    VkSubmitInfo submit_info       = {};
+    submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers    = &vkr->frames[0].main_command_buffer;
 
     VK_CHECK(vkQueueSubmit(vkr->graphics_queue_idx, 1, &submit_info, VK_NULL_HANDLE));
 
     vkDeviceWaitIdle(vkr->device);
+
+    vmaDestroyBuffer(vkr->allocator, staging_buffer.buffer, staging_buffer.allocation);
+
+    static int array_index = 0;
+
+    VkDescriptorImageInfo desc_image_image_info = {};
+    desc_image_image_info.sampler               = NULL;
+    desc_image_image_info.imageLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    desc_image_image_info.imageView             = texture_asset->view;
+    vkr->descriptor_image_infos[array_index]    = desc_image_image_info;
+
+    texture_asset->array_index = array_index++;
+}
+
+static void DestroyTextureAsset(TextureAsset *texture_asset, VulkanRenderer *vkr)
+{
+    vkDestroyImageView(vkr->device, texture_asset->view, NULL);
+    vmaDestroyImage(vkr->allocator, texture_asset->image, texture_asset->allocation);
 }
 
 #endif // VK_TEXTURE_H

@@ -16,6 +16,7 @@
 #include <vk_mem_alloc.h>
 #include <vk_types.h>
 
+#define PI             3.14159265358979323846264338327950288
 #define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
 
 #define FRAME_OVERLAP 2
@@ -52,9 +53,15 @@ struct Camera
     BufferObject UBO[FRAME_OVERLAP];
 };
 
+// this number reflects the texture array size set in the "shaders/textureArray.frag" shader
+// both must be equal
+#define MAX_TEXTURE_COUNT 80
+
 struct VulkanRenderer
 {
-    SDL_Window  *window = NULL;
+    SDL_Window *window = NULL;
+    VkExtent2D  window_extent { 1280, 720 };
+
     Camera       camera = {};
     FrameData    frames[FRAME_OVERLAP];
     BufferObject triangle_SSBO[FRAME_OVERLAP];
@@ -90,7 +97,6 @@ struct VulkanRenderer
     VkDescriptorPool      descriptor_pool;
     VkDescriptorSetLayout set_layout_global;
 
-    uint32_t                           MAX_TEXTURES_COUNT = 10;
     VkDescriptorSetLayout              set_layout_array_of_textures;
     VkDescriptorSet                    set_array_of_textures;
     std::vector<VkDescriptorImageInfo> descriptor_image_infos;
@@ -118,8 +124,6 @@ struct VulkanRenderer
 
     bool     is_initialized     = false;
     uint64_t frame_idx_inflight = 0;
-
-    VkExtent2D window_extent { 1280, 720 };
 };
 
 #define VK_CHECK(x)                                    \
@@ -149,36 +153,21 @@ struct PipelineBuilder
     VkPipeline BuildPipeline(VkDevice device, VkRenderPass render_pass);
 };
 
-FrameData           &get_CurrentFrameData();
-static Mesh         *get_Mesh(const std::string &name);
-static Material     *get_Material(const std::string &name);
-static RenderObject *get_Renderable(std::string name);
+FrameData &get_CurrentFrameData();
 
 static VertexInputDescription GetVertexDescription();
 
-static bool InitShaderModule(const char *filepath, VkShaderModule *outShaderModule);
-static void init_Scene();
-static void InitMeshes();
-
-// create material and add it to the map
-static Material *create_Material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name);
-
-static void CreateMesh(Mesh &mesh);
+static bool CreateShaderModule(const char *filepath, VkShaderModule *outShaderModule);
 
 VkResult CreateBuffer(BufferObject *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation);
 
-static void draw_Renderables(VkCommandBuffer cmd, RenderObject *first, int count);
-
-void vk_Init();
-void VulkanUpdateAndRender(double dt);
-void vk_EndPass();
-void UpdateAndRender();
-void vk_Cleanup();
-
+void       vk_Init();
+void       vk_BeginRenderPass();
+void       vk_EndRenderPass();
+void       vk_Cleanup();
+FrameData &get_CurrentFrameData();
 // temporary examples
-void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *buffer, double dt);
-void InitExamples();
 
 void CreatePipeline();
 // Helper functions

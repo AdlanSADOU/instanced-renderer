@@ -24,9 +24,6 @@ void vk_Init()
         window_flags);
 
 
-
-
-
     VkValidationFeatureEnableEXT enabled_validation_feature[] = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT };
     VkValidationFeaturesEXT      validation_features          = {};
     validation_features.sType                                 = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
@@ -72,13 +69,9 @@ void vk_Init()
 
 
 
-
-
     if (!SDL_Vulkan_CreateSurface(vkr.window, vkr.instance, &vkr.surface)) {
         printf("SDL Failed to create Surface");
     }
-
-
 
 
     ////////////////////////////////////
@@ -91,8 +84,6 @@ void vk_Init()
     std::vector<VkPhysicalDevice> gpus(gpu_count);
     VK_CHECK(vkEnumeratePhysicalDevices(vkr.instance, &gpu_count, gpus.data()));
     vkr.chosen_gpu = gpus[0];
-
-
 
 
 
@@ -150,8 +141,6 @@ void vk_Init()
 
 
 
-
-
     /////////////////////////////
     /// Device
     VkPhysicalDeviceFeatures supported_gpu_features = {};
@@ -179,9 +168,15 @@ void vk_Init()
     create_info_device_queue.queueCount              = 1;
     create_info_device_queue.pQueuePriorities        = queue_priorities;
 
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness_feature_ext = {};
+    robustness_feature_ext.sType                                  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
+    robustness_feature_ext.nullDescriptor                         = VK_TRUE;
+
+    // gpu_vulkan_11_features.pNext = &robustness_feature_ext;
+
     VkDeviceCreateInfo create_info_device   = {};
     create_info_device.sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    create_info_device.pNext                = &gpu_vulkan_11_features;
+    create_info_device.pNext                = &robustness_feature_ext;
     create_info_device.flags                = 0;
     create_info_device.queueCreateInfoCount = 1;
     create_info_device.pQueueCreateInfos    = &create_info_device_queue;
@@ -201,8 +196,6 @@ void vk_Init()
 
 
 
-
-
     ///////////////////////////
     /// VMA Allocator
     VmaAllocatorCreateInfo allocatorInfo = {};
@@ -211,8 +204,6 @@ void vk_Init()
     allocatorInfo.device         = vkr.device;
     allocatorInfo.instance       = vkr.instance;
     vmaCreateAllocator(&allocatorInfo, &vkr.allocator);
-
-
 
 
 
@@ -262,8 +253,6 @@ void vk_Init()
 
 
 
-
-
     //////////////////////////////////////
     /// Swapchain Images acquisition
     uint32_t swapchain_image_count = 0;
@@ -295,8 +284,6 @@ void vk_Init()
     vkr.swapchain_image_format = surface_formats[0].format;
 
 
-
-
     ///////////////////////////////////
     /// Depth Image
     // depth image size will match the window
@@ -312,7 +299,7 @@ void vk_Init()
 
     VmaAllocationCreateInfo create_info_depth_image_allocation = {}; // for the depth image, we want to allocate it from GPU local memory
     create_info_depth_image_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
-    create_info_depth_image_allocation.requiredFlags           = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    create_info_depth_image_allocation.requiredFlags           = (VkMemoryPropertyFlags)VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
     vmaCreateImage(vkr.allocator, &create_info_depth_image, &create_info_depth_image_allocation, &vkr.depth_image._image, &vkr.depth_image.allocation, NULL);
 
@@ -325,8 +312,6 @@ void vk_Init()
         vkDestroyImageView(vkr.device, vkr.depth_image_view, NULL);
         vmaDestroyImage(vkr.allocator, vkr.depth_image._image, vkr.depth_image.allocation);
     });
-
-
 
 
 
@@ -348,8 +333,6 @@ void vk_Init()
             vkDestroyCommandPool(vkr.device, vkr.frames[i].command_pool, NULL);
         });
     }
-
-
 
 
 
@@ -416,8 +399,6 @@ void vk_Init()
 
 
 
-
-
     ///////////////////////////////////////////////
     // Framebuffer initialization
     //
@@ -455,8 +436,6 @@ void vk_Init()
 
 
 
-
-
     ////////////////////////////////////////////////////////////////
     // Sync structures
     // Fence creation
@@ -487,8 +466,6 @@ void vk_Init()
 
 
 
-
-
     /////////////////////////////////////////////////////
     // Descriptors
     std::vector<VkDescriptorPoolSize> sizes = {
@@ -506,8 +483,6 @@ void vk_Init()
     pool_info.poolSizeCount              = (uint32_t)sizes.size();
     pool_info.pPoolSizes                 = sizes.data();
     vkCreateDescriptorPool(vkr.device, &pool_info, NULL, &vkr.descriptor_pool);
-
-
 
 
 
@@ -557,8 +532,24 @@ void vk_Init()
         }
     }
 
+    /// Set 1
+    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampler = {};
+    desc_set_layout_binding_sampler.binding                      = 0;
+    desc_set_layout_binding_sampler.descriptorCount              = 1;
+    desc_set_layout_binding_sampler.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLER;
+    desc_set_layout_binding_sampler.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampled_image = {};
+    desc_set_layout_binding_sampled_image.binding                      = 1;
+    desc_set_layout_binding_sampled_image.descriptorCount              = (uint32_t)80; // texture count
+    desc_set_layout_binding_sampled_image.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    desc_set_layout_binding_sampled_image.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    /// layout > array of textures & sampler
+    std::vector<VkDescriptorSetLayoutBinding> array_of_textures_set_layout_bindings;
+    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampler);
+    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampled_image);
+    CreateDescriptorSetLayout(vkr.device, NULL, &vkr.set_layout_array_of_textures, array_of_textures_set_layout_bindings.data(), (uint32_t)array_of_textures_set_layout_bindings.size());
 
     // Sampler
     VkSamplerCreateInfo ci_sampler = {};
@@ -571,51 +562,12 @@ void vk_Init()
     ci_sampler.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     VK_CHECK(vkCreateSampler(vkr.device, &ci_sampler, NULL, &vkr.sampler));
 
-
-    /// Set 1
-    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampler = {};
-    desc_set_layout_binding_sampler.binding                      = 0;
-    desc_set_layout_binding_sampler.descriptorCount              = 1;
-    desc_set_layout_binding_sampler.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLER;
-    desc_set_layout_binding_sampler.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampled_image = {};
-    desc_set_layout_binding_sampled_image.binding                      = 1;
-    desc_set_layout_binding_sampled_image.descriptorCount              = 1; // texture count
-    desc_set_layout_binding_sampled_image.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    desc_set_layout_binding_sampled_image.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    /// layout > array of textures & sampler
-    std::vector<VkDescriptorSetLayoutBinding> array_of_textures_set_layout_bindings;
-    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampler);
-    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampled_image);
-    CreateDescriptorSetLayout(vkr.device, NULL, &vkr.set_layout_array_of_textures, array_of_textures_set_layout_bindings.data(), (uint32_t)array_of_textures_set_layout_bindings.size());
-
-    VkDescriptorSetAllocateInfo desc_alloc_info = {};
-    desc_alloc_info.sType                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    desc_alloc_info.descriptorPool              = vkr.descriptor_pool;
-    desc_alloc_info.descriptorSetCount          = 1;
-    desc_alloc_info.pSetLayouts                 = &vkr.set_layout_array_of_textures;
-    VK_CHECK(vkAllocateDescriptorSets(vkr.device, &desc_alloc_info, &vkr.set_array_of_textures));
-
-
-    //////////////////////////////////////////////////////
-    // Pipeline
-
-
-
-
-
-    // Right now, we are assigning a pipeline to a material. So we don't have any options
-    // for setting shaders or whatever else we might wanna customize in the future
-    // the @create_Material function should probably create it's pipeline in a customizable way
-    // create_Material(pipeline, pipelineLayout, "defaultmesh");
-
-
-
-
+    CreatePipeline();
 
     vkr.is_initialized = true;
+
+    vkr.descriptor_image_infos.resize(MAX_TEXTURE_COUNT);
+    memset(vkr.descriptor_image_infos.data(), VK_NULL_HANDLE, vkr.descriptor_image_infos.size() * sizeof(VkDescriptorImageInfo));
 }
 
 void CreatePipeline()
@@ -623,7 +575,7 @@ void CreatePipeline()
     //////
     // ShaderModule loading
     VkShaderModule vertexShader;
-    if (!InitShaderModule("./shaders/triangleMesh.vert.spv", &vertexShader)) {
+    if (!CreateShaderModule("./shaders/triangleMesh.vert.spv", &vertexShader)) {
         printf("Error when building the vertex shader module. Did you compile the shaders?\n");
 
     } else {
@@ -631,10 +583,10 @@ void CreatePipeline()
     }
 
     VkShaderModule fragmentShader;
-    if (!InitShaderModule("./shaders/textureArray.frag.spv", &fragmentShader)) {
+    if (!CreateShaderModule("./shaders/textureArray.frag.spv", &fragmentShader)) {
         printf("Error when building the fragment shader module. Did you compile the shaders?\n");
     } else {
-        printf("vertex fragment shader succesfully loaded\n");
+        printf("vertex shader succesfully loaded\n");
     }
 
     // this is where we provide the vertex shader with our matrices
@@ -646,8 +598,8 @@ void CreatePipeline()
     ///////
     // PipelineLayout
     VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info(); // build the pipeline layout that controls the inputs/outputs of the shader
-    pipeline_layout_info.pushConstantRangeCount     = 1;
-    pipeline_layout_info.pPushConstantRanges        = &push_constant;
+    // pipeline_layout_info.pushConstantRangeCount     = 1;
+    // pipeline_layout_info.pPushConstantRanges        = &push_constant;
 
 
     std::vector<VkDescriptorSetLayout> set_layouts = {
@@ -705,8 +657,6 @@ void CreatePipeline()
     vkr.default_pipeline = pipelineBuilder.BuildPipeline(vkr.device, vkr.render_pass);
 
 
-
-
     vkDestroyShaderModule(vkr.device, vertexShader, NULL);
     vkDestroyShaderModule(vkr.device, fragmentShader, NULL);
 
@@ -720,35 +670,32 @@ void CreatePipeline()
 /////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 /// Rendering
-VkFence         *g_inflight_render_fence;
-VkSemaphore     *g_inflight_present_semaphore;
-VkSemaphore     *g_inflight_render_semaphore;
-VkCommandBuffer *g_inflight_main_command_buffer;
-VkDescriptorSet *g_inflight_global_descriptor_set;
-BufferObject    *buffer;
 
-void VulkanUpdateAndRender(double dt)
+void vk_BeginRenderPass()
 {
     // wait until the GPU has finished rendering the last frame. Timeout of 1 second
+    VkFence         *g_inflight_render_fence;
+    VkSemaphore     *g_inflight_present_semaphore;
+    VkSemaphore     *g_inflight_render_semaphore;
+    VkCommandBuffer *g_inflight_main_command_buffer;
+    VkDescriptorSet *g_inflight_global_descriptor_set;
+    BufferObject    *camera_ubo;
+
     g_inflight_render_fence          = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].render_fence;
     g_inflight_present_semaphore     = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].present_semaphore;
     g_inflight_render_semaphore      = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].render_semaphore;
     g_inflight_main_command_buffer   = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].main_command_buffer;
     g_inflight_global_descriptor_set = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].set_global;
 
-    buffer = &vkr.camera.UBO[vkr.frame_idx_inflight % FRAME_OVERLAP];
-
+    camera_ubo = &vkr.camera.UBO[vkr.frame_idx_inflight % FRAME_OVERLAP];
 
 
     VK_CHECK(vkWaitForFences(vkr.device, 1, g_inflight_render_fence, true, SECONDS(1)));
     VK_CHECK(vkResetFences(vkr.device, 1, g_inflight_render_fence));
 
-    uint32_t idx_swapchain_image;
-    VK_CHECK(vkAcquireNextImageKHR(vkr.device, vkr.swapchain, SECONDS(1), *g_inflight_present_semaphore, NULL, &idx_swapchain_image));
+
+    VK_CHECK(vkAcquireNextImageKHR(vkr.device, vkr.swapchain, SECONDS(1), *g_inflight_present_semaphore, NULL, &vkr.frames[vkr.frame_idx_inflight].idx_swapchain_image));
     VK_CHECK(vkResetCommandBuffer(*g_inflight_main_command_buffer, 0)); // now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
-
-
-
 
 
     VkClearValue clear_value;
@@ -762,8 +709,6 @@ void VulkanUpdateAndRender(double dt)
     VkClearValue union_clear_values[] = { clear_value, depth_clear };
 
 
-
-
     //////////////////////
     // BEGIN renderpass
     VkRenderPassBeginInfo rpInfo = {};
@@ -773,29 +718,9 @@ void VulkanUpdateAndRender(double dt)
     rpInfo.renderArea.offset.x   = 0;
     rpInfo.renderArea.offset.y   = 0;
     rpInfo.renderArea.extent     = vkr.window_extent;
-    rpInfo.framebuffer           = vkr.framebuffers[idx_swapchain_image];
+    rpInfo.framebuffer           = vkr.framebuffers[vkr.frames[vkr.frame_idx_inflight].idx_swapchain_image];
     rpInfo.clear_value_count     = 2;
     rpInfo.pClearValues          = &union_clear_values[0];
-
-
-
-
-    // camera view
-    glm::vec3 cam_pos     = { camera_x, 0.f + camera_y - 10, -30.f + camera_z };
-    glm::mat4 translation = glm::translate(glm::mat4(1.f), cam_pos);
-    glm::mat4 rotation    = glm::rotate(glm::mat4(1.f), .66f, glm::vec3(1, 0, 0));
-    glm::mat4 view        = rotation * translation;
-    glm::mat4 projection  = glm::perspective(glm::radians(60.f), (float)vkr.window_extent.width / (float)vkr.window_extent.height, 0.1f, 200.0f);
-    projection[1][1] *= -1;
-
-    vkr.camera.data.projection = projection;
-    vkr.camera.data.view       = view;
-    vkr.camera.data.viewproj   = projection * view;
-
-    AllocateFillBuffer(&vkr.camera, sizeof(Camera::Data), (*buffer).allocation);
-
-
-
 
     ///////////////////////////////////////
     // Begin the command buffer recording
@@ -807,20 +732,14 @@ void VulkanUpdateAndRender(double dt)
     VK_CHECK(vkBeginCommandBuffer(*g_inflight_main_command_buffer, &cmd_begin_info));
 
     vkCmdBeginRenderPass(*g_inflight_main_command_buffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+}
 
-
-
-    /////////////////////////////////////////////////////////////////////////////////////////////////
-    /// Draw commands
-    DrawExamples(g_inflight_main_command_buffer, g_inflight_global_descriptor_set, buffer, dt);
-    // draw_Renderables(*g_inflight_main_command_buffer, vkr.renderables.data(), (uint32_t)vkr.renderables.size());
-
-
-
-    //////////////////////////////////////////////////////////////////////////////////////////////////
+void vk_EndRenderPass()
+{
+    ////////////////////////////////////////////////
     // END renderpass & command buffer recording
-    vkCmdEndRenderPass(*g_inflight_main_command_buffer);
-    VK_CHECK(vkEndCommandBuffer(*g_inflight_main_command_buffer));
+    vkCmdEndRenderPass(get_CurrentFrameData().main_command_buffer);
+    VK_CHECK(vkEndCommandBuffer(get_CurrentFrameData().main_command_buffer));
 
     VkSubmitInfo submit_info = {};
     submit_info.sType        = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -830,17 +749,17 @@ void VulkanUpdateAndRender(double dt)
     submit_info.pWaitDstStageMask  = &waitStage;
 
     submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores    = g_inflight_present_semaphore;
+    submit_info.pWaitSemaphores    = &get_CurrentFrameData().present_semaphore;
 
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores    = g_inflight_render_semaphore;
+    submit_info.pSignalSemaphores    = &get_CurrentFrameData().render_semaphore;
 
     submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers    = g_inflight_main_command_buffer;
+    submit_info.pCommandBuffers    = &get_CurrentFrameData().main_command_buffer;
 
     // submit command buffer to the queue and execute it.
     //  g_inflight_render_fence will now block until the graphic commands finish execution
-    VK_CHECK(vkQueueSubmit(vkr.graphics_queue_idx, 1, &submit_info, *g_inflight_render_fence));
+    VK_CHECK(vkQueueSubmit(vkr.graphics_queue_idx, 1, &submit_info, get_CurrentFrameData().render_fence));
 
     // this will put the image we just rendered into the visible window.
     // we want to g_inflight_render_semaphore for that,
@@ -852,10 +771,10 @@ void VulkanUpdateAndRender(double dt)
     presentInfo.pSwapchains    = &vkr.swapchain;
     presentInfo.swapchainCount = 1;
 
-    presentInfo.pWaitSemaphores    = g_inflight_render_semaphore;
+    presentInfo.pWaitSemaphores    = &get_CurrentFrameData().render_semaphore;
     presentInfo.waitSemaphoreCount = 1;
 
-    presentInfo.pImageIndices = &idx_swapchain_image;
+    presentInfo.pImageIndices = &vkr.frames[vkr.frame_idx_inflight].idx_swapchain_image;
 
     VK_CHECK(vkQueuePresentKHR(vkr.graphics_queue_idx, &presentInfo));
 
@@ -863,7 +782,15 @@ void VulkanUpdateAndRender(double dt)
     vkr.frame_idx_inflight = vkr.frame_idx_inflight % FRAME_OVERLAP;
 }
 
+void VulkanUpdateAndRender(double dt)
+{
 
+
+
+    ////////////////////////////////////////////////
+    /// Draw commands
+    // draw_Renderables(*g_inflight_main_command_buffer, vkr.renderables.data(), (uint32_t)vkr.renderables.size());
+}
 
 
 
@@ -932,84 +859,14 @@ VkPipeline PipelineBuilder::BuildPipeline(VkDevice device, VkRenderPass pass)
 }
 
 
-
-
-////////////////////////////////////////////////////
-/// keeping around for reference
-void InitMeshes()
-{
-    Mesh mesh_triangle;
-    mesh_triangle.vertices.resize(3);
-
-    mesh_triangle.vertices[0].position = { 0.2f, 0.2f, 0.0f };
-    mesh_triangle.vertices[1].position = { -0.2f, 0.2f, 0.0f };
-    mesh_triangle.vertices[2].position = { 0.f, -0.2f, 0.0f };
-
-    mesh_triangle.vertices[0].color = { 0.f, 0.2f, 0.0f }; // pure green
-    mesh_triangle.vertices[1].color = { 0.f, 0.2f, 0.0f }; // pure green
-    mesh_triangle.vertices[2].color = { 0.f, 0.2f, 0.0f }; // pure green
-    // we don't care about the vertex normals
-
-    CreateMesh(mesh_triangle);
-
-    Mesh mesh_monkey;
-    mesh_monkey.LoadFromObj("../assets/monkey_smooth.obj");
-    CreateMesh(mesh_monkey);
-
-    vkr.meshes["monkey"]   = mesh_monkey;
-    vkr.meshes["triangle"] = mesh_triangle;
-}
-
-
-
-
-
-void CreateMesh(Mesh &mesh)
-{
-    // allocate vertex buffer
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    // this is the total size, in bytes, of the buffer we are allocating
-    bufferInfo.size = mesh.vertices.size() * sizeof(Vertex);
-    // this buffer is going to be used as a Vertex Buffer
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-
-    // let the VMA library know that this data should be writeable by CPU, but also readable by GPU
-    VmaAllocationCreateInfo vmaallocInfo = {};
-    vmaallocInfo.usage                   = VMA_MEMORY_USAGE_CPU_TO_GPU;
-
-    // allocate the buffer
-    VK_CHECK(vmaCreateBuffer(vkr.allocator, &bufferInfo, &vmaallocInfo,
-        &mesh.vertex_buffer.buffer,
-        &mesh.vertex_buffer.allocation,
-        NULL));
-
-    // copy vertex data
-    void *data;
-    vmaMapMemory(vkr.allocator, mesh.vertex_buffer.allocation, &data); // gives a ptr to data
-    memcpy(data, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex)); // copies vertices into data
-
-    vmaUnmapMemory(vkr.allocator, mesh.vertex_buffer.allocation);
-    // add the destruction of triangle mesh buffer to the deletion queue
-    vkr.release_queue.push_function([=]() {
-        vmaDestroyBuffer(vkr.allocator, mesh.vertex_buffer.buffer, mesh.vertex_buffer.allocation);
-    });
-}
-
-
-
-
-
-static FrameData &get_CurrentFrameData()
+FrameData &get_CurrentFrameData()
 {
     return vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP];
 }
 
 
 
-
-
-bool InitShaderModule(const char *filepath, VkShaderModule *out_ShaderModule)
+bool CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule)
 {
     std::ifstream file(filepath, std::ios::ate | std::ios::binary);
 
@@ -1048,8 +905,6 @@ bool InitShaderModule(const char *filepath, VkShaderModule *out_ShaderModule)
 
 
 
-
-
 void vk_Cleanup()
 {
     if (vkr.is_initialized) {
@@ -1060,79 +915,18 @@ void vk_Cleanup()
 
         vmaDestroyAllocator(vkr.allocator);
 
+        vkDestroySampler(vkr.device, vkr.sampler, NULL);
         vkDestroySurfaceKHR(vkr.instance, vkr.surface, NULL);
-        // vkr.default_pipeline_layout
         vkDestroyPipelineLayout(vkr.device, vkr.default_pipeline_layout, NULL);
         vkDestroyPipeline(vkr.device, vkr.default_pipeline, NULL);
         vkDestroyDescriptorSetLayout(vkr.device, vkr.set_layout_global, NULL);
+        vkDestroyDescriptorSetLayout(vkr.device, vkr.set_layout_array_of_textures, NULL);
         vkDestroyDescriptorPool(vkr.device, vkr.descriptor_pool, NULL);
         vkDestroyDevice(vkr.device, NULL);
-
-        // vkb::destroy_debug_utils_messenger(vkr.instance, vkr.debug_messenger);
         vkDestroyInstance(vkr.instance, NULL);
         SDL_DestroyWindow(vkr.window);
     }
 }
-
-
-
-
-
-///////////////////////////////////////
-// todo(ad): must rethink these
-Material *create_Material(VkPipeline pipeline, VkPipelineLayout layout, const std::string &name)
-{
-    Material mat;
-    mat.pipeline        = pipeline;
-    mat.pipelineLayout  = layout;
-    vkr.materials[name] = mat;
-    return &vkr.materials[name];
-}
-
-
-
-
-
-Material *get_Material(const std::string &name)
-{
-    // search for the object, and return nullpointer if not found
-    auto it = vkr.materials.find(name);
-    if (it == vkr.materials.end()) {
-        return NULL;
-    } else {
-        return &(*it).second;
-    }
-}
-
-
-
-
-
-Mesh *get_Mesh(const std::string &name)
-{
-    auto it = vkr.meshes.find(name);
-    if (it == vkr.meshes.end()) {
-        return NULL;
-    } else {
-        return &(*it).second;
-    }
-}
-
-
-
-
-
-RenderObject *get_Renderable(std::string name)
-{
-    for (size_t i = 0; i < vkr.renderables.size(); i++) {
-        if (vkr.renderables[i].mesh == get_Mesh(name))
-            return &vkr.renderables[i];
-    }
-    return NULL;
-}
-
-
-
 
 VertexInputDescription GetVertexDescription()
 {
@@ -1193,14 +987,21 @@ VertexInputDescription GetVertexDescription()
         rotation_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
         rotation_attribute.offset                            = offsetof(InstanceData, rot);
 
+        VkVertexInputAttributeDescription scale_attribute = {};
+        scale_attribute.binding                           = 1;
+        scale_attribute.location                          = 6;
+        scale_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        scale_attribute.offset                            = offsetof(InstanceData, scale);
+
         VkVertexInputAttributeDescription tex_idx_attribute = {};
         tex_idx_attribute.binding                           = 1;
-        tex_idx_attribute.location                          = 6;
+        tex_idx_attribute.location                          = 7;
         tex_idx_attribute.format                            = VK_FORMAT_R32_SINT;
         tex_idx_attribute.offset                            = offsetof(InstanceData, tex_idx);
 
         description.attributes.push_back(position_attribute);
         description.attributes.push_back(rotation_attribute);
+        description.attributes.push_back(scale_attribute);
         description.attributes.push_back(tex_idx_attribute);
     }
 
@@ -1228,11 +1029,16 @@ VkResult CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsage
     vmaallocInfo.usage                   = memory_usage;
 
     // bind buffer to allocation
-    return vmaCreateBuffer(vkr.allocator, &bufferInfo, &vmaallocInfo, &dst_buffer->buffer, &dst_buffer->allocation, NULL);
+    VkResult res = vmaCreateBuffer(vkr.allocator, &bufferInfo, &vmaallocInfo, &dst_buffer->buffer, &dst_buffer->allocation, NULL);
 
-    vkr.release_queue.push_function([=]() {
-        vmaDestroyBuffer(vkr.allocator, dst_buffer->buffer, dst_buffer->allocation);
-    });
+    if (res == VK_SUCCESS) {
+        vkr.release_queue.push_function([=]() {
+            if (dst_buffer->buffer != VK_NULL_HANDLE)
+            vmaDestroyBuffer(vkr.allocator, dst_buffer->buffer, dst_buffer->allocation);
+        });
+    }
+
+    return res;
 }
 
 VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)

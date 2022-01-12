@@ -7,6 +7,7 @@
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
 #include <vector>
+#include <functional>
 #include <deque>
 
 struct Vertex
@@ -58,13 +59,13 @@ struct ModelData
 
 struct FrameData
 {
-    VkSemaphore     present_semaphore   = {};
-    VkSemaphore     render_semaphore    = {};
-    VkFence         render_fence        = {};
-    VkCommandPool   command_pool        = {};
-    VkCommandBuffer main_command_buffer = {};
-    VkDescriptorSet set_global          = {};
-    VkDescriptorSet set_model           = {};
+    VkSemaphore     present_semaphore = {};
+    VkSemaphore     render_semaphore  = {};
+    VkFence         render_fence      = {};
+    VkCommandBuffer cmd_buffer_gfx    = {};
+    VkCommandBuffer cmd_buffer_cmp    = {};
+    VkDescriptorSet set_global        = {};
+    VkDescriptorSet set_model         = {};
     uint32_t        idx_swapchain_image;
 };
 
@@ -119,4 +120,24 @@ enum ECommandPoolType
     Graphics,
     Transfer,
     Present
+};
+
+struct ReleaseQueue
+{
+    std::deque<std::function<void()>> deletors = {};
+
+    void push_function(std::function<void()> &&function)
+    {
+        deletors.push_back(function);
+    }
+
+    void flush()
+    {
+        // reverse iterate the deletion queue to execute all the functions
+        for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
+            (*it)(); // call functors
+        }
+
+        deletors.clear();
+    }
 };

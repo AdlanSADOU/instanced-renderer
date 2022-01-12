@@ -123,20 +123,19 @@ void DestroyExamples()
 }
 
 // pipeline, piepeline_layout, descriptor_sets, shader --> custom to a mesh or defaults
-void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *camera_buffer, double dt)
+void DrawExamples(VkCommandBuffer *cmd_buffer, double dt)
 {
 
     /////////////////////////////////////////////////
     // camera
     glm::vec3 cam_pos     = { camera_x, camera_y - 0.f, camera_z - 120.f };
     glm::mat4 translation = glm::translate(glm::mat4(1.f), cam_pos);
-    glm::mat4 rotation    = glm::rotate(glm::mat4(1.f), .0f, glm::vec3(1, 0, 0));
+    glm::mat4 rotation    = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(1, 0, 0));
     glm::mat4 view        = rotation * translation;
-    // glm::mat4 projection  = glm::perspective(glm::radians(60.f), (float)vkr.window_extent.width / (float)vkr.window_extent.height, 0.1f, 200.0f);
+    // glm::mat4 projection  = glm::perspective(glm::radians(60.f), (float)vkr.window_extent.width / (float)vkr.window_extent.height, 0.1f, 1000.0f);
     glm::mat4 projection = glm::ortho(0.f, (float)vkr.window_extent.width, 0.f, (float)vkr.window_extent.height, .1f, 200.f);
-    // float aspect_ratio= (float)vkr.window_extent.width / (float)vkr.window_extent.height;
-    // glm::mat4 projection = glm::ortho(0.f, aspect_ratio, -1.0f, 1.0f, .1f, 200.f);
     glm::mat4 V = glm::lookAt(glm::vec3(0.f, 0.f, 2.0f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f));
+
     projection[1][1] *= -1;
 
     vkr.camera.data.projection = projection * V;

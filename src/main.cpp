@@ -22,9 +22,8 @@ double dt_averaged                = 0;
 
 void UpdateAndRender();
 void DestroyExamples();
-void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *buffer, double dt);
+void DrawExamples(VkCommandBuffer *cmd_buffer, double dt);
 void InitExamples();
-
 
 extern int main(int argc, char *argv[])
 {
@@ -38,7 +37,6 @@ extern int main(int argc, char *argv[])
 
     return 0;
 }
-
 
 void UpdateAndRender()
 {
@@ -97,7 +95,7 @@ void UpdateAndRender()
         if (_E) pos_z += player_speed * (float)dt_averaged;
 
         vk_BeginRenderPass();
-        DrawExamples(&get_CurrentFrameData().main_command_buffer, &get_CurrentFrameData().set_global, &vkr.camera.UBO[vkr.frame_idx_inflight % FRAME_OVERLAP], dt_averaged);
+        DrawExamples(&get_CurrentFrameData().cmd_buffer_gfx, dt_averaged);
         vk_EndRenderPass();
 
         pos_x = pos_y = pos_z = 0;

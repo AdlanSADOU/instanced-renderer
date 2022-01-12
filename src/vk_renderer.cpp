@@ -106,16 +106,27 @@ void vk_Init()
     }
 
     uint32_t graphics_queue_family_idx = UINT32_MAX;
+    uint32_t compute_queue_family_idx  = UINT32_MAX;
     uint32_t present_queue_family_idx  = UINT32_MAX;
+
     for (uint32_t i = 0; i < queue_family_properties_count; i++) {
         if (queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
             if (graphics_queue_family_idx == UINT32_MAX)
                 graphics_queue_family_idx = i;
+
         if (queue_idx_supports_present[i] == VK_TRUE) {
             graphics_queue_family_idx = i;
             present_queue_family_idx  = i;
             break;
         }
+    }
+
+    for (uint32_t i = 0; i < queue_family_properties_count; i++) {
+        if (queue_family_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT)
+            if (compute_queue_family_idx == UINT32_MAX) {
+                compute_queue_family_idx = i;
+                break;
+            }
     }
 
     if (present_queue_family_idx == UINT32_MAX)
@@ -125,10 +136,17 @@ void vk_Init()
                 break;
             }
         }
+    SDL_Log("Graphics queue family idx: %d\n", graphics_queue_family_idx);
+    SDL_Log("Compute  queue family idx: %d\n", compute_queue_family_idx);
+    SDL_Log("Present  queue family idx: %d\n", present_queue_family_idx);
+
+    if ((graphics_queue_family_idx & compute_queue_family_idx))
+        SDL_Log("Separate Graphics and Compute Queues!\n");
+
 
     if ((graphics_queue_family_idx == UINT32_MAX) && (present_queue_family_idx == UINT32_MAX)) {
         // todo(ad): exit on error message
-        printf("Failed to find Graphics and Present queues");
+        SDL_LogError(0, "Failed to find Graphics and Present queues");
     }
 
     vkr.graphics_queue_family     = graphics_queue_family_idx;
@@ -160,13 +178,25 @@ void vk_Init()
     gpu_vulkan_11_features.sType                            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
     gpu_vulkan_11_features.shaderDrawParameters             = VK_TRUE;
 
-    VkDeviceQueueCreateInfo create_info_device_queue = {};
-    create_info_device_queue.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    create_info_device_queue.pNext                   = NULL;
-    create_info_device_queue.flags                   = 0;
-    create_info_device_queue.queueFamilyIndex        = graphics_queue_family_idx;
-    create_info_device_queue.queueCount              = 1;
-    create_info_device_queue.pQueuePriorities        = queue_priorities;
+    std::vector<VkDeviceQueueCreateInfo> create_info_device_queues = {};
+
+    VkDeviceQueueCreateInfo ci_graphics_queue = {};
+    ci_graphics_queue.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    ci_graphics_queue.pNext                   = NULL;
+    ci_graphics_queue.flags                   = 0;
+    ci_graphics_queue.queueFamilyIndex        = graphics_queue_family_idx;
+    ci_graphics_queue.queueCount              = 1;
+    ci_graphics_queue.pQueuePriorities        = queue_priorities;
+    create_info_device_queues.push_back(ci_graphics_queue);
+
+    VkDeviceQueueCreateInfo ci_compute_queue = {};
+    ci_compute_queue.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    ci_compute_queue.pNext                   = NULL;
+    ci_compute_queue.flags                   = 0;
+    ci_compute_queue.queueFamilyIndex        = compute_queue_family_idx;
+    ci_compute_queue.queueCount              = 1;
+    ci_compute_queue.pQueuePriorities        = queue_priorities;
+    create_info_device_queues.push_back(ci_compute_queue);
 
     VkPhysicalDeviceRobustness2FeaturesEXT robustness_feature_ext = {};
     robustness_feature_ext.sType                                  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
@@ -179,7 +209,7 @@ void vk_Init()
     create_info_device.pNext                = &robustness_feature_ext;
     create_info_device.flags                = 0;
     create_info_device.queueCreateInfoCount = 1;
-    create_info_device.pQueueCreateInfos    = &create_info_device_queue;
+    create_info_device.pQueueCreateInfos    = create_info_device_queues.data();
     // create_info_device.enabledLayerCount       = ; // deprecated and ignored
     // create_info_device.ppEnabledLayerNames     = ; // deprecated and ignored
     create_info_device.enabledExtensionCount   = ARR_COUNT(enabled_device_extension_names);
@@ -189,11 +219,12 @@ void vk_Init()
     VK_CHECK(vkCreateDevice(vkr.chosen_gpu, &create_info_device, NULL, &vkr.device));
 
     if (!vkr.is_present_queue_separate) {
-        vkGetDeviceQueue(vkr.device, graphics_queue_family_idx, 0, &vkr.graphics_queue_idx);
+        vkGetDeviceQueue(vkr.device, graphics_queue_family_idx, 0, &vkr.graphics_queue);
     } else {
         // todo(ad): get seperate present queue
     }
 
+    vkGetDeviceQueue(vkr.device, vkr.compute_queue_family, 0, &vkr.compute_queue);
 
 
     ///////////////////////////
@@ -284,6 +315,9 @@ void vk_Init()
     vkr.swapchain_image_format = surface_formats[0].format;
 
 
+
+
+
     ///////////////////////////////////
     /// Depth Image
     // depth image size will match the window
@@ -315,24 +349,32 @@ void vk_Init()
 
 
 
+
+
     //////////////////////////////////////////////////////
     // CommandPools & CommandBuffers creation
-    // create a command pool for commands submitted to the graphics queue.
-    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(vkr.graphics_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    // Graphics
+    VkCommandPoolCreateInfo ci_graphics_cmd_pool = vkinit::CommandPoolCreateInfo(vkr.graphics_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VK_CHECK(vkCreateCommandPool(vkr.device, &ci_graphics_cmd_pool, NULL, &vkr.command_pool_graphics));
+
+    // Compute
+    VkCommandPoolCreateInfo ci_compute_cmd_pool = vkinit::CommandPoolCreateInfo(vkr.compute_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VK_CHECK(vkCreateCommandPool(vkr.device, &ci_compute_cmd_pool, NULL, &vkr.command_pool_compute));
 
     for (int i = 0; i < FRAME_OVERLAP; i++) {
-
-        VK_CHECK(vkCreateCommandPool(vkr.device, &commandPoolInfo, NULL, &vkr.frames[i].command_pool));
-
         // allocate the default command buffer that we will use for rendering
-        VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(vkr.frames[i].command_pool, 1);
+        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_graphics = vkinit::CommandBufferAllocateInfo(vkr.command_pool_graphics);
+        VK_CHECK(vkAllocateCommandBuffers(vkr.device, &cmd_buffer_alloc_info_graphics, &vkr.frames[i].cmd_buffer_gfx));
 
-        VK_CHECK(vkAllocateCommandBuffers(vkr.device, &cmdAllocInfo, &vkr.frames[i].main_command_buffer));
-
-        vkr.release_queue.push_function([=]() {
-            vkDestroyCommandPool(vkr.device, vkr.frames[i].command_pool, NULL);
-        });
+        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_compute = vkinit::CommandBufferAllocateInfo(vkr.command_pool_compute);
+        VK_CHECK(vkAllocateCommandBuffers(vkr.device, &cmd_buffer_alloc_info_compute, &vkr.frames[i].cmd_buffer_cmp));
     }
+
+    vkr.release_queue.push_function([=]() {
+        vkDestroyCommandPool(vkr.device, vkr.command_pool_graphics, NULL);
+        vkDestroyCommandPool(vkr.device, vkr.command_pool_compute, NULL);
+    });
+
 
 
 
@@ -372,7 +414,7 @@ void vk_Init()
     depth_attachment_ref.attachment            = 1;
     depth_attachment_ref.layout                = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-    // we are going to create 1 subpass, which is the minimum you can do
+    // we have to have at least 1 subpass
     VkSubpassDescription subpass    = {};
     subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount    = 1;
@@ -384,13 +426,11 @@ void vk_Init()
     VkAttachmentDescription attachments[2] = { color_attachment, depth_attachment };
 
     VkRenderPassCreateInfo render_pass_info = {};
-
-    render_pass_info.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    render_pass_info.attachmentCount = 2; // connect the color attachment to the info
-    render_pass_info.pAttachments    = &attachments[0];
-    render_pass_info.subpassCount    = 1; // connect the subpass to the info
-    render_pass_info.pSubpasses      = &subpass;
-
+    render_pass_info.sType                  = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    render_pass_info.attachmentCount        = 2; // connect the color attachment to the info
+    render_pass_info.pAttachments           = &attachments[0];
+    render_pass_info.subpassCount           = 1; // connect the subpass to the info
+    render_pass_info.pSubpasses             = &subpass;
     VK_CHECK(vkCreateRenderPass(vkr.device, &render_pass_info, NULL, &vkr.render_pass));
 
     vkr.release_queue.push_function([=]() {
@@ -401,7 +441,6 @@ void vk_Init()
 
     ///////////////////////////////////////////////
     // Framebuffer initialization
-    //
     // create the framebuffers for the swapchain images. This will connect the render-pass to the images for rendering
     VkFramebufferCreateInfo fb_info = {};
     fb_info.sType                   = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -562,7 +601,7 @@ void vk_Init()
     ci_sampler.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     VK_CHECK(vkCreateSampler(vkr.device, &ci_sampler, NULL, &vkr.sampler));
 
-    CreatePipeline();
+    vkr.default_pipeline = CreateGraphicsPipeline();
 
     vkr.is_initialized = true;
 
@@ -570,101 +609,8 @@ void vk_Init()
     memset(vkr.descriptor_image_infos.data(), VK_NULL_HANDLE, vkr.descriptor_image_infos.size() * sizeof(VkDescriptorImageInfo));
 }
 
-void CreatePipeline()
-{
-    //////
-    // ShaderModule loading
-    VkShaderModule vertexShader;
-    if (!CreateShaderModule("./shaders/triangleMesh.vert.spv", &vertexShader)) {
-        printf("Error when building the vertex shader module. Did you compile the shaders?\n");
-
-    } else {
-        printf("fragment shader succesfully loaded\n");
-    }
-
-    VkShaderModule fragmentShader;
-    if (!CreateShaderModule("./shaders/textureArray.frag.spv", &fragmentShader)) {
-        printf("Error when building the fragment shader module. Did you compile the shaders?\n");
-    } else {
-        printf("vertex shader succesfully loaded\n");
-    }
-
-    // this is where we provide the vertex shader with our matrices
-    VkPushConstantRange push_constant;
-    push_constant.offset     = 0;
-    push_constant.size       = sizeof(MeshPushConstants);
-    push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    ///////
-    // PipelineLayout
-    VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info(); // build the pipeline layout that controls the inputs/outputs of the shader
-    // pipeline_layout_info.pushConstantRangeCount     = 1;
-    // pipeline_layout_info.pPushConstantRanges        = &push_constant;
 
 
-    std::vector<VkDescriptorSetLayout> set_layouts = {
-        vkr.set_layout_global,
-        vkr.set_layout_array_of_textures,
-    };
-
-    pipeline_layout_info.setLayoutCount = (uint32_t)set_layouts.size();
-    pipeline_layout_info.pSetLayouts    = set_layouts.data();
-
-    VkPipelineLayout pipelineLayout;
-    VK_CHECK(vkCreatePipelineLayout(vkr.device, &pipeline_layout_info, NULL, &pipelineLayout));
-    VK_CHECK(vkCreatePipelineLayout(vkr.device, &pipeline_layout_info, NULL, &vkr.default_pipeline_layout));
-
-    /////
-    // Pipeline creation
-    PipelineBuilder pipelineBuilder;
-    VkPipeline      pipeline;
-
-    /////
-    // Depth attachment
-    // connect the pipeline builder vertex input info to the one we get from Vertex
-    VertexInputDescription vertexDescription = GetVertexDescription(); // horseshit, make this a useful function with arguments
-
-    pipelineBuilder.create_info_vertex_input_state                                 = vkinit::vertex_input_state_create_info();
-    pipelineBuilder.create_info_vertex_input_state.pVertexAttributeDescriptions    = vertexDescription.attributes.data();
-    pipelineBuilder.create_info_vertex_input_state.vertexAttributeDescriptionCount = (uint32_t)vertexDescription.attributes.size();
-
-    pipelineBuilder.create_info_vertex_input_state.pVertexBindingDescriptions    = vertexDescription.bindings.data();
-    pipelineBuilder.create_info_vertex_input_state.vertexBindingDescriptionCount = (uint32_t)vertexDescription.bindings.size();
-
-    pipelineBuilder.create_info_shader_stages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertexShader));
-    pipelineBuilder.create_info_shader_stages.push_back(vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
-
-    pipelineBuilder.create_info_input_assembly_state = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-
-    // build viewport and scissor from the swapchain extents
-    pipelineBuilder.viewport.x        = 0.0f;
-    pipelineBuilder.viewport.y        = 0.0f;
-    pipelineBuilder.viewport.width    = (float)vkr.window_extent.width;
-    pipelineBuilder.viewport.height   = (float)vkr.window_extent.height;
-    pipelineBuilder.viewport.minDepth = 0.0f;
-    pipelineBuilder.viewport.maxDepth = 1.0f;
-
-    pipelineBuilder.scissor.offset = { 0, 0 };
-    pipelineBuilder.scissor.extent = vkr.window_extent;
-
-    pipelineBuilder.rasterization_state           = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL); // configure the rasterizer to draw filled triangles
-    pipelineBuilder.create_info_multisample_state = vkinit::multisampling_state_create_info(); // we don't use multisampling, so just run the default one
-    pipelineBuilder.attachment_state_color_blend  = vkinit::color_blend_attachment_state(); // a single blend attachment with no blending and writing to RGBA
-    pipelineBuilder.pipeline_layout               = pipelineLayout; // use the triangle layout we created
-
-
-    pipeline             = pipelineBuilder.BuildPipeline(vkr.device, vkr.render_pass);
-    vkr.default_pipeline = pipelineBuilder.BuildPipeline(vkr.device, vkr.render_pass);
-
-
-    vkDestroyShaderModule(vkr.device, vertexShader, NULL);
-    vkDestroyShaderModule(vkr.device, fragmentShader, NULL);
-
-    vkr.release_queue.push_function([=]() {
-        vkDestroyPipeline(vkr.device, pipeline, NULL);
-        vkDestroyPipelineLayout(vkr.device, pipelineLayout, NULL);
-    });
-}
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -684,7 +630,7 @@ void vk_BeginRenderPass()
     g_inflight_render_fence          = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].render_fence;
     g_inflight_present_semaphore     = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].present_semaphore;
     g_inflight_render_semaphore      = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].render_semaphore;
-    g_inflight_main_command_buffer   = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].main_command_buffer;
+    g_inflight_main_command_buffer   = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].cmd_buffer_gfx;
     g_inflight_global_descriptor_set = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].set_global;
 
     camera_ubo = &vkr.camera.UBO[vkr.frame_idx_inflight % FRAME_OVERLAP];
@@ -738,8 +684,8 @@ void vk_EndRenderPass()
 {
     ////////////////////////////////////////////////
     // END renderpass & command buffer recording
-    vkCmdEndRenderPass(get_CurrentFrameData().main_command_buffer);
-    VK_CHECK(vkEndCommandBuffer(get_CurrentFrameData().main_command_buffer));
+    vkCmdEndRenderPass(get_CurrentFrameData().cmd_buffer_gfx);
+    VK_CHECK(vkEndCommandBuffer(get_CurrentFrameData().cmd_buffer_gfx));
 
     VkSubmitInfo submit_info = {};
     submit_info.sType        = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -755,11 +701,11 @@ void vk_EndRenderPass()
     submit_info.pSignalSemaphores    = &get_CurrentFrameData().render_semaphore;
 
     submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers    = &get_CurrentFrameData().main_command_buffer;
+    submit_info.pCommandBuffers    = &get_CurrentFrameData().cmd_buffer_gfx;
 
     // submit command buffer to the queue and execute it.
     //  g_inflight_render_fence will now block until the graphic commands finish execution
-    VK_CHECK(vkQueueSubmit(vkr.graphics_queue_idx, 1, &submit_info, get_CurrentFrameData().render_fence));
+    VK_CHECK(vkQueueSubmit(vkr.graphics_queue, 1, &submit_info, get_CurrentFrameData().render_fence));
 
     // this will put the image we just rendered into the visible window.
     // we want to g_inflight_render_semaphore for that,
@@ -776,7 +722,7 @@ void vk_EndRenderPass()
 
     presentInfo.pImageIndices = &vkr.frames[vkr.frame_idx_inflight].idx_swapchain_image;
 
-    VK_CHECK(vkQueuePresentKHR(vkr.graphics_queue_idx, &presentInfo));
+    VK_CHECK(vkQueuePresentKHR(vkr.graphics_queue, &presentInfo));
 
     vkr.frame_idx_inflight++;
     vkr.frame_idx_inflight = vkr.frame_idx_inflight % FRAME_OVERLAP;
@@ -792,29 +738,17 @@ void VulkanUpdateAndRender(double dt)
     // draw_Renderables(*g_inflight_main_command_buffer, vkr.renderables.data(), (uint32_t)vkr.renderables.size());
 }
 
-
-
-VkPipeline PipelineBuilder::BuildPipeline(VkDevice device, VkRenderPass pass)
+VkPipeline CreateGraphicsPipeline()
 {
-    // make viewport state from our stored viewport and scissor.
-    // at the moment we won't support multiple viewports or scissors
-    VkPipelineViewportStateCreateInfo viewportState = {};
-
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.pNext = NULL;
-
-    viewportState.viewportCount = 1;
-    viewportState.pViewports    = &viewport;
-    viewportState.scissorCount  = 1;
-    viewportState.pScissors     = &scissor;
+    VkPipelineColorBlendAttachmentState attachment_state_color_blend;
+    attachment_state_color_blend = vkinit::color_blend_attachment_state(); // a single blend attachment with no blending and writing to RGBA
 
     // setup dummy color blending. We aren't using transparent objects yet
     // the blending is just "no blend", but we do write to the color attachment
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
 
-    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.pNext = NULL;
-
+    colorBlending.sType             = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.pNext             = NULL;
     colorBlending.logicOpEnable     = VK_FALSE;
     colorBlending.logicOp           = VK_LOGIC_OP_COPY;
     colorBlending.pAttachments      = &attachment_state_color_blend;
@@ -824,34 +758,137 @@ VkPipeline PipelineBuilder::BuildPipeline(VkDevice device, VkRenderPass pass)
     colorBlending.blendConstants[2] = 0.0;
     colorBlending.blendConstants[3] = 0.0;
 
+    VkPipelineDepthStencilStateCreateInfo create_info_depth_stencil_state;
     create_info_depth_stencil_state = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+
+    /////
+    // Depth attachment
+    // connect the pipeline builder vertex input info to the one we get from Vertex
+    // build viewport and scissor from the swapchain extents
+    VkViewport viewport;
+    viewport.x        = 0.0f;
+    viewport.y        = 0.0f;
+    viewport.width    = (float)vkr.window_extent.width;
+    viewport.height   = (float)vkr.window_extent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor;
+    scissor.offset = { 0, 0 };
+    scissor.extent = vkr.window_extent;
+
+    // make viewport state from our stored viewport and scissor.
+    // at the moment we won't support multiple viewports or scissors
+    VkPipelineViewportStateCreateInfo viewportState = {};
+    viewportState.sType                             = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.pNext                             = NULL;
+    viewportState.viewportCount                     = 1;
+    viewportState.pViewports                        = &viewport;
+    viewportState.scissorCount                      = 1;
+    viewportState.pScissors                         = &scissor;
+
+
+
+    ////////////////////////////
+    // ShaderModules
+    VkShaderModule vertexShader;
+    if (!CreateShaderModule("./shaders/triangleMesh.vert.spv", &vertexShader)) {
+        printf("Error when building the vertex shader module. Did you compile the shaders?\n");
+
+    } else {
+        printf("fragment shader succesfully loaded\n");
+    }
+
+    VkShaderModule fragmentShader;
+    if (!CreateShaderModule("./shaders/textureArray.frag.spv", &fragmentShader)) {
+        printf("Error when building the fragment shader module. Did you compile the shaders?\n");
+    } else {
+        printf("vertex shader succesfully loaded\n");
+    }
+
+    std::vector<VkPipelineShaderStageCreateInfo> create_info_shader_stages;
+    create_info_shader_stages.push_back(vkinit::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertexShader));
+    create_info_shader_stages.push_back(vkinit::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
+
+    vkr.release_queue.push_function([=]() {
+        vkDestroyShaderModule(vkr.device, vertexShader, NULL);
+        vkDestroyShaderModule(vkr.device, fragmentShader, NULL);
+    });
+
+    ////////////////////////////
+    /// Vertex Input Description
+    VertexInputDescription               vertexDescription = GetVertexDescription(); // horseshit, make this a useful function with arguments
+    VkPipelineVertexInputStateCreateInfo create_info_vertex_input_state;
+    create_info_vertex_input_state                                 = vkinit::VertexInputStateCreateInfo();
+    create_info_vertex_input_state.pVertexAttributeDescriptions    = vertexDescription.attributes.data();
+    create_info_vertex_input_state.vertexAttributeDescriptionCount = (uint32_t)vertexDescription.attributes.size();
+    create_info_vertex_input_state.pVertexBindingDescriptions      = vertexDescription.bindings.data();
+    create_info_vertex_input_state.vertexBindingDescriptionCount   = (uint32_t)vertexDescription.bindings.size();
+
+    ////////////////////////////
+    /// Input Assembly State
+    VkPipelineInputAssemblyStateCreateInfo create_info_input_assembly_state;
+    create_info_input_assembly_state = vkinit::InputAssemblyCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+
+    ////////////////////////////
+    /// Raster State
+    VkPipelineRasterizationStateCreateInfo rasterization_state;
+    rasterization_state = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL); // configure the rasterizer to draw filled triangles
+
+    ////////////////////////////
+    /// Multisample State
+    VkPipelineMultisampleStateCreateInfo create_info_multisample_state;
+    create_info_multisample_state = vkinit::multisampling_state_create_info(); // we don't use multisampling, so just run the default one
+
+
+    ///////
+    // PipelineLayout
+    // this is where we provide the vertex shader with our matrices
+    // VkPushConstantRange push_constant;
+    // push_constant.offset     = 0;
+    // push_constant.size       = sizeof(MeshPushConstants);
+    // push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info(); // build the pipeline layout that controls the inputs/outputs of the shader
+    // pipeline_layout_info.pushConstantRangeCount     = 1;
+    // pipeline_layout_info.pPushConstantRanges        = &push_constant;
+
+    std::vector<VkDescriptorSetLayout> set_layouts = {
+        vkr.set_layout_global,
+        vkr.set_layout_array_of_textures,
+    };
+
+    pipeline_layout_info.setLayoutCount = (uint32_t)set_layouts.size();
+    pipeline_layout_info.pSetLayouts    = set_layouts.data();
+    VK_CHECK(vkCreatePipelineLayout(vkr.device, &pipeline_layout_info, NULL, &vkr.default_pipeline_layout));
 
     // build the actual pipeline
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
-
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.pNext = NULL;
-
-    pipelineInfo.stageCount          = (uint32_t)create_info_shader_stages.size();
-    pipelineInfo.pStages             = create_info_shader_stages.data();
-    pipelineInfo.pVertexInputState   = &create_info_vertex_input_state;
-    pipelineInfo.pInputAssemblyState = &create_info_input_assembly_state;
-    pipelineInfo.pViewportState      = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterization_state;
-    pipelineInfo.pMultisampleState   = &create_info_multisample_state;
-    pipelineInfo.pColorBlendState    = &colorBlending;
-    pipelineInfo.pDepthStencilState  = &create_info_depth_stencil_state;
-    pipelineInfo.layout              = pipeline_layout;
-    pipelineInfo.renderPass          = pass;
-    pipelineInfo.subpass             = 0;
-    pipelineInfo.basePipelineHandle  = VK_NULL_HANDLE;
+    pipelineInfo.sType                        = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext                        = NULL;
+    pipelineInfo.stageCount                   = (uint32_t)create_info_shader_stages.size();
+    pipelineInfo.pStages                      = create_info_shader_stages.data();
+    pipelineInfo.pVertexInputState            = &create_info_vertex_input_state;
+    pipelineInfo.pInputAssemblyState          = &create_info_input_assembly_state;
+    pipelineInfo.pTessellationState           = NULL;
+    pipelineInfo.pViewportState               = &viewportState;
+    pipelineInfo.pRasterizationState          = &rasterization_state;
+    pipelineInfo.pMultisampleState            = &create_info_multisample_state;
+    pipelineInfo.pDepthStencilState           = &create_info_depth_stencil_state;
+    pipelineInfo.pColorBlendState             = &colorBlending;
+    pipelineInfo.pDynamicState                = NULL;
+    pipelineInfo.layout                       = vkr.default_pipeline_layout;
+    pipelineInfo.renderPass                   = vkr.render_pass;
+    pipelineInfo.subpass                      = 0;
+    pipelineInfo.basePipelineHandle           = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex            = 0;
 
     // it's easy to error out on create graphics pipeline, so we handle it a bit better than the common VK_CHECK case
     VkPipeline newPipeline;
-    if (vkCreateGraphicsPipelines(
-            device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &newPipeline)
-        != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(vkr.device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &newPipeline) != VK_SUCCESS) {
         printf("failed to create pipline\n");
+        vkDestroyShaderModule(vkr.device, vertexShader, NULL);
+        vkDestroyShaderModule(vkr.device, fragmentShader, NULL);
         return VK_NULL_HANDLE; // failed to create graphics pipeline
     } else {
         return newPipeline;
@@ -1034,7 +1071,7 @@ VkResult CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsage
     if (res == VK_SUCCESS) {
         vkr.release_queue.push_function([=]() {
             if (dst_buffer->buffer != VK_NULL_HANDLE)
-            vmaDestroyBuffer(vkr.allocator, dst_buffer->buffer, dst_buffer->allocation);
+                vmaDestroyBuffer(vkr.allocator, dst_buffer->buffer, dst_buffer->allocation);
         });
     }
 

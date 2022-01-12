@@ -91,7 +91,7 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
     VkCommandBufferBeginInfo cmd_buffer_begin_info = {};
     cmd_buffer_begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     cmd_buffer_begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(vkr->frames[0].main_command_buffer, &cmd_buffer_begin_info);
+    vkBeginCommandBuffer(vkr->frames[0].cmd_buffer_gfx, &cmd_buffer_begin_info);
 
     // image layout transitioning
     VkImageSubresourceRange image_subresource_range;
@@ -114,7 +114,7 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
     {
         VkPipelineStageFlags src_stage_flags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         VkPipelineStageFlags dst_stage_flags = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        vkCmdPipelineBarrier(vkr->frames[0].main_command_buffer, src_stage_flags, dst_stage_flags, 0, 0, NULL, 0, NULL, 1, &image_memory_barrier_from_undefined_to_transfer_dst);
+        vkCmdPipelineBarrier(vkr->frames[0].cmd_buffer_gfx, src_stage_flags, dst_stage_flags, 0, 0, NULL, 0, NULL, 1, &image_memory_barrier_from_undefined_to_transfer_dst);
     }
 
     VkBufferImageCopy buffer_image_copy;
@@ -124,7 +124,7 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
     buffer_image_copy.imageSubresource  = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
     buffer_image_copy.imageOffset       = { 0, 0, 0 }; // x, y, z
     buffer_image_copy.imageExtent       = { (uint32_t)tex_width, (uint32_t)tex_height, 1 };
-    vkCmdCopyBufferToImage(vkr->frames[0].main_command_buffer, staging_buffer.buffer, texture_asset->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_image_copy);
+    vkCmdCopyBufferToImage(vkr->frames[0].cmd_buffer_gfx, staging_buffer.buffer, texture_asset->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_image_copy);
 
 
     // Image layout transfer to SHADER_READ_ONLY_OPTIMAL
@@ -141,18 +141,18 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
 
     VkPipelineStageFlags src_stage_flags = VK_PIPELINE_STAGE_TRANSFER_BIT;
     VkPipelineStageFlags dst_stage_flags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    vkCmdPipelineBarrier(vkr->frames[0].main_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &image_memory_barrier_from_transfer_to_shader_read);
+    vkCmdPipelineBarrier(vkr->frames[0].cmd_buffer_gfx, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &image_memory_barrier_from_transfer_to_shader_read);
 
-    VK_CHECK(vkEndCommandBuffer(vkr->frames[0].main_command_buffer));
+    VK_CHECK(vkEndCommandBuffer(vkr->frames[0].cmd_buffer_gfx));
 
 
     // Submit command buffer and copy data from staging buffer to a vertex buffer
     VkSubmitInfo submit_info       = {};
     submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers    = &vkr->frames[0].main_command_buffer;
+    submit_info.pCommandBuffers    = &vkr->frames[0].cmd_buffer_gfx;
 
-    VK_CHECK(vkQueueSubmit(vkr->graphics_queue_idx, 1, &submit_info, VK_NULL_HANDLE));
+    VK_CHECK(vkQueueSubmit(vkr->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
 
     vkDeviceWaitIdle(vkr->device);
 

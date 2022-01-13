@@ -5,7 +5,7 @@ This is a project I use to learn and experiment Vulkan.
 - Array of textures (indexed inside fragment shader) => many textures with only one binding
 - Individual quad transforms via per instance attributes
 
-**Result**: a bindless 2D renderer able to render more than 2 million sprites at high framerates (60+ fps) on relatively modern GPUs with only 1 draw call
+**Result**: a 2D renderer able to render more than 2 million sprites at high framerates (60+ fps) on relatively modern GPUs with only 1 draw call
 
 **Next feature**: Moving transform updates from CPU to GPU via compute shaders
 

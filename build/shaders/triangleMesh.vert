@@ -52,36 +52,33 @@ mat4 translationMatrix(vec3 pos)
 
 void main()
 {
-    mat3 _mx, _my, _mz;
+    	mat3 mx, my, mz;
 
 	// rotate around x
 	float s = sin(iRot.x);
 	float c = cos(iRot.x);
-    _mx = mat3(
-        c,   s,   0.0,
-       -s,   c,   0.0,
-        0.0, 0.0, 1.0
-    );
+
+	mx[0] = vec3(c, s, 0.0);
+	mx[1] = vec3(-s, c, 0.0);
+	mx[2] = vec3(0.0, 0.0, 1.0);
 
 	// rotate around y
 	s = sin(iRot.y);
 	c = cos(iRot.y);
-    _my = mat3(
-        c,   0.0,   s,
-        0.0, 1.0,   0.0,
-       -s,   0.0,   c
-    );
+
+	my[0] = vec3(c, 0.0, s);
+	my[1] = vec3(0.0, 1.0, 0.0);
+	my[2] = vec3(-s, 0.0, c);
 
 	// rot around z
 	s = sin(iRot.z);
 	c = cos(iRot.z);
-    _mz = mat3(
-        1.0, 0.0, 0.0,
-        0.0,   c,   s,
-        0.0,  -s,   c
-    );
 
-	mat3 rotMat = _mz * _my * _mx;
+	mz[0] = vec3(1.0, 0.0, 0.0);
+	mz[1] = vec3(0.0, c, s);
+	mz[2] = vec3(0.0, -s, c);
+
+	mat3 rotMat = mz * my * mx;
 
     // mat4 rotation_matrix = rotationMatrix(vec3(0, 0, 1),);
 

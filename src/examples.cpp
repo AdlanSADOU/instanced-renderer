@@ -1,201 +1,154 @@
 #include "vk_renderer.h"
 #include "vk_types.h"
-
-// mutually exclusive
-#define EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER       0
-#define EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH 1
-#define EXAMPLE_DRAW_INDIRECT_CUBE_BATCH           0
+#include <vk_texture.h>
 
 extern VulkanRenderer vkr;
 
 extern float pos_x, pos_y, pos_z;
+extern float camera_x, camera_y, camera_z;
 
 
+Instances instances;
 
+BufferObject      quads_bo = {};
+std::vector<Quad> quads;
+Quad              quad;
 
-struct Triangle
-{
-    Vertex       vertices[3]   = {};
-    BufferObject buffer_object = {};
-    glm::mat4    transform_m4  = {};
-};
+void        *instances_data_ptr;
+TextureAsset profile;
+TextureAsset itoldu;
 
-Triangle triangle = {};
+InstanceData quad1_idata;
+InstanceData quad2_idata;
 
-
-
-#define SIDE_LENGTH          8
-#define TEST_TRIANGLES_COUNT (SIDE_LENGTH * SIDE_LENGTH * SIDE_LENGTH)
-
-#if EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER
-Triangle test_triangles[TEST_TRIANGLES_COUNT];
-#endif
-
-
-
-
-#if EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH
-struct JustATriange
-{
-    Vertex vertices[3] = {};
-} test_triangles[TEST_TRIANGLES_COUNT]          = {};
-glm::mat4    transform_m4[TEST_TRIANGLES_COUNT] = {};
-BufferObject triangles_vbo                      = {};
-#endif
-
-
-#if EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
-struct JustATriange
-{
-    Vertex vertices[3] = {};
-} test_triangles[TEST_TRIANGLES_COUNT]        = {};
-ModelData    model_data[TEST_TRIANGLES_COUNT] = {};
-BufferObject triangles_vbo                    = {};
-BufferObject triangles_ibo                    = {};
-BufferObject indirect_commands_buffer         = {};
-
-#endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
+const size_t ROW     = 500;
+const size_t COL     = 500;
+int          spacing = 200;
 
 void InitExamples()
 {
-    triangle.vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-    triangle.vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-    triangle.vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-
-    CreateBuffer(&triangle.buffer_object, sizeof(triangle.vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    AllocateFillBuffer(&triangle.vertices, sizeof(triangle.vertices), triangle.buffer_object.allocation);
-
-    glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0., 2., 0.));
-    glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(1., 1., 1.));
-    triangle.transform_m4 = translation * scale;
+    CreateTextureAsset(&profile, "./assets/texture.png", &vkr);
+    CreateTextureAsset(&itoldu, "./assets/bjarn_itoldu.jpg", &vkr);
 
 
+    int MAX_ENTITES = ROW * COL;
+    SDL_Log("max entites: %d\n", MAX_ENTITES);
+
+    for (size_t i = 0, j = 0; i < MAX_ENTITES; i++) {
+        static float _x     = 0;
+        static float _y     = 0;
+        float        _scale = .001f;
+
+        if (i > 0 && (i % ROW) == 0) j++;
+
+        if (i == 0) _scale = .1f;
+        _x = (float)((profile.width + spacing) * (i % ROW) * _scale + 50);
+        _y = (float)((profile.height + spacing) * j) * _scale + 50;
 
 
+        quad1_idata.pos = { _x, -_y, 1 };
+        if (i == 0) quad1_idata.pos = { _x + vkr.window_extent.width / 2 - profile.width * .1f, -_y - vkr.window_extent.height / 2, 1.1f };
 
-#if EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER
-    for (size_t i = 0; i < TEST_TRIANGLES_COUNT; i++) {
-        test_triangles[i].vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-        test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
-        test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.2f, .6f, .2f } };
+        quad1_idata.tex_idx = profile.array_index;
+        quad1_idata.scale   = { profile.width, profile.height, 0 };
+        quad1_idata.scale *= _scale;
 
-        CreateBuffer(&test_triangles[i].buffer_object, sizeof(Vertex) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        AllocateFillBuffer(&test_triangles->vertices, sizeof(Vertex) * 3, test_triangles[i].buffer_object.allocation);
+        // quad2_idata.pos     = { i * 20, j * 20, 0 };
+        // quad2_idata.tex_idx = itoldu.array_index;
+        // quad2_idata.scale   = { itoldu.width, itoldu.height, 0 };
+        // quad2_idata.scale *= _scale;
 
-        static int j = 0;
-        if ((i % 10) == 0) j++;
-
-        glm::mat4 translation          = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0. + i * .1, 0. + j * .1, 0.));
-        glm::mat4 scale                = glm::scale(glm::mat4 { 1.0 }, glm::vec3(.2, .2, .2));
-        test_triangles[i].transform_m4 = translation * scale;
-    }
-#endif // EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER
-
-
-
-
-
-#if EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH
-
-    for (size_t z = 0; z < SIDE_LENGTH; z++) {
-        for (size_t y = 0; y < SIDE_LENGTH; y++) {
-            for (size_t x = 0; x < SIDE_LENGTH; x++) {
-
-                static int i = 0;
-
-                test_triangles[i].vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
-                test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
-                test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
-
-                glm::mat4 translation = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0. + x * .5, -10. + y * .5, 0. + z * .5));
-                glm::mat4 scale       = glm::scale(glm::mat4 { 1.0 }, glm::vec3(.1, .1, .1));
-                transform_m4[i]       = translation * scale;
-
-                i++;
-                if (i == TEST_TRIANGLES_COUNT) break;
-            }
-        }
+        quads.push_back(quad);
+        instances.data.push_back(quad1_idata);
+        // instances.data.push_back(quad2_idata);
     }
 
-    CreateBuffer(&triangles_vbo, sizeof(test_triangles), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    AllocateFillBuffer(&test_triangles, sizeof(test_triangles), triangles_vbo.allocation);
-
-
-#endif // EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH
-
-
-#if EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
-    std::vector<VkDrawIndexedIndirectCommand> draw_indirect_commands;
-
-    uint32_t indices[] = {
-        0, 1, 2
-    };
-
-    CreateBuffer(&triangles_ibo, sizeof(indices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    AllocateFillBuffer(&indices, sizeof(indices), triangles_ibo.allocation);
-
-    for (size_t z = 0; z < SIDE_LENGTH; z++) {
-        for (size_t y = 0; y < SIDE_LENGTH; y++) {
-            for (size_t x = 0; x < SIDE_LENGTH; x++) {
-
-                static int i = 0;
-
-                test_triangles[i].vertices[0] = { { -1.f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
-                test_triangles[i].vertices[1] = { { 0.0f, 0.0f, -1.f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
-                test_triangles[i].vertices[2] = { { 1.0f, 0.0f, 1.0f }, { 0.f, 0.f, -1.f }, { 0.9f, .6f, .2f } };
-
-                glm::mat4 translation   = glm::translate(glm::mat4 { 1.0 }, glm::vec3(0. + x * .5, -0. + y * .5, 0. + z * .5));
-                glm::mat4 scale         = glm::scale(glm::mat4 { 1.0 }, glm::vec3(.1, .1, .1));
-                model_data[i].transform = translation * scale;
-
-
-                i++;
-                if (i == TEST_TRIANGLES_COUNT) break;
-            }
-        }
-    }
-
-    CreateBuffer(&triangles_vbo, sizeof(test_triangles), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    AllocateFillBuffer(&test_triangles, sizeof(test_triangles), triangles_vbo.allocation);
-
-    // for (size_t i = 0; i < 1; i++)
     {
-        VkDrawIndexedIndirectCommand draw_indirect_command = {
-            // .vertexCount   = 3,//ARR_COUNT(test_triangles) * 3,
-            // .instanceCount = 1,
-            // .firstVertex   = 0,
-            // .firstInstance = 0,
-            .indexCount    = 3,
-            .instanceCount = 1,
-            .firstIndex    = 0,
-            .vertexOffset  = (uint32_t)sizeof(JustATriange),
-            .firstInstance = 0,
-        };
-        draw_indirect_commands.push_back(draw_indirect_command);
+        VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        CreateBuffer(&quads_bo, quads.size() * sizeof(Quad::vertices), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        AllocateFillBuffer(quads.data(), quads.size() * sizeof(Quad::vertices), quads_bo.allocation);
+    }
+    {
+        VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        CreateBuffer(&instances.bo, instances.data.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        // AllocateFillBuffer(instances.data.data(), instances.data.size() * sizeof(InstanceData), instances.bo.allocation);
+
+        vmaMapMemory(vkr.allocator, instances.bo.allocation, &instances_data_ptr);
+        memcpy(instances_data_ptr, instances.data.data(), instances.data.size() * sizeof(InstanceData));
     }
 
-    VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    CreateBuffer(&indirect_commands_buffer, draw_indirect_commands.size() * sizeof(VkDrawIndirectCommand), usage, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    AllocateFillBuffer(draw_indirect_commands.data(), draw_indirect_commands.size() * sizeof(VkDrawIndirectCommand), indirect_commands_buffer.allocation);
+    // descriptorImageInfos requires VkImageView(s) which requires VkImage(s) backing actual texture data
+    // we need to finish texture loading in vk_texture.h
+    // we must be able to load textures whenever necessary
 
-#endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
+
+    VkDescriptorSetAllocateInfo desc_alloc_info = {};
+    desc_alloc_info.sType                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    desc_alloc_info.descriptorPool              = vkr.descriptor_pool;
+    desc_alloc_info.descriptorSetCount          = 1;
+    desc_alloc_info.pSetLayouts                 = &vkr.set_layout_array_of_textures;
+    VK_CHECK(vkAllocateDescriptorSets(vkr.device, &desc_alloc_info, &vkr.set_array_of_textures));
+
+    VkWriteDescriptorSet setWrites[2];
+
+    VkDescriptorImageInfo samplerInfo = {};
+    samplerInfo.sampler               = vkr.sampler;
+    setWrites[0]                      = {};
+    setWrites[0].sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    setWrites[0].dstBinding           = 0;
+    setWrites[0].dstArrayElement      = 0;
+    setWrites[0].descriptorType       = VK_DESCRIPTOR_TYPE_SAMPLER;
+    setWrites[0].descriptorCount      = 1;
+    setWrites[0].dstSet               = vkr.set_array_of_textures;
+    setWrites[0].pBufferInfo          = 0;
+    setWrites[0].pImageInfo           = &samplerInfo;
+
+    setWrites[1]                 = {};
+    setWrites[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    setWrites[1].dstBinding      = 1;
+    setWrites[1].dstArrayElement = 0;
+    setWrites[1].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    setWrites[1].descriptorCount = (uint32_t)vkr.descriptor_image_infos.size();
+    setWrites[1].pBufferInfo     = 0;
+    setWrites[1].dstSet          = vkr.set_array_of_textures;
+    setWrites[1].pImageInfo      = vkr.descriptor_image_infos.data();
+    vkUpdateDescriptorSets(vkr.device, 2, setWrites, 0, NULL);
 }
 
-
-
+void DestroyExamples()
+{
+    DestroyTextureAsset(&profile, &vkr);
+    DestroyTextureAsset(&itoldu, &vkr);
+    vmaUnmapMemory(vkr.allocator, instances.bo.allocation);
+}
 
 // pipeline, piepeline_layout, descriptor_sets, shader --> custom to a mesh or defaults
-
-///////////////////////////////////////////////////////////////
-/// Mesh rendering
-void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, BufferObject *camera_buffer, double dt)
+void DrawExamples(VkCommandBuffer *cmd_buffer, double dt)
 {
+
+    /////////////////////////////////////////////////
+    // camera
+    glm::vec3 cam_pos     = { camera_x, camera_y - 0.f, camera_z - 120.f };
+    glm::mat4 translation = glm::translate(glm::mat4(1.f), cam_pos);
+    glm::mat4 rotation    = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(1, 0, 0));
+    glm::mat4 view        = rotation * translation;
+    // glm::mat4 projection  = glm::perspective(glm::radians(60.f), (float)vkr.window_extent.width / (float)vkr.window_extent.height, 0.1f, 1000.0f);
+    glm::mat4 projection = glm::ortho(0.f, (float)vkr.window_extent.width, 0.f, (float)vkr.window_extent.height, .1f, 200.f);
+    glm::mat4 V = glm::lookAt(glm::vec3(0.f, 0.f, 2.0f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    projection[1][1] *= -1;
+
+    vkr.camera.data.projection = projection * V;
+    vkr.camera.data.view       = view;
+    vkr.camera.data.viewproj   = projection * view;
+    AllocateFillBuffer(&vkr.camera, sizeof(Camera::Data), vkr.camera.UBO[vkr.frame_idx_inflight % FRAME_OVERLAP].allocation); // todo(ad): just map the data ptr once
+
     // Bindings
     vkCmdBindPipeline(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline);
 
     const uint32_t dynamic_offsets = 0;
-    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, &vkr.frames[vkr.frame_idx_inflight].global_descriptor, 0, NULL);
-    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.frames[vkr.frame_idx_inflight].model_descriptor, 0, NULL);
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, &vkr.frames[vkr.frame_idx_inflight].set_global, 0, NULL);
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.set_array_of_textures, 0, NULL);
 
     {
         // push constants
@@ -203,168 +156,22 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, VkDescriptorSet *descriptor_set, 
         // model matrix is specific to the "thing" we want to draw
         // so each model or triangle has its matrix so that it can be positioned on screen with respect to the camera position
 
-        VkDeviceSize offsets = { 0 };
-        vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangle.buffer_object.buffer, &offsets);
-
-        glm::vec3         triangle_pos = { pos_x, 0, pos_z };
-        glm::mat4         model        = glm::translate(triangle.transform_m4, triangle_pos);
-        MeshPushConstants constants;
-        constants.render_matrix = model;
-        vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+        VkBuffer     buffers[] = { quads_bo.buffer };
+        VkDeviceSize offsets[] = { 0, /*offsetof(Quad, data.indices) */ };
+        vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, buffers, offsets);
+        vkCmdBindVertexBuffers(*cmd_buffer, 1, 1, &instances.bo.buffer, offsets);
 
 
-        vkCmdDraw(*cmd_buffer, ARR_COUNT(triangle.vertices), 1, 0, 0);
-    }
+        instances.data[0].pos.x += pos_x;
+        instances.data[0].pos.y += pos_y;
+        // instances.data[0].rot.z += pos_x;
+        instances.data[0].rot.x += (float)(pos_z * PI / 180);
+        // instances.data[0].scale *= pos_z*.1f+1;
 
 
+        memcpy(instances_data_ptr, instances.data.data(), instances.data.size() * sizeof(InstanceData));
 
-
-
-#if EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER
-
-    for (size_t i = 0; i < TEST_TRIANGLES_COUNT; i++) {
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &test_triangles[i].buffer_object.buffer, &offset);
-
-        glm::vec3 triangle_pos = { pos_x, 0, pos_z };
-        glm::mat4 model        = glm::translate(test_triangles[i].transform_m4, triangle_pos);
-
-        // final render matrix, that we are calculating on the cpu
-        // glm::mat4 mesh_matrix = projection * view * model;
-        MeshPushConstants constants = {};
-        constants.render_matrix     = model;
-        vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
-
-        uint32_t vertex_count = sizeof(test_triangles->vertices) / sizeof(test_triangles->vertices[0]);
-        vkCmdDraw(*cmd_buffer, vertex_count, 1, 0, 0);
-    }
-#endif // EXAMPLE_DRAW_ONE_TRIANGLE_PER_BUFFER
-
-
-
-
-
-#if EXAMPLE_CPU_BOUND_DRAW_TRIANGLE_CUBE_BATCH
-
-    for (size_t i = 0; i < TEST_TRIANGLES_COUNT; i++) {
-        VkDeviceSize offset = sizeof(JustATriange) * i; // let's pray
-        // glm::vec3 triangle_pos = { pos_x, 0, pos_z };
-
-        if (i == 0) {
-            vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangles_vbo.buffer, &offset);
-            // glm::vec3 triangle_pos         = { pos_x - 10, 0, pos_z };
-            // glm::mat4 first_triangle_model = glm::translate(transform_m4[0], triangle_pos);
-
-            // MeshPushConstants first_triangle_constant = {};
-            // first_triangle_constant.render_matrix     = first_triangle_model;
-            // vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &first_triangle_constant);
-        }
-
-        MeshPushConstants constants = {};
-
-        glm::mat4 model         = transform_m4[i];
-        constants.render_matrix = model;
-        vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
-        // // final render matrix, that we are calculating on the cpu
-        // // glm::mat4 mesh_matrix = projection * view * model;
-
-        // ---------- cant do this with only one draw call
-
-        vkCmdDraw(*cmd_buffer, 3, 1, 0, 0);
-    }
-#endif
-
-
-
-
-
-#if EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
-
-    VkDeviceSize offsets = 0;
-    vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, &triangles_vbo.buffer, &offsets);
-    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.frames[vkr.frame_idx_inflight].model_descriptor, 0, NULL);
-    vkCmdBindIndexBuffer(*cmd_buffer, triangles_ibo.buffer, 0, VkIndexType::VK_INDEX_TYPE_UINT32);
-
-    // static int i = 0;
-    // MeshPushConstants constants = {};
-    // glm::mat4 model         = triangle_transforms[i++ % 8];
-    // constants.render_matrix = model;
-    // vkCmdPushConstants(*cmd_buffer, vkr.default_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
-
-
-    // void *data;
-    // vmaMapMemory(vkr.allocator, vkr.triangle_SSBO[vkr.frame_idx_inflight].allocation, &data);
-    // vmaUnmapMemory(vkr.allocator, vkr.triangle_SSBO[vkr.frame_idx_inflight].allocation);
-    // std::vector<VkDrawIndirectCommand> draw_indirect_commands;
-    // for (uint32_t i = 0; i < 1; i++) {
-    //     VkDrawIndirectCommand draw_indirect_command = {
-    //         .vertexCount   = ARR_COUNT(test_triangles) * 3,
-    //         .instanceCount = 1,
-    //         .firstVertex   = 0,
-    //         .firstInstance = 0,
-    //     };
-    //     draw_indirect_commands.push_back(draw_indirect_command);
-    // }
-
-    AllocateFillBuffer(&model_data, sizeof(model_data), vkr.triangle_SSBO[vkr.frame_idx_inflight].allocation);
-
-    vkCmdDrawIndexedIndirect(*cmd_buffer, indirect_commands_buffer.buffer, sizeof(JustATriange) * 0, 1, sizeof(VkDrawIndexedIndirectCommand));
-    // vkCmdDrawIndexedIndirect(*   cmd_buffer, &indirect_commands_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
-    // vkCmdDraw(cmd_buffer, ARR_COUNT(test_triangles) * 3, 1, 0, )
-    // https://vkguide.dev/docs/chapter-4/storage_buffers/
-#endif // EXAMPLE_DRAW_INDIRECT_CUBE_BATCH
-}
-
-
-
-
-
-/////////////////////////////////////////////////////////////////////////////////////
-// just keeping this around for reference
-static void draw_Renderables(VkCommandBuffer cmd, RenderObject *first, int count)
-{
-    // make a model view matrix for rendering the object
-    // camera view
-    glm::vec3 cam_pos; //= { camera_x, 0.f + camera_y, -30.f + camera_z };
-
-    glm::mat4 view = glm::translate(glm::mat4(1.f), cam_pos);
-    // camera projection
-    glm::mat4 projection = glm::perspective(glm::radians(60.f), 1700.f / 900.f, 0.1f, 200.0f);
-    projection[1][1] *= -1;
-
-    Mesh     *lastMesh     = NULL;
-    Material *lastMaterial = NULL;
-
-    for (int i = 0; i < count; i++) {
-        RenderObject &object = first[i];
-
-        // only bind the pipeline if it doesn't match with the already bound one
-        if (object.material != lastMaterial) {
-
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipeline);
-            lastMaterial = object.material;
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, object.material->pipelineLayout, 0, 1, &get_CurrentFrameData().global_descriptor, 0, NULL);
-        }
-
-        glm::mat4 model = object.transformMatrix;
-        // final render matrix, that we are calculating on the cpu
-        glm::mat4 mesh_matrix = projection * view * model;
-
-        MeshPushConstants constants;
-        constants.render_matrix = object.transformMatrix;
-
-        // upload the mesh constants to the GPU via pushconstants
-        vkCmdPushConstants(cmd, object.material->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
-
-        // only bind the mesh if it's a different one from last bind
-        if (object.mesh != lastMesh) {
-            // bind the mesh vertex buffer with offset 0
-            VkDeviceSize offset = 0;
-            vkCmdBindVertexBuffers(cmd, 0, 1, &object.mesh->vertex_buffer.buffer, &offset);
-            lastMesh = object.mesh;
-        }
-        // we can now draw
-        uint32_t size = static_cast<uint32_t>(object.mesh->vertices.size());
-        vkCmdDraw(cmd, size, 1, 0, 0);
+        vkCmdDraw(*cmd_buffer, ARR_COUNT(quad.vertices), (uint32_t)quads.size(), 0, 0);
+        // vkCmdDrawIndexed(*cmd_buffer, 6, 2, 0, 0, 0);
     }
 }

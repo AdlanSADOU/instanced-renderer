@@ -7,16 +7,27 @@
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
 #include <vector>
+#include <functional>
 #include <deque>
 
-struct InstanceData
+struct Vertex
 {
-    glm::mat4 tranform_matrix;
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec3 color;
+    glm::vec2 tex_uv;
 };
 
-struct ModelData
+struct Quad
 {
-    glm::mat4 transform;
+    Vertex vertices[6] = {
+        { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }, // bot-left 1
+        { { -1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } }, // top-left
+        { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }, // top-right 1
+        { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }, // bot-left 2
+        { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }, // top-right 2
+        { { +1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } }, // bot-right
+    };
 };
 
 struct BufferObject
@@ -25,15 +36,37 @@ struct BufferObject
     VmaAllocation allocation;
 };
 
+struct InstanceData
+{
+    // glm::mat4 tranform_matrix;
+    glm::vec3 pos;
+    glm::vec3 rot;
+    glm::vec3 scale;
+    int32_t   tex_idx;
+};
+
+struct Instances
+{
+    std::vector<InstanceData> data;
+    BufferObject              bo;
+};
+
+struct ModelData
+{
+    glm::mat4 transform;
+};
+
+
 struct FrameData
 {
-    VkSemaphore     present_semaphore   = {};
-    VkSemaphore     render_semaphore    = {};
-    VkFence         render_fence        = {};
-    VkCommandPool   command_pool        = {};
-    VkCommandBuffer main_command_buffer = {};
-    VkDescriptorSet global_descriptor   = {};
-    VkDescriptorSet model_descriptor    = {};
+    VkSemaphore     present_semaphore = {};
+    VkSemaphore     render_semaphore  = {};
+    VkFence         render_fence      = {};
+    VkCommandBuffer cmd_buffer_gfx    = {};
+    VkCommandBuffer cmd_buffer_cmp    = {};
+    VkDescriptorSet set_global        = {};
+    VkDescriptorSet set_model         = {};
+    uint32_t        idx_swapchain_image;
 };
 
 struct MeshPushConstants
@@ -62,12 +95,6 @@ struct Material
     VkPipelineLayout pipelineLayout;
 };
 
-struct Vertex
-{
-    glm::vec3 position;
-    glm::vec3 normal;
-    glm::vec3 color;
-};
 
 struct Mesh
 {
@@ -83,4 +110,34 @@ struct RenderObject
     Mesh     *mesh            = {};
     Material *material        = {};
     glm::mat4 transformMatrix = {};
+};
+
+////////////////////////////
+// todo(ad): cleanup
+
+enum ECommandPoolType
+{
+    Graphics,
+    Transfer,
+    Present
+};
+
+struct ReleaseQueue
+{
+    std::deque<std::function<void()>> deletors = {};
+
+    void push_function(std::function<void()> &&function)
+    {
+        deletors.push_back(function);
+    }
+
+    void flush()
+    {
+        // reverse iterate the deletion queue to execute all the functions
+        for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
+            (*it)(); // call functors
+        }
+
+        deletors.clear();
+    }
 };

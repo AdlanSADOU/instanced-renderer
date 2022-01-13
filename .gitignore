@@ -8,3 +8,12 @@
 *.spv
 
 v16
+.vs/vulkan-ex/v17/Browse.VC.db
+.vs/vulkan-ex/v17/.suo
+.vs/vulkan-ex/v17/workspaceFileList.bin
+.vs/vulkan-ex/v17/ipch/AutoPCH/2153d9d891dc6df1/EXAMPLES.ipch
+.vs/vulkan-ex/project-colors.json
+.vs/slnx.sqlite
+
+.vs/*
+.vs/slnx.sqlite

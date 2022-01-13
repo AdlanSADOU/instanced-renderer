@@ -7,7 +7,7 @@
 - [Mike Bailey's Vulkan Page](http://web.engr.oregonstate.edu/~mjb/vulkan/)
 - [Vulkanised 2021](https://www.khronos.org/events/vulkanised-2021)
 - [Writing an efficient vulkan renderer - A.Kapoulkine](https://zeux.io/2020/02/27/writing-an-efficient-vulkan-renderer/)
-
+- [Vulkan Dos and Donts - Nvidia](https://developer.nvidia.com/blog/vulkan-dos-donts/)
 ## quick notes
 
 use case:
@@ -73,3 +73,9 @@ Basically, the instance represents your application, makes sure that the validat
 ## Shaders
 
 ### [Static Use](https://www.khronos.org/registry/vulkan/specs/1.2/html/chap9.html#shaders-staticuse)
+
+### Compute
+
+get the queue index > vkGetPhysicalDeviceQueueFamilyProperties
+specify the queue index > vkDeviceQueueCreateInfo
+get the device queue > vkGetDeviceQueue

@@ -153,3 +153,20 @@ The basic idea of using descriptor sets is to group your shader bindings by upda
 
 
 For each set n that is statically used by the VkPipeline ?:
+
+
+---
+
+VkBuffer buffers[] = { myBuffer, myBuffer, myBuffer, ... };
+VkDeviceSize offsets[] = { 0x1000, 0x2000, 0x3000, ... };
+vkCmdBindVertexBuffers(commandBuffer, 0, 3, buffers, offsets);
+
+If we're talking about 2D, you can put your level into a Quadtree data structure and use that to very quickly cull parts of the level that are not on screen.
+
+One example of such a restriction/constraint: Your 10,000 sprites are all the same base "model" (probably a quad) with only differences in how each "instance" is being affinely transformed.
+In this case you can use instancing with a big Uniform Buffer Object to hold each instance's matrix in. This would require only one GL call to upload the UBO and only one draw call to draw all 10,000 instances at once.
+You can then select the right matrix via gl_InstanceID in your shader.
+
+Additional constraint: Every instance needs to have a separate texture or one of a few possible textures.
+Solution: For this to work with instancing you could either use a texture atlas and per-instance texture coordinates, which you could also specify in the UBO, to select the right texture part for the right instance.
+Or you could use array textures with each layer being a different texture and then encode the texture to be used inside the UBO as per-instance data (as a simple integer).

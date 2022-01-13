@@ -5,63 +5,43 @@
 extern VulkanRenderer vkr;
 
 bool  _up = false, _down = false, _left = false, _right = false;
-bool  _W = false, _A = false, _S = false, _D = false;
+bool  _W = false, _A = false, _S = false, _D = false, _Q = false, _E = false;
 float camera_x = 0, camera_y = 0, camera_z = 0;
 
 float pos_x = 0;
 float pos_y = 0;
 float pos_z = 0;
 
-float camera_speed = 40.f;
-float player_speed = 40.f;
-
-void UpdateAndRender();
-
-// #ifdef _WIN32
-
-// #if defined(NO_CONSOLE) && defined(_WIN32)
-// int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
-// {
-//     return SDL_main(__argc, __argv);
-// }
-// #else
-// int main(int argc, char **argv)
-// {
-//     return SDL_main(argc, argv);
-// }
-// #endif
-
-// #endif
-
-int main(int argc, char *argv[])
-{
-    vk_Init();
-
-    // todo(ad): these 2 calls are not part of the vulkan initialization phase
-    InitExamples();
-    // InitMeshes();
-    // init_Scene();
-
-    UpdateAndRender();
-    vk_Cleanup();
-
-    return 0;
-}
-
-float seconds = 0;
+float camera_speed = 140.f;
+float player_speed = 250.f;
 
 const uint64_t MAX_DT_SAMPLES = 256;
 
 double dt_samples[MAX_DT_SAMPLES] = {};
 double dt_averaged                = 0;
 
+void UpdateAndRender();
+void DestroyExamples();
+void DrawExamples(VkCommandBuffer *cmd_buffer, double dt);
+void InitExamples();
+
+extern int main(int argc, char *argv[])
+{
+    vk_Init();
+
+    InitExamples();
+    UpdateAndRender();
+    DestroyExamples();
+
+    vk_Cleanup();
+
+    return 0;
+}
+
 void UpdateAndRender()
 {
     SDL_Event e;
-
-    bool bQuit = false;
-
-
+    bool      bQuit = false;
 
 
     while (!bQuit) {
@@ -83,6 +63,8 @@ void UpdateAndRender()
                 if (key == SDLK_s) _S = false;
                 if (key == SDLK_a) _A = false;
                 if (key == SDLK_d) _D = false;
+                if (key == SDLK_q) _Q = false;
+                if (key == SDLK_e) _E = false;
             }
 
             if (e.type == SDL_KEYDOWN) {
@@ -95,30 +77,28 @@ void UpdateAndRender()
                 if (key == SDLK_s) _S = true;
                 if (key == SDLK_a) _A = true;
                 if (key == SDLK_d) _D = true;
+                if (key == SDLK_q) _Q = true;
+                if (key == SDLK_e) _E = true;
             }
         }
 
-        if (_up) camera_z += camera_speed * (float)dt_averaged;
-        if (_down) camera_z -= camera_speed * (float)dt_averaged;
-        if (_left) camera_x -= camera_speed * (float)dt_averaged;
-        if (_right) camera_x += camera_speed * (float)dt_averaged;
+        if (_up) camera_y -= camera_speed * (float)dt_averaged;
+        if (_down) camera_y += camera_speed * (float)dt_averaged;
+        if (_left) camera_x += camera_speed * (float)dt_averaged;
+        if (_right) camera_x -= camera_speed * (float)dt_averaged;
 
-        if (_W) pos_z -= player_speed * (float)dt_averaged;
-        if (_S) pos_z += player_speed * (float)dt_averaged;
+        if (_W) pos_y += player_speed * (float)dt_averaged;
+        if (_S) pos_y -= player_speed * (float)dt_averaged;
         if (_A) pos_x -= player_speed * (float)dt_averaged;
         if (_D) pos_x += player_speed * (float)dt_averaged;
+        if (_Q) pos_z -= player_speed * (float)dt_averaged;
+        if (_E) pos_z += player_speed * (float)dt_averaged;
 
-        // static RenderObject *monkey = get_Renderable("monkey");
-        // monkey->transformMatrix = glm::translate(monkey->transformMatrix, glm::vec3(pos_x, pos_y, 0));
-        // pos_x = pos_y = 0;
+        vk_BeginRenderPass();
+        DrawExamples(&get_CurrentFrameData().cmd_buffer_gfx, dt_averaged);
+        vk_EndRenderPass();
 
-
-
-
-        VulkanUpdateAndRender(dt_averaged);
-
-
-
+        pos_x = pos_y = pos_z = 0;
 
 
         static double acc = 0;
@@ -138,6 +118,5 @@ void UpdateAndRender()
             sum += dt_samples[i];
         }
         dt_averaged = sum / MAX_DT_SAMPLES;
-
     }
 }

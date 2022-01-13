@@ -9,6 +9,7 @@ pushd shaders
 
 %PATH_VulkanSDK_bin%/glslc.exe coloredTriangle.vert -o coloredTriangle.vert.spv
 %PATH_VulkanSDK_bin%/glslc.exe coloredTriangle.frag -o coloredTriangle.frag.spv
+%PATH_VulkanSDK_bin%/glslc.exe textureArray.frag -o textureArray.frag.spv
 
 %PATH_VulkanSDK_bin%/glslc.exe triangleMesh.vert -o triangleMesh.vert.spv
 

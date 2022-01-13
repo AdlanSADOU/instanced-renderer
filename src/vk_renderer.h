@@ -4,6 +4,10 @@
 #if !defined(VK_RENDERER)
 #define VK_RENDERER
 
+#if defined(WIN32)
+#define __func__ __FUNCTION__
+#endif
+
 #include <SDL.h>
 #include <SDL_vulkan.h>
 
@@ -12,30 +16,41 @@
 #include <glm/gtx/transform.hpp>
 
 #include <vector>
-#include <vk_mem_alloc.h>
 #include <vk_types.h>
 
 #define PI 3.14159265358979323846264338327950288
 
 #define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
 
-#define FRAME_OVERLAP 2
+#define FRAME_BUFFER_COUNT 3
 
-struct Camera
-{
-    struct Data
-    {
-        glm::mat4 view       = {};
-        glm::mat4 projection = {};
-        glm::mat4 viewproj   = {};
-    } data {};
+#define SECONDS(value) (1000000000 * value)
 
-    BufferObject UBO[FRAME_OVERLAP];
-};
+FrameData &get_CurrentFrameData();
 
-// this number reflects the texture array size set in the "shaders/textureArray.frag" shader
-// both must be equal
-#define MAX_TEXTURE_COUNT 80
+static VertexInputDescription GetVertexDescription();
+
+static bool CreateShaderModule(const char *filepath, VkShaderModule *outShaderModule);
+
+VkResult CreateBuffer(BufferObject *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+bool     CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
+VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocation allocation);
+
+void       vk_Init();
+void       vk_BeginRenderPass();
+void       vk_EndRenderPass();
+void       vk_Cleanup();
+FrameData &get_CurrentFrameData();
+
+VkPipeline CreateGraphicsPipeline();
+// Helper functions
+bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
+bool AllocateImageMemory(VkDevice device, VkPhysicalDevice gpu, VkImage image, VkDeviceMemory *memory);
+bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
+
+uint32_t FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
+VkResult CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
+VkResult AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
 
 struct VulkanRenderer
 {
@@ -43,9 +58,8 @@ struct VulkanRenderer
     VkExtent2D  window_extent { 720, 480 };
     // VkExtent2D  window_extent { 1920, 1080 };
 
-    Camera       camera = {};
-    FrameData    frames[FRAME_OVERLAP];
-    BufferObject triangle_SSBO[FRAME_OVERLAP];
+    FrameData    frames[FRAME_BUFFER_COUNT];
+    BufferObject triangle_SSBO[FRAME_BUFFER_COUNT];
     //
     // Vulkan initialization phase types
     //
@@ -81,7 +95,7 @@ struct VulkanRenderer
     // Descriptor sets
     //
     VkDescriptorPool      descriptor_pool;
-    VkDescriptorSetLayout set_layout_global;
+    VkDescriptorSetLayout set_layout_global; // todo(ad): camera set layout
 
     VkDescriptorSetLayout              set_layout_array_of_textures;
     VkDescriptorSet                    set_array_of_textures;
@@ -109,8 +123,77 @@ struct VulkanRenderer
     ///////////////////////////////////
 
     bool     is_initialized     = false;
-    uint64_t frame_idx_inflight = 0;
+    uint32_t frame_idx_inflight = 0;
 };
+
+struct Camera
+{
+    struct Data
+    {
+        glm::mat4 view       = {};
+        glm::mat4 projection = {};
+        glm::mat4 viewproj   = {};
+    } data {};
+
+    void           *data_ptr[FRAME_BUFFER_COUNT];
+    BufferObject    UBO[FRAME_BUFFER_COUNT];
+    VkDescriptorSet set_global[FRAME_BUFFER_COUNT] = {};
+
+
+    void MapDataPtr(VmaAllocator allocator, VkDevice device, VkPhysicalDevice gpu, VulkanRenderer vkr)
+    {
+        for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
+
+            CreateBuffer(&UBO[i], sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+            VkDescriptorBufferInfo info_descriptor_camera_buffer;
+
+            AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.set_layout_global, &set_global[i]);
+
+
+            { // todo(ad): function
+                info_descriptor_camera_buffer.buffer = UBO[i].buffer;
+                info_descriptor_camera_buffer.offset = 0;
+                info_descriptor_camera_buffer.range  = sizeof(Camera::Data);
+
+                VkWriteDescriptorSet write_camera_buffer = {};
+                write_camera_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                write_camera_buffer.pNext                = NULL;
+                write_camera_buffer.dstBinding           = 0; // we are going to write into binding number 0
+                write_camera_buffer.dstSet               = set_global[i]; // of the global descriptor
+                write_camera_buffer.descriptorCount      = 1;
+                write_camera_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
+                write_camera_buffer.pBufferInfo          = &info_descriptor_camera_buffer;
+                vkUpdateDescriptorSets(vkr.device, 1, &write_camera_buffer, 0, NULL);
+            }
+
+            vmaMapMemory(allocator, UBO[i].allocation, &data_ptr[i]);
+        }
+    }
+
+    void UnmapDataPtrs(VmaAllocator allocator)
+    {
+        for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
+            vmaUnmapMemory(allocator, UBO[i].allocation);
+        }
+    }
+
+    void copyDataPtr(uint32_t frame_idx)
+    {
+        memcpy(data_ptr[frame_idx], &data, sizeof(data));
+    }
+
+    void Destroy(VkDevice device)
+    {
+        // UnmapDataPtr(device);
+        for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
+            // vkDestroyBuffer(device, UBO[i].buffer, NULL);
+        }
+    }
+};
+
+// this number reflects the texture array size set in the "shaders/textureArray.frag" shader
+// both must be equal
+#define MAX_TEXTURE_COUNT 80
 
 #define VK_CHECK(x)                                    \
     do {                                               \
@@ -121,30 +204,4 @@ struct VulkanRenderer
         }                                              \
     } while (0)
 
-#define SECONDS(value) (1000000000 * value)
-
-FrameData &get_CurrentFrameData();
-
-static VertexInputDescription GetVertexDescription();
-
-static bool CreateShaderModule(const char *filepath, VkShaderModule *outShaderModule);
-
-VkResult CreateBuffer(BufferObject *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation);
-
-void       vk_Init();
-void       vk_BeginRenderPass();
-void       vk_EndRenderPass();
-void       vk_Cleanup();
-FrameData &get_CurrentFrameData();
-
-VkPipeline CreateGraphicsPipeline();
-// Helper functions
-bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
-bool AllocateImageMemory(VkDevice device, VkPhysicalDevice gpu, VkImage image, VkDeviceMemory *memory);
-bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
-
-uint32_t FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
-VkResult CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
-VkResult AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
 #endif // VK_RENDERER

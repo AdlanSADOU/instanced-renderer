@@ -33,7 +33,11 @@ struct Quad
 struct BufferObject
 {
     VkBuffer      buffer;
+
+    // union?
     VmaAllocation allocation;
+    VkDeviceMemory  memory;
+
 };
 
 struct InstanceData
@@ -64,7 +68,6 @@ struct FrameData
     VkFence         render_fence      = {};
     VkCommandBuffer cmd_buffer_gfx    = {};
     VkCommandBuffer cmd_buffer_cmp    = {};
-    VkDescriptorSet set_global        = {};
     VkDescriptorSet set_model         = {};
     uint32_t        idx_swapchain_image;
 };

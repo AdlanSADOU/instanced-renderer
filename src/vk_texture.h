@@ -5,8 +5,9 @@
 #include <stdint.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <vk_mem_alloc.h>
 
-struct TextureAsset
+struct Texture
 {
     VkImage        image;
     VkDeviceMemory memory;
@@ -20,7 +21,7 @@ struct TextureAsset
     uint32_t array_index;
 };
 
-static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath, VulkanRenderer *vkr)
+static void CreateTexture(Texture *texture_asset, const char *filepath, VulkanRenderer *vkr)
 {
     int tex_width, tex_height, texChannels;
 
@@ -169,7 +170,7 @@ static void CreateTextureAsset(TextureAsset *texture_asset, const char *filepath
     texture_asset->array_index = array_index++;
 }
 
-static void DestroyTextureAsset(TextureAsset *texture_asset, VulkanRenderer *vkr)
+static void DestroyTextureAsset(Texture *texture_asset, VulkanRenderer *vkr)
 {
     vkDestroyImageView(vkr->device, texture_asset->view, NULL);
     vmaDestroyImage(vkr->allocator, texture_asset->image, texture_asset->allocation);

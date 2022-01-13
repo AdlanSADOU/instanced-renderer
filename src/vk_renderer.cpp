@@ -1,10 +1,10 @@
 ﻿
 #include "vk_renderer.h"
-#define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
 #include <vk_initializers.h>
 #include <vk_types.h>
 #include <fstream>
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
 
 VulkanRenderer vkr;
 extern float   camera_x, camera_y, camera_z;
@@ -361,7 +361,7 @@ void vk_Init()
     VkCommandPoolCreateInfo ci_compute_cmd_pool = vkinit::CommandPoolCreateInfo(vkr.compute_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     VK_CHECK(vkCreateCommandPool(vkr.device, &ci_compute_cmd_pool, NULL, &vkr.command_pool_compute));
 
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
+    for (int i = 0; i < FRAME_BUFFER_COUNT; i++) {
         // allocate the default command buffer that we will use for rendering
         VkCommandBufferAllocateInfo cmd_buffer_alloc_info_graphics = vkinit::CommandBufferAllocateInfo(vkr.command_pool_graphics);
         VK_CHECK(vkAllocateCommandBuffers(vkr.device, &cmd_buffer_alloc_info_graphics, &vkr.frames[i].cmd_buffer_gfx));
@@ -483,7 +483,7 @@ void vk_Init()
     fenceCreateInfo.pNext             = NULL;
     fenceCreateInfo.flags             = VK_FENCE_CREATE_SIGNALED_BIT; // we want to create the fence with the Create Signaled flag, so we can wait on it before using it on a GPU command (for the first frame)
 
-    for (size_t i = 0; i < FRAME_OVERLAP; i++) {
+    for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
         VK_CHECK(vkCreateFence(vkr.device, &fenceCreateInfo, NULL, &vkr.frames[i].render_fence));
 
         /////
@@ -540,36 +540,15 @@ void vk_Init()
 
     /////////////////////////////////////
     /// Allocate sets for each camera buffer, we have a camera buffer for each framebuffer
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
+    for (int i = 0; i < FRAME_BUFFER_COUNT; i++) {
 
         //////////////////////////
         //// Set allocation
         // allocate one descriptor set for each frame
 
-        AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.set_layout_global, &vkr.frames[i].set_global);
 
-
-        CreateBuffer(&vkr.camera.UBO[i], sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        VkDescriptorBufferInfo info_descriptor_camera_buffer;
-
-
-        { // todo(ad): function
-            info_descriptor_camera_buffer.buffer = vkr.camera.UBO[i].buffer;
-            info_descriptor_camera_buffer.offset = 0;
-            info_descriptor_camera_buffer.range  = sizeof(Camera::Data);
-
-            VkWriteDescriptorSet write_camera_buffer = {};
-            write_camera_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write_camera_buffer.pNext                = NULL;
-            write_camera_buffer.dstBinding           = 0; // we are going to write into binding number 0
-            write_camera_buffer.dstSet               = vkr.frames[i].set_global; // of the global descriptor
-            write_camera_buffer.descriptorCount      = 1;
-            write_camera_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
-            write_camera_buffer.pBufferInfo          = &info_descriptor_camera_buffer;
-            vkUpdateDescriptorSets(vkr.device, 1, &write_camera_buffer, 0, NULL);
-        }
     }
+
 
     /// Set 1
     VkDescriptorSetLayoutBinding desc_set_layout_binding_sampler = {};
@@ -624,16 +603,13 @@ void vk_BeginRenderPass()
     VkSemaphore     *g_inflight_present_semaphore;
     VkSemaphore     *g_inflight_render_semaphore;
     VkCommandBuffer *g_inflight_main_command_buffer;
-    VkDescriptorSet *g_inflight_global_descriptor_set;
-    BufferObject    *camera_ubo;
+    // VkDescriptorSet *g_inflight_global_descriptor_set;
 
-    g_inflight_render_fence          = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].render_fence;
-    g_inflight_present_semaphore     = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].present_semaphore;
-    g_inflight_render_semaphore      = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].render_semaphore;
-    g_inflight_main_command_buffer   = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].cmd_buffer_gfx;
-    g_inflight_global_descriptor_set = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].set_global;
-
-    camera_ubo = &vkr.camera.UBO[vkr.frame_idx_inflight % FRAME_OVERLAP];
+    g_inflight_render_fence          = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].render_fence;
+    g_inflight_present_semaphore     = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].present_semaphore;
+    g_inflight_render_semaphore      = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].render_semaphore;
+    g_inflight_main_command_buffer   = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].cmd_buffer_gfx;
+    // g_inflight_global_descriptor_set = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].set_global;
 
 
     VK_CHECK(vkWaitForFences(vkr.device, 1, g_inflight_render_fence, true, SECONDS(1)));
@@ -641,7 +617,7 @@ void vk_BeginRenderPass()
 
 
     VK_CHECK(vkAcquireNextImageKHR(vkr.device, vkr.swapchain, SECONDS(1), *g_inflight_present_semaphore, NULL, &vkr.frames[vkr.frame_idx_inflight].idx_swapchain_image));
-    VK_CHECK(vkResetCommandBuffer(*g_inflight_main_command_buffer, 0)); // now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
+    // VK_CHECK(vkResetCommandBuffer(*g_inflight_main_command_buffer, 0)); // now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
 
 
     VkClearValue clear_value;
@@ -725,7 +701,7 @@ void vk_EndRenderPass()
     VK_CHECK(vkQueuePresentKHR(vkr.graphics_queue, &presentInfo));
 
     vkr.frame_idx_inflight++;
-    vkr.frame_idx_inflight = vkr.frame_idx_inflight % FRAME_OVERLAP;
+    vkr.frame_idx_inflight = vkr.frame_idx_inflight % FRAME_BUFFER_COUNT;
 }
 
 void VulkanUpdateAndRender(double dt)
@@ -898,7 +874,7 @@ VkPipeline CreateGraphicsPipeline()
 
 FrameData &get_CurrentFrameData()
 {
-    return vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP];
+    return vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT];
 }
 
 
@@ -1078,8 +1054,11 @@ VkResult CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsage
     return res;
 }
 
-VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)
+VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocation allocation)
 {
+    // if (src == NULL)
+        SDL_LogInfo(0, "%d:%s src buffer is NULL\n", __LINE__, __func__);
+
     void    *data;
     VkResult result = (vmaMapMemory(vkr.allocator, allocation, &data));
     memcpy(data, src, size);
@@ -1087,5 +1066,3 @@ VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)
 
     return result;
 }
-
-///////////////////////////////////////

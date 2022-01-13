@@ -44,6 +44,16 @@ bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer
     return false;
 }
 
+bool CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer)
+{
+    VkBufferCreateInfo ci_buffer = {};
+    ci_buffer.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    ci_buffer.flags       = 0;
+    ci_buffer.size        = size;
+    ci_buffer.usage       = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    ci_buffer.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    return vkCreateBuffer(device, &ci_buffer, NULL, out_buffer);
+}
 
 bool AllocateImageMemory(VkDevice device, VkPhysicalDevice gpu, VkImage image, VkDeviceMemory *memory)
 {

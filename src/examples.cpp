@@ -7,29 +7,31 @@ extern VulkanRenderer vkr;
 extern float pos_x, pos_y, pos_z;
 extern float camera_x, camera_y, camera_z;
 
-
 Instances instances;
 
 BufferObject      quads_bo = {};
 std::vector<Quad> quads;
 Quad              quad;
 
-void        *instances_data_ptr;
-TextureAsset profile;
-TextureAsset itoldu;
+void   *instances_data_ptr;
+Texture profile;
+Texture itoldu;
 
 InstanceData quad1_idata;
 InstanceData quad2_idata;
 
-const size_t ROW     = 500;
-const size_t COL     = 500;
-int          spacing = 200;
+const size_t ROW     = 2000;
+const size_t COL     = 2000;
+int          spacing = 300;
+
+Camera camera;
 
 void InitExamples()
 {
-    CreateTextureAsset(&profile, "./assets/texture.png", &vkr);
-    CreateTextureAsset(&itoldu, "./assets/bjarn_itoldu.jpg", &vkr);
+    CreateTexture(&profile, "./assets/texture.png", &vkr);
+    CreateTexture(&itoldu, "./assets/bjarn_itoldu.jpg", &vkr);
 
+    camera.MapDataPtr(vkr.allocator, vkr.device, vkr.chosen_gpu, vkr);
 
     int MAX_ENTITES = ROW * COL;
     SDL_Log("max entites: %d\n", MAX_ENTITES);
@@ -58,20 +60,20 @@ void InitExamples()
         // quad2_idata.scale   = { itoldu.width, itoldu.height, 0 };
         // quad2_idata.scale *= _scale;
 
-        quads.push_back(quad);
         instances.data.push_back(quad1_idata);
         // instances.data.push_back(quad2_idata);
     }
+    quads.push_back(quad);
 
     {
         VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
         CreateBuffer(&quads_bo, quads.size() * sizeof(Quad::vertices), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        AllocateFillBuffer(quads.data(), quads.size() * sizeof(Quad::vertices), quads_bo.allocation);
+        MapMemcpyMemory(quads.data(), quads.size() * sizeof(Quad::vertices), quads_bo.allocation);
     }
     {
         VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
         CreateBuffer(&instances.bo, instances.data.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        // AllocateFillBuffer(instances.data.data(), instances.data.size() * sizeof(InstanceData), instances.bo.allocation);
+        // MapMemcpyMemory(instances.data.data(), instances.data.size() * sizeof(InstanceData), instances.bo.allocation);
 
         vmaMapMemory(vkr.allocator, instances.bo.allocation, &instances_data_ptr);
         memcpy(instances_data_ptr, instances.data.data(), instances.data.size() * sizeof(InstanceData));
@@ -120,6 +122,7 @@ void DestroyExamples()
     DestroyTextureAsset(&profile, &vkr);
     DestroyTextureAsset(&itoldu, &vkr);
     vmaUnmapMemory(vkr.allocator, instances.bo.allocation);
+    camera.UnmapDataPtrs(vkr.allocator);
 }
 
 // pipeline, piepeline_layout, descriptor_sets, shader --> custom to a mesh or defaults
@@ -128,38 +131,41 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, double dt)
 
     /////////////////////////////////////////////////
     // camera
-    glm::vec3 cam_pos     = { camera_x, camera_y - 0.f, camera_z - 120.f };
-    glm::mat4 translation = glm::translate(glm::mat4(1.f), cam_pos);
-    glm::mat4 rotation    = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(1, 0, 0));
-    glm::mat4 view        = rotation * translation;
-    // glm::mat4 projection  = glm::perspective(glm::radians(60.f), (float)vkr.window_extent.width / (float)vkr.window_extent.height, 0.1f, 1000.0f);
-    glm::mat4 projection = glm::ortho(0.f, (float)vkr.window_extent.width, 0.f, (float)vkr.window_extent.height, .1f, 200.f);
-    glm::mat4 V = glm::lookAt(glm::vec3(0.f, 0.f, 2.0f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f));
+    { // camera.update();
+        glm::vec3 cam_pos     = { camera_x, camera_y - 0.f, camera_z - 120.f };
+        glm::mat4 translation = glm::translate(glm::mat4(1.f), cam_pos);
+        glm::mat4 rotation    = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(1, 0, 0));
+        glm::mat4 view        = rotation * translation;
+        // glm::mat4 projection  = glm::perspective(glm::radians(60.f), (float)vkr.window_extent.width / (float)vkr.window_extent.height, 0.1f, 1000.0f);
+        glm::mat4 projection = glm::ortho(0.f, (float)vkr.window_extent.width, 0.f, (float)vkr.window_extent.height, .1f, 200.f);
+        glm::mat4 V          = glm::lookAt(glm::vec3(0.f, 0.f, 2.0f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-    projection[1][1] *= -1;
+        projection[1][1] *= -1;
 
-    vkr.camera.data.projection = projection * V;
-    vkr.camera.data.view       = view;
-    vkr.camera.data.viewproj   = projection * view;
-    AllocateFillBuffer(&vkr.camera, sizeof(Camera::Data), vkr.camera.UBO[vkr.frame_idx_inflight % FRAME_OVERLAP].allocation); // todo(ad): just map the data ptr once
-
+        camera.data.projection = projection * V;
+        camera.data.view       = view;
+        camera.data.viewproj   = projection * view;
+        camera.copyDataPtr(vkr.frame_idx_inflight);
+    }
     // Bindings
+    static int i = 0;
     vkCmdBindPipeline(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline);
-
-    const uint32_t dynamic_offsets = 0;
-    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, &vkr.frames[vkr.frame_idx_inflight].set_global, 0, NULL);
+    vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 0, 1, &camera.set_global[vkr.frame_idx_inflight], 0, NULL);
     vkCmdBindDescriptorSets(*cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline_layout, 1, 1, &vkr.set_array_of_textures, 0, NULL);
+    if (i < 2) {
+        i++;
+    }
 
     {
-        // push constants
-        // make a model view matrix for rendering the object
-        // model matrix is specific to the "thing" we want to draw
-        // so each model or triangle has its matrix so that it can be positioned on screen with respect to the camera position
 
         VkBuffer     buffers[] = { quads_bo.buffer };
         VkDeviceSize offsets[] = { 0, /*offsetof(Quad, data.indices) */ };
         vkCmdBindVertexBuffers(*cmd_buffer, 0, 1, buffers, offsets);
         vkCmdBindVertexBuffers(*cmd_buffer, 1, 1, &instances.bo.buffer, offsets);
+        // push constants
+        // make a model view matrix for rendering the object
+        // model matrix is specific to the "thing" we want to draw
+        // so each model or triangle has its matrix so that it can be positioned on screen with respect to the camera position
 
 
         instances.data[0].pos.x += pos_x;
@@ -171,7 +177,7 @@ void DrawExamples(VkCommandBuffer *cmd_buffer, double dt)
 
         memcpy(instances_data_ptr, instances.data.data(), instances.data.size() * sizeof(InstanceData));
 
-        vkCmdDraw(*cmd_buffer, ARR_COUNT(quad.vertices), (uint32_t)quads.size(), 0, 0);
+        vkCmdDraw(*cmd_buffer, ARR_COUNT(quad.vertices), (uint32_t)instances.data.size(), 0, 0);
         // vkCmdDrawIndexed(*cmd_buffer, 6, 2, 0, 0, 0);
     }
 }

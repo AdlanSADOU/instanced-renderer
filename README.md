@@ -1,4 +1,8 @@
-This is a project I use to learn and experiment Vulkan.
+
+This project is still under heavy development and in early stage, even though almost all critical rendering features are there.
+Nothing has been cristallized yet. So pretty big changes and refactorings are to come.
+
+--- 
 
 ## Features
 - Instanced quad rendering
@@ -9,19 +13,8 @@ This is a project I use to learn and experiment Vulkan.
 
 **Next feature**: Moving transform updates from CPU to GPU via compute shaders
 
-## TLDR; 
-The code might be rough at some places.
-I don't do OOP while learning/exploring. More generally, I do not "Orient" code around objects in the Object Oriented sense.
-You wont find a ``Game`` class with a ``game.run`` method, because there is only ever one instance of the game, we just call into it, so it does not need to be a class. In contrast. I might have a Sprite class, because that is resusable.
+---
 
-From my limited experience, I find that making everything a class only makes it harder to to keep track of the code and thus hurts its maintenance.
-For that reason I write very procedural code with minimal indirection, only factoring things out that I intend to reuse, i.e buffer creation.
-
-In general, I think it is way easier and more natural to first solve the problem at hand, get a better idea of the overall code and then let abstractions arise naturally and not try and force it upfront without any problem domain knowledge.
-
-Just something that works well for me.
-
---- 
 <img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="44%" height="44%">
 
 

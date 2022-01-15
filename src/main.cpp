@@ -20,10 +20,11 @@ const uint64_t MAX_DT_SAMPLES = 256;
 double dt_samples[MAX_DT_SAMPLES] = {};
 double dt_averaged                = 0;
 
-void UpdateAndRender();
-void DestroyExamples();
-void DrawExamples(VkCommandBuffer *cmd_buffer, double dt);
 void InitExamples();
+void DestroyExamples();
+void UpdateAndRender();
+void ComputeExamples();
+void DrawExamples(VkCommandBuffer *cmd_buffer, double dt);
 
 extern int main(int argc, char *argv[])
 {
@@ -93,6 +94,11 @@ void UpdateAndRender()
         if (_D) pos_x += player_speed * (float)dt_averaged;
         if (_Q) pos_z -= player_speed * (float)dt_averaged;
         if (_E) pos_z += player_speed * (float)dt_averaged;
+
+
+
+
+        ComputeExamples();
 
         vk_BeginRenderPass();
         DrawExamples(&get_CurrentFrameData().cmd_buffer_gfx, dt_averaged);

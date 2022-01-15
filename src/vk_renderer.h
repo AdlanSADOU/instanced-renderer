@@ -22,27 +22,31 @@
 
 #define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
 
-#define FRAME_BUFFER_COUNT 3
+#define FRAME_BUFFER_COUNT 2
 
 #define SECONDS(value) (1000000000 * value)
 
 FrameData &get_CurrentFrameData();
 
-static VertexInputDescription GetVertexDescription();
+VertexInputDescription GetVertexDescription();
 
 static bool CreateShaderModule(const char *filepath, VkShaderModule *outShaderModule);
 
-VkResult CreateBuffer(BufferObject *newBuffer, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, ReleaseQueue *queue, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
 bool     CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
-VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocation allocation);
+VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
 
 void       vk_Init();
+void       vk_BeginCommandBuffer();
+void       vk_EndCommandBuffer();
 void       vk_BeginRenderPass();
 void       vk_EndRenderPass();
 void       vk_Cleanup();
 FrameData &get_CurrentFrameData();
 
 VkPipeline CreateGraphicsPipeline();
+VkPipeline CreateComputePipeline();
+
 // Helper functions
 bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
 bool AllocateImageMemory(VkDevice device, VkPhysicalDevice gpu, VkImage image, VkDeviceMemory *memory);
@@ -91,16 +95,25 @@ struct VulkanRenderer
     VkPipeline       default_pipeline;
     VkPipelineLayout default_pipeline_layout;
 
-    //
-    // Descriptor sets
-    //
-    VkDescriptorPool      descriptor_pool;
-    VkDescriptorSetLayout set_layout_global; // todo(ad): camera set layout
+    ////////////////////
+    // Graphics
+    VkDescriptorPool descriptor_pool;
 
-    VkDescriptorSetLayout              set_layout_array_of_textures;
-    VkDescriptorSet                    set_array_of_textures;
+    VkDescriptorSetLayout set_layout_global; // todo(ad): camera set layout
+    VkDescriptorSetLayout set_layout_array_of_textures;
+    VkDescriptorSet       set_array_of_textures;
+
     std::vector<VkDescriptorImageInfo> descriptor_image_infos;
     VkSampler                          sampler;
+
+    ////////////////////
+    // Compute
+    VkPipeline                   compute_pipeline;
+    VkPipelineLayout             compute_pipeline_layout;
+    VkDescriptorPool             descriptor_pool_compute;
+    VkDescriptorSetLayout        set_layout_instanced_data;
+    std::vector<VkDescriptorSet> compute_descriptor_sets;
+
     //
     // RenderPass & Framebuffers
     //
@@ -144,32 +157,37 @@ struct Camera
     {
         for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
 
-            CreateBuffer(&UBO[i], sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-            VkDescriptorBufferInfo info_descriptor_camera_buffer;
+            CreateBuffer(&UBO[i], vkr.allocator, &vkr.release_queue, sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
+            VkDescriptorBufferInfo info_descriptor_camera_buffer;
             AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.set_layout_global, &set_global[i]);
 
+            info_descriptor_camera_buffer.buffer = UBO[i].buffer;
+            info_descriptor_camera_buffer.offset = 0;
+            info_descriptor_camera_buffer.range  = sizeof(Camera::Data);
 
-            { // todo(ad): function
-                info_descriptor_camera_buffer.buffer = UBO[i].buffer;
-                info_descriptor_camera_buffer.offset = 0;
-                info_descriptor_camera_buffer.range  = sizeof(Camera::Data);
-
-                VkWriteDescriptorSet write_camera_buffer = {};
-                write_camera_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                write_camera_buffer.pNext                = NULL;
-                write_camera_buffer.dstBinding           = 0; // we are going to write into binding number 0
-                write_camera_buffer.dstSet               = set_global[i]; // of the global descriptor
-                write_camera_buffer.descriptorCount      = 1;
-                write_camera_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
-                write_camera_buffer.pBufferInfo          = &info_descriptor_camera_buffer;
-                vkUpdateDescriptorSets(vkr.device, 1, &write_camera_buffer, 0, NULL);
-            }
+            VkWriteDescriptorSet write_camera_buffer = {};
+            write_camera_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write_camera_buffer.pNext                = NULL;
+            write_camera_buffer.dstBinding           = 0; // we are going to write into binding number 0
+            write_camera_buffer.dstSet               = set_global[i]; // of the global descriptor
+            write_camera_buffer.descriptorCount      = 1;
+            write_camera_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
+            write_camera_buffer.pBufferInfo          = &info_descriptor_camera_buffer;
+            vkUpdateDescriptorSets(vkr.device, 1, &write_camera_buffer, 0, NULL);
 
             vmaMapMemory(allocator, UBO[i].allocation, &data_ptr[i]);
         }
     }
 
+    void UnmapDataPtr(VmaAllocator allocator, uint32_t index)
+    {
+        vmaUnmapMemory(allocator, UBO[index].allocation);
+    }
+
+    /**
+     * @brief A convevience function to unmap every data ptr
+     */
     void UnmapDataPtrs(VmaAllocator allocator)
     {
         for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
@@ -182,11 +200,24 @@ struct Camera
         memcpy(data_ptr[frame_idx], &data, sizeof(data));
     }
 
-    void Destroy(VkDevice device)
+    void DestroyBuffers(VkDevice device)
     {
-        // UnmapDataPtr(device);
         for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
-            // vkDestroyBuffer(device, UBO[i].buffer, NULL);
+            vkDestroyBuffer(device, UBO[i].buffer, NULL);
+        }
+    }
+
+    /**
+     ** @brief A convevience function to unmap every data ptr and destroy all buffers -
+     ** do not mix with UnmapDataPtrs/ UnmapDataPtr or DestroyBuffers
+     */
+    void Destroy(VkDevice device, VmaAllocator allocator)
+    {
+        vkDeviceWaitIdle(device);
+
+        UnmapDataPtrs(allocator);
+        for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
+            vmaDestroyBuffer(allocator, UBO[i].buffer, UBO[i].allocation);
         }
     }
 };

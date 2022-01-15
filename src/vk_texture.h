@@ -23,6 +23,7 @@ struct Texture
 
 static void CreateTexture(Texture *texture_asset, const char *filepath, VulkanRenderer *vkr)
 {
+
     int tex_width, tex_height, texChannels;
 
     // STBI_rgb_alpha forces alpha

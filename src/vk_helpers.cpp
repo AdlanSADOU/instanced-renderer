@@ -48,10 +48,10 @@ bool CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffe
 {
     VkBufferCreateInfo ci_buffer = {};
     ci_buffer.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    ci_buffer.flags       = 0;
-    ci_buffer.size        = size;
-    ci_buffer.usage       = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    ci_buffer.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    ci_buffer.flags              = 0;
+    ci_buffer.size               = size;
+    ci_buffer.usage              = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    ci_buffer.sharingMode        = VK_SHARING_MODE_EXCLUSIVE;
     return vkCreateBuffer(device, &ci_buffer, NULL, out_buffer);
 }
 
@@ -120,4 +120,122 @@ VkResult AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_poo
     allocInfo.pSetLayouts        = set_layouts;
 
     return vkAllocateDescriptorSets(device, &allocInfo, descriptor_set);
+}
+
+
+VertexInputDescription GetVertexDescription()
+{
+    VertexInputDescription description;
+
+    // we will have just 1 vertex buffer binding, with a per-vertex rate
+    VkVertexInputBindingDescription mainBinding = {};
+    mainBinding.binding                         = 0;
+    mainBinding.stride                          = sizeof(Vertex);
+    mainBinding.inputRate                       = VK_VERTEX_INPUT_RATE_VERTEX;
+    description.bindings.push_back(mainBinding);
+
+    // Position will be stored at Location 0
+    {
+        VkVertexInputAttributeDescription position_attribute = {};
+        position_attribute.binding                           = 0;
+        position_attribute.location                          = 0;
+        position_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        position_attribute.offset                            = offsetof(Vertex, position);
+
+        // Normal will be stored at Location 1
+        VkVertexInputAttributeDescription normal_attribute = {};
+        normal_attribute.binding                           = 0;
+        normal_attribute.location                          = 1;
+        normal_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        normal_attribute.offset                            = offsetof(Vertex, normal);
+
+        // Color will be stored at Location 2
+        VkVertexInputAttributeDescription color_attribute = {};
+        color_attribute.binding                           = 0;
+        color_attribute.location                          = 2;
+        color_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        color_attribute.offset                            = offsetof(Vertex, color);
+
+        VkVertexInputAttributeDescription tex_uv_attribute = {};
+        tex_uv_attribute.binding                           = 0;
+        tex_uv_attribute.location                          = 3;
+        tex_uv_attribute.format                            = VK_FORMAT_R32G32_SFLOAT;
+        tex_uv_attribute.offset                            = offsetof(Vertex, tex_uv);
+
+
+        description.attributes.push_back(position_attribute);
+        description.attributes.push_back(normal_attribute);
+        description.attributes.push_back(color_attribute);
+        description.attributes.push_back(tex_uv_attribute);
+    }
+
+    {
+        VkVertexInputAttributeDescription position_attribute = {};
+        position_attribute.binding                           = 1;
+        position_attribute.location                          = 4;
+        position_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        position_attribute.offset                            = offsetof(InstanceData, pos);
+
+        VkVertexInputAttributeDescription rotation_attribute = {};
+        rotation_attribute.binding                           = 1;
+        rotation_attribute.location                          = 5;
+        rotation_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        rotation_attribute.offset                            = offsetof(InstanceData, rot);
+
+        VkVertexInputAttributeDescription scale_attribute = {};
+        scale_attribute.binding                           = 1;
+        scale_attribute.location                          = 6;
+        scale_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        scale_attribute.offset                            = offsetof(InstanceData, scale);
+
+        VkVertexInputAttributeDescription tex_idx_attribute = {};
+        tex_idx_attribute.binding                           = 1;
+        tex_idx_attribute.location                          = 7;
+        tex_idx_attribute.format                            = VK_FORMAT_R32_SINT;
+        tex_idx_attribute.offset                            = offsetof(InstanceData, tex_idx);
+
+        description.attributes.push_back(position_attribute);
+        description.attributes.push_back(rotation_attribute);
+        description.attributes.push_back(scale_attribute);
+        description.attributes.push_back(tex_idx_attribute);
+    }
+
+    // InstanceData
+    VkVertexInputBindingDescription instance_data_binding = {};
+    instance_data_binding.binding                         = 1;
+    instance_data_binding.stride                          = sizeof(InstanceData);
+    instance_data_binding.inputRate                       = VK_VERTEX_INPUT_RATE_INSTANCE;
+    description.bindings.push_back(instance_data_binding);
+
+    return description;
+}
+
+
+VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, ReleaseQueue *queue, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
+{
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.pNext              = NULL;
+
+    bufferInfo.size  = alloc_size;
+    bufferInfo.usage = usage;
+
+    VmaAllocationCreateInfo vmaallocInfo = {};
+    vmaallocInfo.usage                   = memory_usage;
+
+    // bind buffer to allocation
+    VkResult res = vmaCreateBuffer(allocator, &bufferInfo, &vmaallocInfo, &dst_buffer->buffer, &dst_buffer->allocation, NULL);
+
+    return res;
+}
+
+VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation)
+{
+
+    void    *data;
+    VkResult result = (vmaMapMemory(allocator, allocation, &data));
+    memcpy(data, src, size);
+    vmaUnmapMemory(allocator, allocation);
+
+    return result;
 }

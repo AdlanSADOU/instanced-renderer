@@ -76,7 +76,11 @@
         "valarray": "cpp",
         "xhash": "cpp",
         "shared_mutex": "cpp",
-        "optional": "cpp"
+        "optional": "cpp",
+        "bit": "cpp",
+        "charconv": "cpp",
+        "format": "cpp",
+        "stop_token": "cpp"
     },
     "C_Cpp.errorSquiggles": "Enabled",
 }

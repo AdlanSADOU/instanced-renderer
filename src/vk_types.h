@@ -11,6 +11,11 @@
 #include <functional>
 #include <deque>
 
+
+#define PI 3.14159265358979323846264338327950288
+
+#define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
+
 struct Vertex
 {
     glm::vec3 position;
@@ -46,14 +51,9 @@ struct InstanceData
     alignas(16) glm::vec3 pos;
     alignas(16) glm::vec3 rot;
     alignas(16) glm::vec3 scale;
-    int32_t   tex_idx;
+    int32_t texure_id;
 };
 
-struct Instances
-{
-    std::vector<InstanceData> data;
-    BufferObject              bo;
-};
 
 struct ModelData
 {
@@ -154,4 +154,5 @@ struct ReleaseQueue
 
 static std::unordered_map<VkResult, std::string> fence_status = {
     { VK_SUCCESS, "VK_SUCCESS" },
+    { VK_NOT_READY, "VK_NOT_READY" },
 };

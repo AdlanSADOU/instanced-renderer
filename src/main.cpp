@@ -5,6 +5,7 @@
 extern VulkanRenderer vkr;
 
 bool  _up = false, _down = false, _left = false, _right = false;
+bool _key_r = false;
 bool  _W = false, _A = false, _S = false, _D = false, _Q = false, _E = false;
 float camera_x = 0, camera_y = 0, camera_z = 0;
 
@@ -24,7 +25,7 @@ void InitExamples();
 void DestroyExamples();
 void UpdateAndRender();
 void ComputeExamples();
-void DrawExamples(VkCommandBuffer *cmd_buffer, double dt);
+void DrawExamples(VkCommandBuffer cmd_buffer, double dt);
 
 extern int main(int argc, char *argv[])
 {
@@ -66,6 +67,7 @@ void UpdateAndRender()
                 if (key == SDLK_d) _D = false;
                 if (key == SDLK_q) _Q = false;
                 if (key == SDLK_e) _E = false;
+                if (key == SDLK_r) _key_r = false;
             }
 
             if (e.type == SDL_KEYDOWN) {
@@ -80,6 +82,7 @@ void UpdateAndRender()
                 if (key == SDLK_d) _D = true;
                 if (key == SDLK_q) _Q = true;
                 if (key == SDLK_e) _E = true;
+                if (key == SDLK_r) _key_r = true;
             }
         }
 
@@ -101,17 +104,17 @@ void UpdateAndRender()
         ComputeExamples();
 
         vk_BeginRenderPass();
-        DrawExamples(&get_CurrentFrameData().cmd_buffer_gfx, dt_averaged);
+        DrawExamples(get_CurrentFrameData().cmd_buffer_gfx, dt_averaged);
         vk_EndRenderPass();
 
         pos_x = pos_y = pos_z = 0;
 
 
-        static double acc = 0;
-        if ((acc += dt_averaged) > 1) {
-            SDL_SetWindowTitle(vkr.window, std::to_string(1 / dt_averaged).c_str());
-            acc = 0;
-        }
+        // static double acc = 0;
+        // if ((acc += dt_averaged) > 1) {
+        //     SDL_SetWindowTitle(vkr.window, std::to_string(1 / dt_averaged).c_str());
+        //     acc = 0;
+        // }
         // printf("seconds: %f\n", 1/dt_averaged);
         uint64_t end = SDL_GetPerformanceCounter();
 

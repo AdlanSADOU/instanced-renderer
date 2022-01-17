@@ -42,7 +42,10 @@ void vk_Init()
     SDL_Vulkan_GetInstanceExtensions(vkr.window, &required_extensions_count, required_instance_extensions);
 
     const char *validation_layers[] = {
+#if _DEBUG
         { "VK_LAYER_KHRONOS_validation" },
+#endif
+        { "VK_LAYER_LUNARG_monitor" },
     };
 
     VkApplicationInfo application_info  = {};
@@ -54,13 +57,11 @@ void vk_Init()
     application_info.engineVersion      = VK_MAKE_VERSION(0, 1, 0);
     application_info.apiVersion         = VK_API_VERSION_1_2;
 
-    VkInstanceCreateInfo create_info_instance = {};
-    create_info_instance.sType                = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-#if _DEBUG
-    create_info_instance.pNext               = &validation_features;
-    create_info_instance.enabledLayerCount   = ARR_COUNT(validation_layers);
-    create_info_instance.ppEnabledLayerNames = validation_layers;
-#endif
+    VkInstanceCreateInfo create_info_instance    = {};
+    create_info_instance.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    create_info_instance.pNext                   = &validation_features;
+    create_info_instance.enabledLayerCount       = ARR_COUNT(validation_layers);
+    create_info_instance.ppEnabledLayerNames     = validation_layers;
     create_info_instance.flags                   = 0;
     create_info_instance.pApplicationInfo        = &application_info;
     create_info_instance.enabledExtensionCount   = required_extensions_count;
@@ -942,9 +943,9 @@ VkPipeline CreateComputePipeline()
     //////////////////////////
     // Push Constants
     VkPushConstantRange push_constant_range = {};
-    push_constant_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    push_constant_range.size = sizeof(float_t);
-    push_constant_range.offset = 0;
+    push_constant_range.stageFlags          = VK_SHADER_STAGE_COMPUTE_BIT;
+    push_constant_range.size                = sizeof(float_t);
+    push_constant_range.offset              = 0;
 
     std::vector<VkPushConstantRange> push_constant_ranges {};
     push_constant_ranges.push_back(push_constant_range);
@@ -987,7 +988,7 @@ VkPipeline CreateComputePipeline()
     ci_pipeline_layout.flags                      = 0;
     ci_pipeline_layout.setLayoutCount             = (uint32_t)compute_set_layouts.size();
     ci_pipeline_layout.pSetLayouts                = compute_set_layouts.data();
-    ci_pipeline_layout.pushConstantRangeCount     = push_constant_ranges.size();
+    ci_pipeline_layout.pushConstantRangeCount     = (uint32_t)push_constant_ranges.size();
     ci_pipeline_layout.pPushConstantRanges        = push_constant_ranges.data();
     VK_CHECK(vkCreatePipelineLayout(vkr.device, &ci_pipeline_layout, NULL, &vkr.compute_pipeline_layout));
 

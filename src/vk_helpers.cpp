@@ -1,4 +1,6 @@
-#include <vulkan/vulkan.h>
+#include <SDL.h>
+#include <SDL_vulkan.h>
+
 #include "vk_types.h"
 
 uint32_t FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties)
@@ -192,7 +194,7 @@ VertexInputDescription GetVertexDescription()
         tex_idx_attribute.binding                           = 1;
         tex_idx_attribute.location                          = 7;
         tex_idx_attribute.format                            = VK_FORMAT_R32_SINT;
-        tex_idx_attribute.offset                            = offsetof(InstanceData, tex_idx);
+        tex_idx_attribute.offset                            = offsetof(InstanceData, texure_id);
 
         description.attributes.push_back(position_attribute);
         description.attributes.push_back(rotation_attribute);
@@ -213,6 +215,8 @@ VertexInputDescription GetVertexDescription()
 
 VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, ReleaseQueue *queue, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
 {
+    assert(alloc_size != 0 && "alloc_size is 0");
+
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.pNext              = NULL;
@@ -238,4 +242,13 @@ VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllo
     vmaUnmapMemory(allocator, allocation);
 
     return result;
+}
+
+void CopyBuffer(VkCommandBuffer cmd_buffer, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size)
+{
+    VkBufferCopy regions = {};
+    regions.srcOffset = 0;
+    regions.dstOffset = 0;
+    regions.size = size;
+    vkCmdCopyBuffer(cmd_buffer, src_buffer, dst_buffer, 1, &regions);
 }

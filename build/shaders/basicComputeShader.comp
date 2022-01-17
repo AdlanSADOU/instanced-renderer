@@ -37,7 +37,6 @@ void main() {
 
     // instance_data[gl_GlobalInvocationID.x].pos = vec3(371.0 + in_x, -290.0, -1.0);
     vec3 pos = instance_data[gl_GlobalInvocationID.x].pos;
-    // if (gl_GlobalInvocationID.x == 0)
     instance_data[gl_GlobalInvocationID.x].pos.x = pos.x + in_x;
     instance_data[gl_GlobalInvocationID.x].rot = vec3(0.0, 0.0, 0.0);
     // instance_data[gl_GlobalInvocationID.x].scale = vec3(0.1, 0.1, 0.1);

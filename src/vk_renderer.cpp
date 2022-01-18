@@ -1,10 +1,10 @@
 ﻿
 #include "vk_renderer.h"
-#define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
 #include <vk_initializers.h>
 #include <vk_types.h>
 #include <fstream>
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
 
 VulkanRenderer vkr;
 extern float   camera_x, camera_y, camera_z;
@@ -42,7 +42,10 @@ void vk_Init()
     SDL_Vulkan_GetInstanceExtensions(vkr.window, &required_extensions_count, required_instance_extensions);
 
     const char *validation_layers[] = {
+#if _DEBUG
         { "VK_LAYER_KHRONOS_validation" },
+#endif
+        { "VK_LAYER_LUNARG_monitor" },
     };
 
     VkApplicationInfo application_info  = {};
@@ -54,13 +57,11 @@ void vk_Init()
     application_info.engineVersion      = VK_MAKE_VERSION(0, 1, 0);
     application_info.apiVersion         = VK_API_VERSION_1_2;
 
-    VkInstanceCreateInfo create_info_instance = {};
-    create_info_instance.sType                = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-#if _DEBUG
-    create_info_instance.pNext               = &validation_features;
-    create_info_instance.enabledLayerCount   = ARR_COUNT(validation_layers);
-    create_info_instance.ppEnabledLayerNames = validation_layers;
-#endif
+    VkInstanceCreateInfo create_info_instance    = {};
+    create_info_instance.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    create_info_instance.pNext                   = &validation_features;
+    create_info_instance.enabledLayerCount       = ARR_COUNT(validation_layers);
+    create_info_instance.ppEnabledLayerNames     = validation_layers;
     create_info_instance.flags                   = 0;
     create_info_instance.pApplicationInfo        = &application_info;
     create_info_instance.enabledExtensionCount   = required_extensions_count;
@@ -70,7 +71,7 @@ void vk_Init()
 
 
     if (!SDL_Vulkan_CreateSurface(vkr.window, vkr.instance, &vkr.surface)) {
-        printf("SDL Failed to create Surface");
+        SDL_Log("SDL Failed to create Surface");
     }
 
 
@@ -361,7 +362,7 @@ void vk_Init()
     VkCommandPoolCreateInfo ci_compute_cmd_pool = vkinit::CommandPoolCreateInfo(vkr.compute_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     VK_CHECK(vkCreateCommandPool(vkr.device, &ci_compute_cmd_pool, NULL, &vkr.command_pool_compute));
 
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
+    for (int i = 0; i < FRAME_BUFFER_COUNT; i++) {
         // allocate the default command buffer that we will use for rendering
         VkCommandBufferAllocateInfo cmd_buffer_alloc_info_graphics = vkinit::CommandBufferAllocateInfo(vkr.command_pool_graphics);
         VK_CHECK(vkAllocateCommandBuffers(vkr.device, &cmd_buffer_alloc_info_graphics, &vkr.frames[i].cmd_buffer_gfx));
@@ -483,8 +484,9 @@ void vk_Init()
     fenceCreateInfo.pNext             = NULL;
     fenceCreateInfo.flags             = VK_FENCE_CREATE_SIGNALED_BIT; // we want to create the fence with the Create Signaled flag, so we can wait on it before using it on a GPU command (for the first frame)
 
-    for (size_t i = 0; i < FRAME_OVERLAP; i++) {
+    for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
         VK_CHECK(vkCreateFence(vkr.device, &fenceCreateInfo, NULL, &vkr.frames[i].render_fence));
+        VK_CHECK(vkCreateFence(vkr.device, &fenceCreateInfo, NULL, &vkr.frames[i].compute_fence));
 
         /////
         // Semaphores creation
@@ -498,6 +500,7 @@ void vk_Init()
 
         vkr.release_queue.push_function([=]() {
             vkDestroyFence(vkr.device, vkr.frames[i].render_fence, NULL);
+            vkDestroyFence(vkr.device, vkr.frames[i].compute_fence, NULL);
             vkDestroySemaphore(vkr.device, vkr.frames[i].present_semaphore, NULL);
             vkDestroySemaphore(vkr.device, vkr.frames[i].render_semaphore, NULL);
         });
@@ -540,36 +543,13 @@ void vk_Init()
 
     /////////////////////////////////////
     /// Allocate sets for each camera buffer, we have a camera buffer for each framebuffer
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
+    for (int i = 0; i < FRAME_BUFFER_COUNT; i++) {
 
         //////////////////////////
         //// Set allocation
         // allocate one descriptor set for each frame
-
-        AllocateDescriptorSets(vkr.device, vkr.descriptor_pool, 1, &vkr.set_layout_global, &vkr.frames[i].set_global);
-
-
-        CreateBuffer(&vkr.camera.UBO[i], sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        VkDescriptorBufferInfo info_descriptor_camera_buffer;
-
-
-        { // todo(ad): function
-            info_descriptor_camera_buffer.buffer = vkr.camera.UBO[i].buffer;
-            info_descriptor_camera_buffer.offset = 0;
-            info_descriptor_camera_buffer.range  = sizeof(Camera::Data);
-
-            VkWriteDescriptorSet write_camera_buffer = {};
-            write_camera_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write_camera_buffer.pNext                = NULL;
-            write_camera_buffer.dstBinding           = 0; // we are going to write into binding number 0
-            write_camera_buffer.dstSet               = vkr.frames[i].set_global; // of the global descriptor
-            write_camera_buffer.descriptorCount      = 1;
-            write_camera_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
-            write_camera_buffer.pBufferInfo          = &info_descriptor_camera_buffer;
-            vkUpdateDescriptorSets(vkr.device, 1, &write_camera_buffer, 0, NULL);
-        }
     }
+
 
     /// Set 1
     VkDescriptorSetLayoutBinding desc_set_layout_binding_sampler = {};
@@ -602,6 +582,7 @@ void vk_Init()
     VK_CHECK(vkCreateSampler(vkr.device, &ci_sampler, NULL, &vkr.sampler));
 
     vkr.default_pipeline = CreateGraphicsPipeline();
+    vkr.compute_pipeline = CreateComputePipeline();
 
     vkr.is_initialized = true;
 
@@ -617,6 +598,14 @@ void vk_Init()
 ////////////////////////////////////////////////////////////////////////
 /// Rendering
 
+void BeginCommandBuffer()
+{
+}
+
+void EndCommandBuffer()
+{
+}
+
 void vk_BeginRenderPass()
 {
     // wait until the GPU has finished rendering the last frame. Timeout of 1 second
@@ -624,16 +613,13 @@ void vk_BeginRenderPass()
     VkSemaphore     *g_inflight_present_semaphore;
     VkSemaphore     *g_inflight_render_semaphore;
     VkCommandBuffer *g_inflight_main_command_buffer;
-    VkDescriptorSet *g_inflight_global_descriptor_set;
-    BufferObject    *camera_ubo;
+    // VkDescriptorSet *g_inflight_global_descriptor_set;
 
-    g_inflight_render_fence          = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].render_fence;
-    g_inflight_present_semaphore     = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].present_semaphore;
-    g_inflight_render_semaphore      = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].render_semaphore;
-    g_inflight_main_command_buffer   = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].cmd_buffer_gfx;
-    g_inflight_global_descriptor_set = &vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP].set_global;
-
-    camera_ubo = &vkr.camera.UBO[vkr.frame_idx_inflight % FRAME_OVERLAP];
+    g_inflight_render_fence        = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].render_fence;
+    g_inflight_present_semaphore   = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].present_semaphore;
+    g_inflight_render_semaphore    = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].render_semaphore;
+    g_inflight_main_command_buffer = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].cmd_buffer_gfx;
+    // g_inflight_global_descriptor_set = &vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT].set_global;
 
 
     VK_CHECK(vkWaitForFences(vkr.device, 1, g_inflight_render_fence, true, SECONDS(1)));
@@ -641,7 +627,7 @@ void vk_BeginRenderPass()
 
 
     VK_CHECK(vkAcquireNextImageKHR(vkr.device, vkr.swapchain, SECONDS(1), *g_inflight_present_semaphore, NULL, &vkr.frames[vkr.frame_idx_inflight].idx_swapchain_image));
-    VK_CHECK(vkResetCommandBuffer(*g_inflight_main_command_buffer, 0)); // now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
+    // VK_CHECK(vkResetCommandBuffer(*g_inflight_main_command_buffer, 0)); // now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
 
 
     VkClearValue clear_value;
@@ -655,6 +641,16 @@ void vk_BeginRenderPass()
     VkClearValue union_clear_values[] = { clear_value, depth_clear };
 
 
+
+    ///////////////////////////////////////
+    // Begin the command buffer recording
+    VkCommandBufferBeginInfo cmd_begin_info = {};
+    cmd_begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmd_begin_info.pNext                    = NULL;
+    cmd_begin_info.pInheritanceInfo         = NULL;
+    cmd_begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // We will use this command buffer exactly once (per frame)
+    VK_CHECK(vkBeginCommandBuffer(*g_inflight_main_command_buffer, &cmd_begin_info));
+
     //////////////////////
     // BEGIN renderpass
     VkRenderPassBeginInfo rpInfo = {};
@@ -667,16 +663,6 @@ void vk_BeginRenderPass()
     rpInfo.framebuffer           = vkr.framebuffers[vkr.frames[vkr.frame_idx_inflight].idx_swapchain_image];
     rpInfo.clear_value_count     = 2;
     rpInfo.pClearValues          = &union_clear_values[0];
-
-    ///////////////////////////////////////
-    // Begin the command buffer recording
-    VkCommandBufferBeginInfo cmd_begin_info = {};
-    cmd_begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmd_begin_info.pNext                    = NULL;
-    cmd_begin_info.pInheritanceInfo         = NULL;
-    cmd_begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // We will use this command buffer exactly once (per frame)
-    VK_CHECK(vkBeginCommandBuffer(*g_inflight_main_command_buffer, &cmd_begin_info));
-
     vkCmdBeginRenderPass(*g_inflight_main_command_buffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
@@ -725,17 +711,12 @@ void vk_EndRenderPass()
     VK_CHECK(vkQueuePresentKHR(vkr.graphics_queue, &presentInfo));
 
     vkr.frame_idx_inflight++;
-    vkr.frame_idx_inflight = vkr.frame_idx_inflight % FRAME_OVERLAP;
+    vkr.frame_idx_inflight = vkr.frame_idx_inflight % FRAME_BUFFER_COUNT;
 }
 
-void VulkanUpdateAndRender(double dt)
+FrameData &get_CurrentFrameData()
 {
-
-
-
-    ////////////////////////////////////////////////
-    /// Draw commands
-    // draw_Renderables(*g_inflight_main_command_buffer, vkr.renderables.data(), (uint32_t)vkr.renderables.size());
+    return vkr.frames[vkr.frame_idx_inflight % FRAME_BUFFER_COUNT];
 }
 
 VkPipeline CreateGraphicsPipeline()
@@ -792,18 +773,19 @@ VkPipeline CreateGraphicsPipeline()
     ////////////////////////////
     // ShaderModules
     VkShaderModule vertexShader;
-    if (!CreateShaderModule("./shaders/triangleMesh.vert.spv", &vertexShader)) {
-        printf("Error when building the vertex shader module. Did you compile the shaders?\n");
-
+    if (!CreateShaderModule("./shaders/quad.vert.spv", &vertexShader)) {
+        // todo(ad): error
+        SDL_Log("Failed to build vertex shader module. Did you compile the shaders?\n");
     } else {
-        printf("fragment shader succesfully loaded\n");
+        SDL_Log("vertex shader succesfully built\n");
     }
 
     VkShaderModule fragmentShader;
     if (!CreateShaderModule("./shaders/textureArray.frag.spv", &fragmentShader)) {
-        printf("Error when building the fragment shader module. Did you compile the shaders?\n");
+        // todo(ad): error
+        SDL_Log("Failed to built fragment shader module. Did you compile the shaders?\n");
     } else {
-        printf("vertex shader succesfully loaded\n");
+        SDL_Log("fragment shader succesfully built\n");
     }
 
     std::vector<VkPipelineShaderStageCreateInfo> create_info_shader_stages;
@@ -884,24 +866,147 @@ VkPipeline CreateGraphicsPipeline()
     pipelineInfo.basePipelineIndex            = 0;
 
     // it's easy to error out on create graphics pipeline, so we handle it a bit better than the common VK_CHECK case
-    VkPipeline newPipeline;
-    if (vkCreateGraphicsPipelines(vkr.device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &newPipeline) != VK_SUCCESS) {
-        printf("failed to create pipline\n");
+    VkPipeline new_graphics_pipeline;
+    if (vkCreateGraphicsPipelines(vkr.device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &new_graphics_pipeline) != VK_SUCCESS) {
+        SDL_Log("failed to create pipline\n");
         vkDestroyShaderModule(vkr.device, vertexShader, NULL);
         vkDestroyShaderModule(vkr.device, fragmentShader, NULL);
         return VK_NULL_HANDLE; // failed to create graphics pipeline
     } else {
-        return newPipeline;
+        return new_graphics_pipeline;
     }
 }
 
 
-FrameData &get_CurrentFrameData()
+
+VkPipeline CreateComputePipeline()
 {
-    return vkr.frames[vkr.frame_idx_inflight % FRAME_OVERLAP];
+    VkShaderModule compute_shader_module;
+    if (!CreateShaderModule("./shaders/basicComputeShader.comp.spv", &compute_shader_module)) {
+        // todo(ad): error
+        SDL_Log("Failed to build compute shader module. Did you compile the shaders?\n");
+
+    } else {
+        SDL_Log("Compute shader built succesfully\n");
+    }
+
+    VkPipelineShaderStageCreateInfo ci_shader_stage = {};
+    ci_shader_stage.sType                           = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    ci_shader_stage.flags                           = 0;
+    ci_shader_stage.stage                           = VK_SHADER_STAGE_COMPUTE_BIT;
+    ci_shader_stage.module                          = compute_shader_module;
+    ci_shader_stage.pName                           = "main"; // compute shader entry point
+
+
+
+
+
+    VkDescriptorSetLayoutBinding instanced_data_IN_set_binding = {};
+    instanced_data_IN_set_binding.binding                      = 0;
+    instanced_data_IN_set_binding.descriptorType               = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    instanced_data_IN_set_binding.descriptorCount              = 1;
+    instanced_data_IN_set_binding.stageFlags                   = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    // VkDescriptorSetLayoutBinding instanced_data_OUT_set_binding = {};
+    // instanced_data_OUT_set_binding.binding                      = 1;
+    // instanced_data_OUT_set_binding.descriptorType               = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    // instanced_data_OUT_set_binding.descriptorCount              = 1;
+    // instanced_data_OUT_set_binding.stageFlags                   = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutBinding instanced_data_uniform_set_binding = {};
+    instanced_data_uniform_set_binding.binding                      = 1;
+    instanced_data_uniform_set_binding.descriptorType               = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    instanced_data_uniform_set_binding.descriptorCount              = 1;
+    instanced_data_uniform_set_binding.stageFlags                   = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    std::vector<VkDescriptorSetLayoutBinding> instanced_data_set_layout_bindings = {};
+    instanced_data_set_layout_bindings.push_back(instanced_data_IN_set_binding);
+    // instanced_data_set_layout_bindings.push_back(instanced_data_OUT_set_binding);
+    // instanced_data_set_layout_bindings.push_back(instanced_data_uniform_set_binding);
+
+    VkDescriptorSetLayoutCreateInfo ci_instanced_data_set_layout = {};
+    ci_instanced_data_set_layout.sType                           = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    ci_instanced_data_set_layout.flags                           = 0;
+    ci_instanced_data_set_layout.bindingCount                    = (uint32_t)instanced_data_set_layout_bindings.size();
+    ci_instanced_data_set_layout.pBindings                       = instanced_data_set_layout_bindings.data();
+    VK_CHECK(vkCreateDescriptorSetLayout(vkr.device, &ci_instanced_data_set_layout, NULL, &vkr.set_layout_instanced_data));
+
+    std::vector<VkDescriptorSetLayout> compute_set_layouts;
+    compute_set_layouts.push_back(vkr.set_layout_instanced_data);
+
+    ///////////////////////////////////////////////
+    // dummy descriptor set to be allocated
+    // we should probably make a map of sets
+    vkr.compute_descriptor_sets.push_back(VkDescriptorSet {});
+
+
+    //////////////////////////
+    // Push Constants
+    VkPushConstantRange push_constant_range = {};
+    push_constant_range.stageFlags          = VK_SHADER_STAGE_COMPUTE_BIT;
+    push_constant_range.size                = sizeof(float_t);
+    push_constant_range.offset              = 0;
+
+    std::vector<VkPushConstantRange> push_constant_ranges {};
+    push_constant_ranges.push_back(push_constant_range);
+
+
+    ///////////////////////////
+    // Descriptor Pool
+    std::vector<VkDescriptorPoolSize> pool_sizes = {};
+    for (size_t i = 0; i < instanced_data_set_layout_bindings.size(); i++) {
+        VkDescriptorPoolSize pool_size = {
+            instanced_data_set_layout_bindings[i].descriptorType,
+            instanced_data_set_layout_bindings[i].descriptorCount
+        };
+        pool_sizes.push_back(pool_size);
+    }
+
+    VkDescriptorPoolCreateInfo ci_descriptor_pool = {};
+    ci_descriptor_pool.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    ci_descriptor_pool.flags                      = 0;
+    ci_descriptor_pool.maxSets                    = (uint32_t)vkr.compute_descriptor_sets.size();
+    ci_descriptor_pool.poolSizeCount              = (uint32_t)pool_sizes.size();
+    ci_descriptor_pool.pPoolSizes                 = pool_sizes.data();
+    VK_CHECK(vkCreateDescriptorPool(vkr.device, &ci_descriptor_pool, NULL, &vkr.descriptor_pool_compute));
+
+
+    ////////////////////////
+    // Set allocation
+    VkDescriptorSetAllocateInfo ci_set_alloc_info = {};
+    ci_set_alloc_info.sType                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    ci_set_alloc_info.descriptorPool              = vkr.descriptor_pool_compute;
+    ci_set_alloc_info.descriptorSetCount          = (uint32_t)vkr.compute_descriptor_sets.size();
+    ci_set_alloc_info.pSetLayouts                 = &vkr.set_layout_instanced_data;
+    VK_CHECK(vkAllocateDescriptorSets(vkr.device, &ci_set_alloc_info, vkr.compute_descriptor_sets.data()));
+
+
+    ////////////////////////////////////////////
+    // Pipeline Layout & Pipeline creation
+    VkPipelineLayoutCreateInfo ci_pipeline_layout = {};
+    ci_pipeline_layout.sType                      = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    ci_pipeline_layout.flags                      = 0;
+    ci_pipeline_layout.setLayoutCount             = (uint32_t)compute_set_layouts.size();
+    ci_pipeline_layout.pSetLayouts                = compute_set_layouts.data();
+    ci_pipeline_layout.pushConstantRangeCount     = (uint32_t)push_constant_ranges.size();
+    ci_pipeline_layout.pPushConstantRanges        = push_constant_ranges.data();
+    VK_CHECK(vkCreatePipelineLayout(vkr.device, &ci_pipeline_layout, NULL, &vkr.compute_pipeline_layout));
+
+    VkComputePipelineCreateInfo ci_compute_pipeline = {};
+    ci_compute_pipeline.sType                       = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    ci_compute_pipeline.stage                       = ci_shader_stage;
+    ci_compute_pipeline.layout                      = vkr.compute_pipeline_layout;
+
+    VkPipeline new_compute_pipeline;
+    if (vkCreateComputePipelines(vkr.device, VK_NULL_HANDLE, 1, &ci_compute_pipeline, NULL, &new_compute_pipeline) != VK_SUCCESS) {
+        // todo(ad): error
+        SDL_Log("failed to create pipline\n");
+        vkDestroyShaderModule(vkr.device, compute_shader_module, NULL);
+        return VK_NULL_HANDLE; // failed to create graphics pipeline
+    } else {
+        return new_compute_pipeline;
+    }
 }
-
-
 
 bool CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule)
 {
@@ -940,13 +1045,13 @@ bool CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule)
     return true;
 }
 
-
-
 void vk_Cleanup()
 {
     if (vkr.is_initialized) {
         vkWaitForFences(vkr.device, 1, &vkr.frames[0].render_fence, true, SECONDS(1));
         vkWaitForFences(vkr.device, 1, &vkr.frames[1].render_fence, true, SECONDS(1));
+
+        vkDeviceWaitIdle(vkr.device);
 
         vkr.release_queue.flush();
 
@@ -964,128 +1069,3 @@ void vk_Cleanup()
         SDL_DestroyWindow(vkr.window);
     }
 }
-
-VertexInputDescription GetVertexDescription()
-{
-    VertexInputDescription description;
-
-    // we will have just 1 vertex buffer binding, with a per-vertex rate
-    VkVertexInputBindingDescription mainBinding = {};
-    mainBinding.binding                         = 0;
-    mainBinding.stride                          = sizeof(Vertex);
-    mainBinding.inputRate                       = VK_VERTEX_INPUT_RATE_VERTEX;
-    description.bindings.push_back(mainBinding);
-
-    // Position will be stored at Location 0
-    {
-        VkVertexInputAttributeDescription position_attribute = {};
-        position_attribute.binding                           = 0;
-        position_attribute.location                          = 0;
-        position_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
-        position_attribute.offset                            = offsetof(Vertex, position);
-
-        // Normal will be stored at Location 1
-        VkVertexInputAttributeDescription normal_attribute = {};
-        normal_attribute.binding                           = 0;
-        normal_attribute.location                          = 1;
-        normal_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
-        normal_attribute.offset                            = offsetof(Vertex, normal);
-
-        // Color will be stored at Location 2
-        VkVertexInputAttributeDescription color_attribute = {};
-        color_attribute.binding                           = 0;
-        color_attribute.location                          = 2;
-        color_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
-        color_attribute.offset                            = offsetof(Vertex, color);
-
-        VkVertexInputAttributeDescription tex_uv_attribute = {};
-        tex_uv_attribute.binding                           = 0;
-        tex_uv_attribute.location                          = 3;
-        tex_uv_attribute.format                            = VK_FORMAT_R32G32_SFLOAT;
-        tex_uv_attribute.offset                            = offsetof(Vertex, tex_uv);
-
-
-        description.attributes.push_back(position_attribute);
-        description.attributes.push_back(normal_attribute);
-        description.attributes.push_back(color_attribute);
-        description.attributes.push_back(tex_uv_attribute);
-    }
-
-    {
-        VkVertexInputAttributeDescription position_attribute = {};
-        position_attribute.binding                           = 1;
-        position_attribute.location                          = 4;
-        position_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
-        position_attribute.offset                            = offsetof(InstanceData, pos);
-
-        VkVertexInputAttributeDescription rotation_attribute = {};
-        rotation_attribute.binding                           = 1;
-        rotation_attribute.location                          = 5;
-        rotation_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
-        rotation_attribute.offset                            = offsetof(InstanceData, rot);
-
-        VkVertexInputAttributeDescription scale_attribute = {};
-        scale_attribute.binding                           = 1;
-        scale_attribute.location                          = 6;
-        scale_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
-        scale_attribute.offset                            = offsetof(InstanceData, scale);
-
-        VkVertexInputAttributeDescription tex_idx_attribute = {};
-        tex_idx_attribute.binding                           = 1;
-        tex_idx_attribute.location                          = 7;
-        tex_idx_attribute.format                            = VK_FORMAT_R32_SINT;
-        tex_idx_attribute.offset                            = offsetof(InstanceData, tex_idx);
-
-        description.attributes.push_back(position_attribute);
-        description.attributes.push_back(rotation_attribute);
-        description.attributes.push_back(scale_attribute);
-        description.attributes.push_back(tex_idx_attribute);
-    }
-
-    // InstanceData
-    VkVertexInputBindingDescription instance_data_binding = {};
-    instance_data_binding.binding                         = 1;
-    instance_data_binding.stride                          = sizeof(InstanceData);
-    instance_data_binding.inputRate                       = VK_VERTEX_INPUT_RATE_INSTANCE;
-    description.bindings.push_back(instance_data_binding);
-
-    return description;
-}
-
-
-VkResult CreateBuffer(BufferObject *dst_buffer, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
-{
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType              = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.pNext              = NULL;
-
-    bufferInfo.size  = alloc_size;
-    bufferInfo.usage = usage;
-
-    VmaAllocationCreateInfo vmaallocInfo = {};
-    vmaallocInfo.usage                   = memory_usage;
-
-    // bind buffer to allocation
-    VkResult res = vmaCreateBuffer(vkr.allocator, &bufferInfo, &vmaallocInfo, &dst_buffer->buffer, &dst_buffer->allocation, NULL);
-
-    if (res == VK_SUCCESS) {
-        vkr.release_queue.push_function([=]() {
-            if (dst_buffer->buffer != VK_NULL_HANDLE)
-                vmaDestroyBuffer(vkr.allocator, dst_buffer->buffer, dst_buffer->allocation);
-        });
-    }
-
-    return res;
-}
-
-VkResult AllocateFillBuffer(void *src, size_t size, VmaAllocation allocation)
-{
-    void    *data;
-    VkResult result = (vmaMapMemory(vkr.allocator, allocation, &data));
-    memcpy(data, src, size);
-    vmaUnmapMemory(vkr.allocator, allocation);
-
-    return result;
-}
-
-///////////////////////////////////////

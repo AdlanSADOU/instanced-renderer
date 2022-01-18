@@ -7,8 +7,14 @@
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
 #include <vector>
+#include <unordered_map>
 #include <functional>
 #include <deque>
+
+
+#define PI 3.14159265358979323846264338327950288
+
+#define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
 
 struct Vertex
 {
@@ -32,24 +38,21 @@ struct Quad
 
 struct BufferObject
 {
-    VkBuffer      buffer;
-    VmaAllocation allocation;
+    VkBuffer buffer;
+
+    // union?
+    VmaAllocation  allocation;
+    VkDeviceMemory memory;
 };
 
 struct InstanceData
 {
-    // glm::mat4 tranform_matrix;
-    glm::vec3 pos;
-    glm::vec3 rot;
-    glm::vec3 scale;
-    int32_t   tex_idx;
+    alignas(16) glm::vec3 pos   = {};
+    alignas(16) glm::vec3 rot   = {};
+    alignas(16) glm::vec3 scale = {};
+    int32_t texure_id;
 };
 
-struct Instances
-{
-    std::vector<InstanceData> data;
-    BufferObject              bo;
-};
 
 struct ModelData
 {
@@ -62,9 +65,9 @@ struct FrameData
     VkSemaphore     present_semaphore = {};
     VkSemaphore     render_semaphore  = {};
     VkFence         render_fence      = {};
+    VkFence         compute_fence     = {};
     VkCommandBuffer cmd_buffer_gfx    = {};
     VkCommandBuffer cmd_buffer_cmp    = {};
-    VkDescriptorSet set_global        = {};
     VkDescriptorSet set_model         = {};
     uint32_t        idx_swapchain_image;
 };
@@ -140,4 +143,15 @@ struct ReleaseQueue
 
         deletors.clear();
     }
+};
+
+// const char fence_status[][11] {
+//     "VK_SUCCESS",
+//     "VK_NOT_READY",
+//     "VK_ERROR_DEVICE_LOST",
+// };
+
+static std::unordered_map<VkResult, std::string> fence_status = {
+    { VK_SUCCESS, "VK_SUCCESS" },
+    { VK_NOT_READY, "VK_NOT_READY" },
 };

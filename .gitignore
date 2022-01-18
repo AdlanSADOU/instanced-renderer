@@ -2,4 +2,6 @@ build
 
 *.zip
 .vs
+.vscode
+.misc
 v16

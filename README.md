@@ -1,17 +1,16 @@
 
-This project is still under heavy development and in early stage. Even though almost all critical features are there, the API is not yet fleshed out.
+This project is still under heavy development and in pre alpha stage. I'm still working on & exploring techniques, thus the API is not yet fleshed out.
 So pretty big changes and refactorings are to come.
 
 --- 
 
 ## Features
 
-- Instanced quad rendering
-- Array of textures: indexed inside fragment shader per quad instance
+- Instanced rendering
+- Array of textures: indexed inside fragment shader per primitive instance
+- compute dispatch
 
 **Result**: a 2D renderer able to render more than 2 million sprites at high framerates (60+ fps) on relatively modern GPUs with only 1 draw call
-
-**Next feature**: Moving transform updates from CPU to GPU via compute shaders
 
 ---
 

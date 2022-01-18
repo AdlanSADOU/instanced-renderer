@@ -47,10 +47,9 @@ struct BufferObject
 
 struct InstanceData
 {
-    // glm::mat4 tranform_matrix;
-    alignas(16) glm::vec3 pos;
-    alignas(16) glm::vec3 rot;
-    alignas(16) glm::vec3 scale;
+    alignas(16) glm::vec3 pos   = {};
+    alignas(16) glm::vec3 rot   = {};
+    alignas(16) glm::vec3 scale = {};
     int32_t texure_id;
 };
 

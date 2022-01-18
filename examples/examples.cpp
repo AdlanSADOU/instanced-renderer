@@ -9,16 +9,13 @@ extern float pos_x, pos_y, pos_z;
 extern float camera_x, camera_y, camera_z;
 extern bool  _key_r;
 
-Instances instances;
+const size_t ROW     = 100;
+const size_t COL     = 100;
+int          spacing = 100;
 
+Instances instances;
 Texture profile;
 Texture itoldu;
-
-
-const size_t ROW     = 1000;
-const size_t COL     = 1000;
-int          spacing = 50;
-
 Camera camera;
 
 // Compute
@@ -29,7 +26,7 @@ void InitExamples()
 {
 
     profile.Create("./assets/texture.png", &vkr);
-    itoldu.Create("./assets/bjarn_itoldu.jpg", &vkr);
+    // itoldu.Create("./assets/bjarn_itoldu.jpg", &vkr);
 
     camera.MapDataPtr(vkr.allocator, vkr.device, vkr.chosen_gpu, &vkr);
 
@@ -42,7 +39,7 @@ void InitExamples()
     for (size_t i = 0, j = 0; i < MAX_ENTITES; i++) {
         static float _x     = 0;
         static float _y     = 0;
-        float        _scale = .03f;
+        float        _scale = .09f;
 
         if (i > 0 && (i % ROW) == 0) j++;
 
@@ -51,7 +48,7 @@ void InitExamples()
         _y = (float)((profile.height + spacing) * j) * _scale + 50;
 
 
-        instance_data.pos = { _x, -_y, -1 };
+        instance_data.pos = { _x, -_y, 1 };
         if (i == 0) instance_data.pos = { _x + vkr.window_extent.width / 2 - profile.width * .1f, -_y - vkr.window_extent.height / 2, 1.1f };
 
         instance_data.texure_id = profile.id;
@@ -148,12 +145,8 @@ void ComputeExamples()
     vkQueueSubmit(vkr.compute_queue, 1, &submit_info, vkr.frames[0].compute_fence);
 }
 
-// pipeline, piepeline_layout, descriptor_sets, shader --> custom to a mesh or defaults
 void DrawExamples(VkCommandBuffer cmd_buffer, double dt)
 {
-    // Bindings
-
-
     camera.m_position = { camera_x, camera_y - 0.f, camera_z - 120.f };
     camera.Update(cmd_buffer);
 
@@ -162,12 +155,5 @@ void DrawExamples(VkCommandBuffer cmd_buffer, double dt)
         instances.DestroyInstance(&vkr, i++);
     }
 
-    // instances.data[0].pos.x += pos_x;
-    // instances.data[0].pos.y += pos_y;
-    // // instances.data[0].rot.z += pos_x;
-    // instances.data[0].rot.x += (float)(pos_z * PI / 180);
-    // instances.data[0].scale *= pos_z*.1f+1;
-
-    // vkCmdDrawIndexed(cmd_buffer, 6, 2, 0, 0, 0);
     instances.Draw(cmd_buffer, &vkr);
 }

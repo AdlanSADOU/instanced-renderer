@@ -1,15 +1,19 @@
-﻿// vulkan_guide.h : Include file for standard system include files,
-// or project specific include files.
-
-#if !defined(VK_RENDERER)
+﻿#if !defined(VK_RENDERER)
 #define VK_RENDERER
 
 #if defined(WIN32)
 #define __func__ __FUNCTION__
 #endif
 
-#include <SDL.h>
-#include <SDL_vulkan.h>
+#ifdef _WIN32
+#define EXPORT //__declspec(dllexport)
+#elif __GNUC__
+#define EXPORT __attribute__((visibility("default")))
+// #define EXPORT
+#endif
+
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_vulkan.h>
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -22,36 +26,29 @@
 
 #define SECONDS(value) (1000000000 * value)
 
-FrameData &get_CurrentFrameData();
 
-VertexInputDescription GetVertexDescription();
-
-static bool CreateShaderModule(const char *filepath, VkShaderModule *outShaderModule);
-
-VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, ReleaseQueue *queue, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
-bool     CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
-VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
-
-void       vk_Init();
-void       vk_BeginCommandBuffer();
-void       vk_EndCommandBuffer();
-void       vk_BeginRenderPass();
-void       vk_EndRenderPass();
-void       vk_Cleanup();
-FrameData &get_CurrentFrameData();
-
-VkPipeline CreateGraphicsPipeline();
-VkPipeline CreateComputePipeline();
-
-// Helper functions
-bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
-bool AllocateImageMemory(VkDevice device, VkPhysicalDevice gpu, VkImage image, VkDeviceMemory *memory);
-bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
-void CopyBuffer(VkCommandBuffer cmd_buffer, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
-
-uint32_t FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
-VkResult CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
-VkResult AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
+EXPORT void                   vk_Init();
+EXPORT void                   vk_BeginCommandBuffer();
+EXPORT void                   vk_EndCommandBuffer();
+EXPORT void                   vk_BeginRenderPass();
+EXPORT void                   vk_EndRenderPass();
+EXPORT void                   vk_Cleanup();
+EXPORT FrameData             &get_CurrentFrameData();
+EXPORT VertexInputDescription GetVertexDescription();
+EXPORT bool                   CreateShaderModule(const char *filepath, VkShaderModule *outShaderModule);
+EXPORT VkResult               CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, ReleaseQueue *queue, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
+EXPORT bool                   CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
+EXPORT VkResult               MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
+EXPORT FrameData             &get_CurrentFrameData();
+EXPORT VkPipeline             CreateGraphicsPipeline();
+EXPORT VkPipeline             CreateComputePipeline();
+EXPORT bool                   AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
+EXPORT bool                   AllocateImageMemory(VkDevice device, VkPhysicalDevice gpu, VkImage image, VkDeviceMemory *memory);
+EXPORT bool                   AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
+EXPORT void                   CopyBuffer(VkCommandBuffer cmd_buffer, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
+EXPORT uint32_t               FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
+EXPORT VkResult               CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
+EXPORT VkResult               AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
 
 struct VulkanRenderer
 {
@@ -79,12 +76,12 @@ struct VulkanRenderer
     VkCommandPool command_pool_graphics = {};
     VkCommandPool command_pool_compute  = {};
 
-    uint32_t graphics_queue_family; // family of that queue
-    uint32_t compute_queue_family; // family of that queue
-    uint32_t present_queue_family; // family of that queue
-    VkQueue  graphics_queue; // queue we will submit to
-    VkQueue  compute_queue; // queue we will submit to
-    VkQueue  present_queue; // queue we will submit to
+    uint32_t graphics_queue_family;
+    uint32_t compute_queue_family;
+    uint32_t present_queue_family;
+    VkQueue  graphics_queue;
+    VkQueue  compute_queue;
+    VkQueue  present_queue;
     VkBool32 is_present_queue_separate;
     // todo(ad): must also check is_compute_queue_separate
 
@@ -99,7 +96,7 @@ struct VulkanRenderer
     VkDescriptorSetLayout set_layout_global; // todo(ad): camera set layout
 
     // Do not modify this
-    uint32_t texture_array_index = 0;
+    uint32_t              texture_array_index = 0;
     VkDescriptorSetLayout set_layout_array_of_textures;
     VkDescriptorSet       set_array_of_textures;
 
@@ -139,7 +136,7 @@ struct VulkanRenderer
     uint32_t frame_idx_inflight = 0;
 };
 
-struct Camera
+struct EXPORT Camera
 {
     struct Data
     {

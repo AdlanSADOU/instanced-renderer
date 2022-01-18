@@ -101,7 +101,7 @@ void UpdateAndRender()
 
 
 
-        ComputeExamples();
+        // ComputeExamples();
 
         vk_BeginRenderPass();
         DrawExamples(get_CurrentFrameData().cmd_buffer_gfx, dt_averaged);

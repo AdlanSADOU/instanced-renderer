@@ -3,14 +3,14 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
+#include <SDL2/SDL_vulkan.h>
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
-#include <vector>
 #include <unordered_map>
 #include <functional>
 #include <deque>
 
+class vector;
 
 #define PI 3.14159265358979323846264338327950288
 
@@ -145,13 +145,8 @@ struct ReleaseQueue
     }
 };
 
-// const char fence_status[][11] {
-//     "VK_SUCCESS",
-//     "VK_NOT_READY",
-//     "VK_ERROR_DEVICE_LOST",
-// };
-
 static std::unordered_map<VkResult, std::string> fence_status = {
     { VK_SUCCESS, "VK_SUCCESS" },
     { VK_NOT_READY, "VK_NOT_READY" },
+    { VK_ERROR_DEVICE_LOST, "VK_ERROR_DEVICE_LOST" },
 };

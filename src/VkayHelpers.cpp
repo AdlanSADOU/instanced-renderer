@@ -1,11 +1,10 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
-#include "vk_types.h"
+#include "VkayTypes.h"
 
 uint32_t FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties)
 {
-
     const uint32_t memoryCount = pMemoryProperties->memoryTypeCount;
     for (uint32_t memoryIndex = 0; memoryIndex < memoryCount; ++memoryIndex) {
         const uint32_t memoryTypeBits       = (1 << memoryIndex);

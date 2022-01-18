@@ -1,8 +1,8 @@
-#include "vk_renderer.h"
+#include "VkayRenderer.h"
 #include <array>
 
-struct Instances
-{
+class Instances {
+public:
     void                     *m_instances_data_ptr;
     std::vector<InstanceData> m_data;
     BufferObject              m_bo;
@@ -11,7 +11,7 @@ struct Instances
     std::vector<Quad> m_quads;
     Quad              m_quad;
 
-    bool Upload(VulkanRenderer *vkr)
+    bool Upload(VkayRenderer *vkr)
     {
         m_quads.push_back(m_quad);
 
@@ -51,26 +51,19 @@ struct Instances
         return true;
     }
 
-    void DestroyInstance(VulkanRenderer *vkr, uint32_t instance_index)
+    void DestroyInstance(VkayRenderer *vkr, uint32_t instance_index)
     {
-        // erase from container
-
-
-        // std::vector<InstanceData>::iterator it = (std::find(m_data.begin(), m_data.end(), m_data.data()[instance_index]));
         if (instance_index >= m_data.size()) {
             SDL_Log("InstanceData : element %d does not exist\n", instance_index);
             return;
         }
 
         m_data.erase(m_data.begin() + instance_index);
-        // resize container?
         vmaResizeAllocation(vkr->allocator, m_bo.allocation, m_data.size() * sizeof(InstanceData));
         memcpy(m_instances_data_ptr, m_data.data(), m_data.size() * sizeof(InstanceData));
-        // resize allocation
-        // memcpy
     }
 
-    void Draw(VkCommandBuffer cmd_buffer, VulkanRenderer *vkr)
+    void Draw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr)
     {
         vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr->default_pipeline);
         vkCmdBindDescriptorSets(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr->default_pipeline_layout, 1, 1, &vkr->set_array_of_textures, 0, NULL);

@@ -19,29 +19,31 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
 
-#include <vector>
-#include <vk_types.h>
+#include <VkayTypes.h>
+
+struct VkayRenderer;
 
 #define FRAME_BUFFER_COUNT 2
 
 #define SECONDS(value) (1000000000 * value)
 
 
-EXPORT void                   vk_Init();
-EXPORT void                   vk_BeginCommandBuffer();
-EXPORT void                   vk_EndCommandBuffer();
-EXPORT void                   vk_BeginRenderPass();
-EXPORT void                   vk_EndRenderPass();
-EXPORT void                   vk_Cleanup();
-EXPORT FrameData             &get_CurrentFrameData();
+
+EXPORT void       VkayRendererInit(VkayRenderer *vkr);
+EXPORT void       VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
+EXPORT void       VkayRendererEndCommandBuffer(VkayRenderer *vkr);
+EXPORT void       VkayRendererBeginRenderPass(VkayRenderer *vkr);
+EXPORT void       VkayRendererEndRenderPass(VkayRenderer *vkr);
+EXPORT void       VkayRendererCleanup(VkayRenderer *vkr);
+EXPORT FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr);
+
 EXPORT VertexInputDescription GetVertexDescription();
-EXPORT bool                   CreateShaderModule(const char *filepath, VkShaderModule *outShaderModule);
+bool                          CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
 EXPORT VkResult               CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, ReleaseQueue *queue, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
 EXPORT bool                   CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
 EXPORT VkResult               MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
-EXPORT FrameData             &get_CurrentFrameData();
-EXPORT VkPipeline             CreateGraphicsPipeline();
-EXPORT VkPipeline             CreateComputePipeline();
+EXPORT VkPipeline             CreateGraphicsPipeline(VkayRenderer *vkr);
+EXPORT VkPipeline             CreateComputePipeline(VkayRenderer *vkr);
 EXPORT bool                   AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
 EXPORT bool                   AllocateImageMemory(VkDevice device, VkPhysicalDevice gpu, VkImage image, VkDeviceMemory *memory);
 EXPORT bool                   AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
@@ -50,7 +52,7 @@ EXPORT uint32_t               FindProperties(const VkPhysicalDeviceMemoryPropert
 EXPORT VkResult               CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
 EXPORT VkResult               AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
 
-struct VulkanRenderer
+struct VkayRenderer
 {
     SDL_Window *window = NULL;
     // VkExtent2D  window_extent { 720, 480 };
@@ -149,9 +151,9 @@ struct EXPORT Camera
     BufferObject    m_UBO[FRAME_BUFFER_COUNT];
     VkDescriptorSet m_set_global[FRAME_BUFFER_COUNT] = {};
     glm::vec3       m_position;
-    VulkanRenderer *m_vkr;
+    VkayRenderer   *m_vkr;
 
-    void MapDataPtr(VmaAllocator allocator, VkDevice device, VkPhysicalDevice gpu, VulkanRenderer *vkr)
+    void MapDataPtr(VmaAllocator allocator, VkDevice device, VkPhysicalDevice gpu, VkayRenderer *vkr)
     {
         this->m_vkr = vkr;
         for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {

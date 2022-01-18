@@ -1,18 +1,19 @@
-#include <vk_renderer.h>
+#include <VkayRenderer.h>
+#include "VkayTypes.h"
+#include "VkayTexture.h"
+#include "VkayInstances.h"
+
 #include <string>
 #include <thread>
 
-extern VulkanRenderer vkr;
-
 bool  _up = false, _down = false, _left = false, _right = false;
-bool _key_r = false;
+bool  _key_r = false;
 bool  _W = false, _A = false, _S = false, _D = false, _Q = false, _E = false;
 float camera_x = 0, camera_y = 0, camera_z = 0;
 
-float pos_x = 0;
-float pos_y = 0;
-float pos_z = 0;
-
+float pos_x        = 0;
+float pos_y        = 0;
+float pos_z        = 0;
 float camera_speed = 140.f;
 float player_speed = 250.f;
 
@@ -21,30 +22,104 @@ const uint64_t MAX_DT_SAMPLES = 256;
 double dt_samples[MAX_DT_SAMPLES] = {};
 double dt_averaged                = 0;
 
-void InitExamples();
-void DestroyExamples();
+Instances instances;
+Texture   profile;
+Texture   itoldu;
+Camera    camera;
+
+// Compute
+BufferObject instance_data_storage_buffer;
+void        *instance_data_storage_buffer_ptr;
+
+VkayRenderer vkr;
+
 void UpdateAndRender();
-void ComputeExamples();
-void DrawExamples(VkCommandBuffer cmd_buffer, double dt);
 
-extern int main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
-    vk_Init();
+    VkayRendererInit(&vkr);
 
-    InitExamples();
+    VkayTextureCreate("./assets/texture.png", &vkr, &profile);
+    VkayTextureCreate("./assets/bjarn_itoldu.jpg", &vkr, &itoldu);
+    camera.MapDataPtr(vkr.allocator, vkr.device, vkr.chosen_gpu, &vkr);
+
+    InstanceData instance_data;
+
+    const size_t ROW         = 100;
+    const size_t COL         = 100;
+    int          spacing     = 100;
+    int          MAX_ENTITES = ROW * COL;
+    SDL_Log("max entites: %d\n", MAX_ENTITES);
+
+    for (size_t i = 0, j = 0; i < MAX_ENTITES; i++) {
+        static float _x     = 0;
+        static float _y     = 0;
+        float        _scale = .09f;
+
+        if (i > 0 && (i % ROW) == 0) j++;
+        if (i == 0) _scale = .1f;
+        _x = (float)((profile.width + spacing) * (i % ROW) * _scale + 50);
+        _y = (float)((profile.height + spacing) * j) * _scale + 50;
+
+        instance_data.pos = { _x, -_y, 1 };
+        if (i == 0) instance_data.pos = { _x + vkr.window_extent.width / 2 - profile.width * .1f, -_y - vkr.window_extent.height / 2, 1.1f };
+        instance_data.texure_id = profile.id;
+        instance_data.scale     = { profile.width, profile.height, 0 };
+        instance_data.scale *= _scale;
+        instances.m_data.push_back(instance_data);
+    }
+
+    instances.Upload(&vkr);
+
     UpdateAndRender();
-    DestroyExamples();
 
-    vk_Cleanup();
+    //////////////////////
+    // Cleanup, some things are missings
+    vkDeviceWaitIdle(vkr.device);
+    VkayTextureDestroy(&vkr, &profile);
+    VkayTextureDestroy(&vkr, &itoldu);
+    vmaDestroyBuffer(vkr.allocator, instances.m_quads_bo.buffer, instances.m_quads_bo.allocation);
+    vmaUnmapMemory(vkr.allocator, instances.m_bo.allocation);
+    vmaDestroyBuffer(vkr.allocator, instances.m_bo.buffer, instances.m_bo.allocation);
+    camera.Destroy(vkr.device, vkr.allocator);
+    VkayRendererCleanup(&vkr);
 
     return 0;
+}
+
+void ComputeDispatch()
+{
+    vkWaitForFences(vkr.device, 1, &vkr.frames[0].compute_fence, true, SECONDS(1));
+    vkResetFences(vkr.device, 1, &vkr.frames[0].compute_fence);
+    vkResetCommandBuffer(vkr.frames[0].cmd_buffer_cmp, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
+
+    VkCommandBufferBeginInfo begin_info = {};
+    begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(vkr.frames[0].cmd_buffer_cmp, &begin_info);
+    vkCmdBindPipeline(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline);
+    vkCmdBindDescriptorSets(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline_layout, 0, 1, vkr.compute_descriptor_sets.data(), 0, 0);
+    vkCmdPushConstants(vkr.frames[0].cmd_buffer_cmp, vkr.compute_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(float_t), &pos_x);
+    vkCmdDispatch(vkr.frames[0].cmd_buffer_cmp, (uint32_t)(instances.m_data.size()), 1, 1);
+    vkEndCommandBuffer(vkr.frames[0].cmd_buffer_cmp);
+
+    VkSubmitInfo submit_info         = {};
+    submit_info.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.waitSemaphoreCount   = 0;
+    submit_info.pWaitSemaphores      = NULL;
+    submit_info.pWaitDstStageMask    = NULL;
+    submit_info.commandBufferCount   = 1;
+    submit_info.pCommandBuffers      = &vkr.frames[0].cmd_buffer_cmp;
+    submit_info.signalSemaphoreCount = 0;
+    submit_info.pSignalSemaphores    = NULL;
+    vkQueueSubmit(vkr.compute_queue, 1, &submit_info, vkr.frames[0].compute_fence);
 }
 
 void UpdateAndRender()
 {
     SDL_Event e;
     bool      bQuit = false;
-
 
     while (!bQuit) {
         uint64_t start = SDL_GetPerformanceCounter();
@@ -98,31 +173,23 @@ void UpdateAndRender()
         if (_Q) pos_z -= player_speed * (float)dt_averaged;
         if (_E) pos_z += player_speed * (float)dt_averaged;
 
+        ComputeDispatch();
+        static int i = 0;
+        if (_key_r) {
+            instances.DestroyInstance(&vkr, i++);
+        }
 
+        VkayRendererBeginRenderPass(&vkr);
+        camera.m_position = { camera_x, camera_y - 0.f, camera_z - 120.f };
+        camera.Update(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx);
+        instances.Draw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr);
+        VkayRendererEndRenderPass(&vkr);
 
-
-        // ComputeExamples();
-
-        vk_BeginRenderPass();
-        DrawExamples(get_CurrentFrameData().cmd_buffer_gfx, dt_averaged);
-        vk_EndRenderPass();
-
-        pos_x = pos_y = pos_z = 0;
-
-
-        // static double acc = 0;
-        // if ((acc += dt_averaged) > 1) {
-        //     SDL_SetWindowTitle(vkr.window, std::to_string(1 / dt_averaged).c_str());
-        //     acc = 0;
-        // }
-        // printf("seconds: %f\n", 1/dt_averaged);
-        uint64_t end = SDL_GetPerformanceCounter();
-
-        static uint64_t idx = 0;
-
+        pos_x = pos_y = pos_z              = 0;
+        uint64_t        end                = SDL_GetPerformanceCounter();
+        static uint64_t idx                = 0;
         dt_samples[idx++ % MAX_DT_SAMPLES] = (end - start) / (double)SDL_GetPerformanceFrequency();
-
-        double sum = 0;
+        double sum                         = 0;
         for (uint64_t i = 0; i < MAX_DT_SAMPLES; i++) {
             sum += dt_samples[i];
         }

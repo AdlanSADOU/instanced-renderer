@@ -14,7 +14,7 @@ So pretty big changes and refactorings are to come.
 
 ---
 
-<img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="44%" height="44%">
+<!-- <img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="44%" height="44%"> -->
 
 
 ## Dependencies

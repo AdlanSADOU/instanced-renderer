@@ -11,7 +11,7 @@ layout (location = 5) in vec3 iRot;
 layout (location = 6) in vec3 iScale;
 layout (location = 7) in int  iTexIdx;
 
-layout(set = 0, binding = 0) uniform  CameraBuffer
+layout(set = 0, binding = 0) uniform CameraBuffer
 {
 	mat4 view;
 	mat4 proj;

@@ -1,40 +1,53 @@
+/*
+    This file contains the implementation of IntanceBucket
+    An InstanceBucket is a data structure that holds data about instances of a same base mesh
+    which allows you to draw them all with only one draw call very efficiently
+    using instanced rendering.
+
+    i.e: you could add many sprites with different Texture(s) and Transform(s)
+    and draw them all at once.
+
+    This is particularly useful for something like a particle system.
+*/
+
 #include "VkayRenderer.h"
-#include <array>
 
-struct Instances
+struct InstanceBucket
 {
-    void                     *m_instances_data_ptr;
-    std::vector<InstanceData> m_data;
-    BufferObject              m_bo;
+    void                     *mapped_data_ptr     = {};
+    std::vector<InstanceData> instance_data_array = {};
+    BufferObject              buffer_object       = {};
 
-    BufferObject      m_quads_bo = {};
-    Quad              m_quad;
+    BufferObject quad_buffer_object = {};
 };
 
-bool VkayInstancesUpload(VkayRenderer *vkr, Instances *instances)
+void VkayInstanceBucketSetBaseMesh()
 {
-    // instances->m_quads.push_back(instances->m_quad);
 
+}
+
+bool VkayInstancesUpload(VkayRenderer *vkr, InstanceBucket *bucket, Mesh base_mesh)
+{
     {
         VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        VK_CHECK(CreateBuffer(&instances->m_quads_bo, vkr->allocator, sizeof(Quad), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
-        VK_CHECK(MapMemcpyMemory(&instances->m_quad, sizeof(Quad), vkr->allocator, instances->m_quads_bo.allocation));
+        VK_CHECK(CreateBuffer(&bucket->quad_buffer_object, vkr->allocator, sizeof(Vertex) * base_mesh.vertices.size(), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
+        VK_CHECK(MapMemcpyMemory(base_mesh.vertices.data(), sizeof(Vertex) * base_mesh.vertices.size(), vkr->allocator, bucket->quad_buffer_object.allocation));
     }
 
     {
         VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        VK_CHECK(CreateBuffer(&instances->m_bo, vkr->allocator, instances->m_data.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
-        VK_CHECK(vmaMapMemory(vkr->allocator, instances->m_bo.allocation, &instances->m_instances_data_ptr));
-        memcpy(instances->m_instances_data_ptr, instances->m_data.data(), instances->m_data.size() * sizeof(InstanceData));
+        VK_CHECK(CreateBuffer(&bucket->buffer_object, vkr->allocator, bucket->instance_data_array.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
+        VK_CHECK(vmaMapMemory(vkr->allocator, bucket->buffer_object.allocation, &bucket->mapped_data_ptr));
+        memcpy(bucket->mapped_data_ptr, bucket->instance_data_array.data(), bucket->instance_data_array.size() * sizeof(InstanceData));
 
-        assert(instances->m_instances_data_ptr != NULL && "m_instances_data_ptr is NULL");
+        assert(bucket->mapped_data_ptr != NULL && "mapped_data_ptr is NULL");
     }
 
     VkDescriptorBufferInfo storage_buffer_info = {};
     // storage_buffer_info.buffer                 = instance_data_storage_buffer.buffer;
-    storage_buffer_info.buffer = instances->m_bo.buffer;
+    storage_buffer_info.buffer = bucket->buffer_object.buffer;
     storage_buffer_info.offset = 0;
-    storage_buffer_info.range  = instances->m_data.size() * sizeof(InstanceData);
+    storage_buffer_info.range  = bucket->instance_data_array.size() * sizeof(InstanceData);
 
     VkWriteDescriptorSet inst_data_descriptor_write = {};
     inst_data_descriptor_write.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -51,27 +64,35 @@ bool VkayInstancesUpload(VkayRenderer *vkr, Instances *instances)
     return true;
 }
 
-void VkayInstancesDestroy(VkayRenderer *vkr, uint32_t instance_index, Instances *instances)
+void VkayInstancesDestroyInstance(VkayRenderer *vkr, uint32_t instance_index, InstanceBucket *bucket)
 {
-    if (instance_index >= instances->m_data.size()) {
+    if (instance_index >= bucket->instance_data_array.size()) {
         SDL_Log("InstanceData : element %d does not exist\n", instance_index);
         return;
     }
 
-    instances->m_data.erase(instances->m_data.begin() + instance_index);
-    vmaResizeAllocation(vkr->allocator, instances->m_bo.allocation, instances->m_data.size() * sizeof(InstanceData));
-    memcpy(instances->m_instances_data_ptr, instances->m_data.data(), instances->m_data.size() * sizeof(InstanceData));
+    bucket->instance_data_array.erase(bucket->instance_data_array.begin() + instance_index);
+    vmaResizeAllocation(vkr->allocator, bucket->buffer_object.allocation, bucket->instance_data_array.size() * sizeof(InstanceData));
+    memcpy(bucket->mapped_data_ptr, bucket->instance_data_array.data(), bucket->instance_data_array.size() * sizeof(InstanceData));
 }
 
-void VkayInstancesDraw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr, Instances *instances)
+void VkayInstancesDraw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr, InstanceBucket *bucket, Mesh base_mesh)
 {
+    // todo(ad): the issue is that for each InstanceBucket drawn we are redundently re-binding these
     vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr->default_pipeline);
     vkCmdBindDescriptorSets(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr->default_pipeline_layout, 1, 1, &vkr->set_array_of_textures, 0, NULL);
 
-    VkBuffer     buffers[] = { instances->m_quads_bo.buffer };
+    VkBuffer     buffers[] = { bucket->quad_buffer_object.buffer };
     VkDeviceSize offsets[] = { 0 };
     vkCmdBindVertexBuffers(cmd_buffer, 0, 1, buffers, offsets);
-    vkCmdBindVertexBuffers(cmd_buffer, 1, 1, &instances->m_bo.buffer, offsets);
+    vkCmdBindVertexBuffers(cmd_buffer, 1, 1, &bucket->buffer_object.buffer, offsets);
 
-    vkCmdDraw(cmd_buffer, ARR_COUNT(instances->m_quad.vertices), (uint32_t)instances->m_data.size(), 0, 0);
+    vkCmdDraw(cmd_buffer, (uint32_t)base_mesh.vertices.size(), (uint32_t)bucket->instance_data_array.size(), 0, 0);
+}
+
+void VkayInstancesDestroy(VkayRenderer *vkr, InstanceBucket *bucket)
+{
+    vmaDestroyBuffer(vkr->allocator, bucket->quad_buffer_object.buffer, bucket->quad_buffer_object.allocation);
+    vmaUnmapMemory(vkr->allocator, bucket->buffer_object.allocation);
+    vmaDestroyBuffer(vkr->allocator, bucket->buffer_object.buffer, bucket->buffer_object.allocation);
 }

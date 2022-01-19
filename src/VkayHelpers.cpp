@@ -90,6 +90,11 @@ VertexInputDescription GetVertexDescription()
     return description;
 }
 
+void VkayAllocation()
+{
+    // vmaAllocateMemory
+}
+
 uint32_t FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties)
 {
     const uint32_t memoryCount = pMemoryProperties->memoryTypeCount;

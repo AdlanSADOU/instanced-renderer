@@ -451,7 +451,7 @@ void VkayRendererInit(VkayRenderer *vkr)
 
     // grab how many images we have in the swapchain
     const size_t swapchain_imagecount = vkr->swapchain_images.size();
-    vkr->framebuffers                  = std::vector<VkFramebuffer>(swapchain_imagecount);
+    vkr->framebuffers                 = std::vector<VkFramebuffer>(swapchain_imagecount);
 
     // create framebuffers for each of the swapchain image views
     for (size_t i = 0; i < swapchain_imagecount; i++) {
@@ -998,8 +998,11 @@ VkPipeline CreateComputePipeline(VkayRenderer *vkr)
         // todo(ad): error
         SDL_Log("failed to create pipline\n");
         vkDestroyShaderModule(vkr->device, compute_shader_module, NULL);
-        return VK_NULL_HANDLE; // failed to create graphics pipeline
+        return VK_NULL_HANDLE;
     } else {
+        vkr->release_queue.push_function([=]() {
+            vkDestroyShaderModule(vkr->device, compute_shader_module, NULL);
+        });
         return new_compute_pipeline;
     }
 }
@@ -1055,10 +1058,15 @@ void VkayRendererCleanup(VkayRenderer *vkr)
 
         vkDestroySampler(vkr->device, vkr->sampler, NULL);
         vkDestroySurfaceKHR(vkr->instance, vkr->surface, NULL);
+
+        vkDestroyPipelineLayout(vkr->device, vkr->compute_pipeline_layout, NULL);
         vkDestroyPipelineLayout(vkr->device, vkr->default_pipeline_layout, NULL);
         vkDestroyPipeline(vkr->device, vkr->default_pipeline, NULL);
+        vkDestroyPipeline(vkr->device, vkr->compute_pipeline, NULL);
+        vkDestroyDescriptorSetLayout(vkr->device, vkr->set_layout_instanced_data, NULL);
         vkDestroyDescriptorSetLayout(vkr->device, vkr->set_layout_global, NULL);
         vkDestroyDescriptorSetLayout(vkr->device, vkr->set_layout_array_of_textures, NULL);
+        vkDestroyDescriptorPool(vkr->device, vkr->descriptor_pool_compute, NULL);
         vkDestroyDescriptorPool(vkr->device, vkr->descriptor_pool, NULL);
         vkDestroyDevice(vkr->device, NULL);
         vkDestroyInstance(vkr->instance, NULL);

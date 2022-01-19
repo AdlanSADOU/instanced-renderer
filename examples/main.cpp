@@ -9,9 +9,9 @@
 
 void UpdateAndRender();
 
-bool  _up = false, _down = false, _left = false, _right = false;
-bool  _key_r = false;
-bool  _W = false, _A = false, _S = false, _D = false, _Q = false, _E = false;
+bool  _key_r  = false;
+bool  _key_up = false, _key_down = false, _key_left = false, _key_right = false;
+bool  _key_W = false, _key_A = false, _key_S = false, _key_D = false, _key_Q = false, _key_E = false;
 float camera_x = 0, camera_y = 0, camera_z = 0;
 
 float pos_x        = 0;
@@ -25,12 +25,13 @@ const uint64_t MAX_DT_SAMPLES = 256;
 double dt_samples[MAX_DT_SAMPLES] = {};
 double dt_averaged                = 0;
 
-Instances instances;
-Texture   profile;
-Texture   itoldu;
-Camera    camera;
+InstanceBucket instances;
+Texture        profile;
+Texture        itoldu;
+Camera         camera;
 
 VkayRenderer vkr;
+Quad         quad;
 
 int main(int argc, char *argv[])
 {
@@ -42,9 +43,9 @@ int main(int argc, char *argv[])
 
     InstanceData instance_data;
 
-    const uint32_t ROW          = 1000;
-    const uint32_t COL          = 1000;
-    const int      spacing      = 100;
+    const uint32_t ROW          = 4;
+    const uint32_t COL          = 4;
+    const int      spacing      = 50;
     uint32_t       SPRITE_COUNT = ROW * COL;
     SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
 
@@ -52,7 +53,7 @@ int main(int argc, char *argv[])
     for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;
         static float _y     = 0;
-        float        _scale = .03f;
+        float        _scale = .06f;
 
         if (i > 0 && (i % ROW) == 0) j++;
         if (i == 0) _scale = .1f;
@@ -64,9 +65,10 @@ int main(int argc, char *argv[])
         instance_data.texure_id = profile.id;
         instance_data.scale     = { profile.width, profile.height, 0 };
         instance_data.scale *= _scale;
-        instances.m_data.push_back(instance_data);
+        instances.instance_data_array.push_back(instance_data);
     }
-    VkayInstancesUpload(&vkr, &instances);
+
+    VkayInstancesUpload(&vkr, &instances, quad.mesh);
 
     UpdateAndRender();
 
@@ -75,9 +77,7 @@ int main(int argc, char *argv[])
     vkDeviceWaitIdle(vkr.device);
     VkayTextureDestroy(&vkr, &profile);
     VkayTextureDestroy(&vkr, &itoldu);
-    vmaDestroyBuffer(vkr.allocator, instances.m_quads_bo.buffer, instances.m_quads_bo.allocation);
-    vmaUnmapMemory(vkr.allocator, instances.m_bo.allocation);
-    vmaDestroyBuffer(vkr.allocator, instances.m_bo.buffer, instances.m_bo.allocation);
+    VkayInstancesDestroy(&vkr, &instances);
     VkayCameraDestroy(&vkr, &camera);
     VkayRendererCleanup(&vkr);
 
@@ -99,51 +99,51 @@ void UpdateAndRender()
             if (e.type == SDL_KEYUP) {
                 if (key == SDLK_ESCAPE) bQuit = true;
 
-                if (key == SDLK_UP) _up = false;
-                if (key == SDLK_DOWN) _down = false;
-                if (key == SDLK_LEFT) _left = false;
-                if (key == SDLK_RIGHT) _right = false;
+                if (key == SDLK_UP) _key_up = false;
+                if (key == SDLK_DOWN) _key_down = false;
+                if (key == SDLK_LEFT) _key_left = false;
+                if (key == SDLK_RIGHT) _key_right = false;
 
-                if (key == SDLK_w) _W = false;
-                if (key == SDLK_s) _S = false;
-                if (key == SDLK_a) _A = false;
-                if (key == SDLK_d) _D = false;
-                if (key == SDLK_q) _Q = false;
-                if (key == SDLK_e) _E = false;
+                if (key == SDLK_w) _key_W = false;
+                if (key == SDLK_a) _key_A = false;
+                if (key == SDLK_s) _key_S = false;
+                if (key == SDLK_d) _key_D = false;
+                if (key == SDLK_q) _key_Q = false;
+                if (key == SDLK_e) _key_E = false;
                 if (key == SDLK_r) _key_r = false;
             }
 
             if (e.type == SDL_KEYDOWN) {
-                if (key == SDLK_UP) _up = true;
-                if (key == SDLK_DOWN) _down = true;
-                if (key == SDLK_LEFT) _left = true;
-                if (key == SDLK_RIGHT) _right = true;
+                if (key == SDLK_UP) _key_up = true;
+                if (key == SDLK_DOWN) _key_down = true;
+                if (key == SDLK_LEFT) _key_left = true;
+                if (key == SDLK_RIGHT) _key_right = true;
 
-                if (key == SDLK_w) _W = true;
-                if (key == SDLK_s) _S = true;
-                if (key == SDLK_a) _A = true;
-                if (key == SDLK_d) _D = true;
-                if (key == SDLK_q) _Q = true;
-                if (key == SDLK_e) _E = true;
+                if (key == SDLK_w) _key_W = true;
+                if (key == SDLK_s) _key_S = true;
+                if (key == SDLK_a) _key_A = true;
+                if (key == SDLK_d) _key_D = true;
+                if (key == SDLK_q) _key_Q = true;
+                if (key == SDLK_e) _key_E = true;
                 if (key == SDLK_r) _key_r = true;
             }
         }
 
-        if (_up) camera_y -= camera_speed * (float)dt_averaged;
-        if (_down) camera_y += camera_speed * (float)dt_averaged;
-        if (_left) camera_x += camera_speed * (float)dt_averaged;
-        if (_right) camera_x -= camera_speed * (float)dt_averaged;
+        if (_key_up) camera_y -= camera_speed * (float)dt_averaged;
+        if (_key_down) camera_y += camera_speed * (float)dt_averaged;
+        if (_key_left) camera_x += camera_speed * (float)dt_averaged;
+        if (_key_right) camera_x -= camera_speed * (float)dt_averaged;
 
-        if (_W) pos_y += player_speed * (float)dt_averaged;
-        if (_S) pos_y -= player_speed * (float)dt_averaged;
-        if (_A) pos_x -= player_speed * (float)dt_averaged;
-        if (_D) pos_x += player_speed * (float)dt_averaged;
-        if (_Q) pos_z -= player_speed * (float)dt_averaged;
-        if (_E) pos_z += player_speed * (float)dt_averaged;
+        if (_key_W) pos_y += player_speed * (float)dt_averaged;
+        if (_key_S) pos_y -= player_speed * (float)dt_averaged;
+        if (_key_A) pos_x -= player_speed * (float)dt_averaged;
+        if (_key_D) pos_x += player_speed * (float)dt_averaged;
+        if (_key_Q) pos_z -= player_speed * (float)dt_averaged;
+        if (_key_E) pos_z += player_speed * (float)dt_averaged;
 
         static int i = 0;
         if (_key_r) {
-            VkayInstancesDestroy(&vkr, i++, &instances);
+            VkayInstancesDestroyInstance(&vkr, i++, &instances);
         }
 
         ///////////////////////////////
@@ -160,7 +160,7 @@ void UpdateAndRender()
         vkCmdBindPipeline(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline);
         vkCmdBindDescriptorSets(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline_layout, 0, 1, vkr.compute_descriptor_sets.data(), 0, 0);
         vkCmdPushConstants(vkr.frames[0].cmd_buffer_cmp, vkr.compute_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(float_t), &pos_x);
-        vkCmdDispatch(vkr.frames[0].cmd_buffer_cmp, (uint32_t)(instances.m_data.size()), 1, 1);
+        vkCmdDispatch(vkr.frames[0].cmd_buffer_cmp, (uint32_t)(instances.instance_data_array.size()), 1, 1);
         vkEndCommandBuffer(vkr.frames[0].cmd_buffer_cmp);
 
         VkSubmitInfo submit_info         = {};
@@ -179,7 +179,7 @@ void UpdateAndRender()
         VkayRendererBeginRenderPass(&vkr);
         camera.m_position = { camera_x, camera_y - 0.f, camera_z - 120.f };
         VkayCameraUpdate(&vkr, &camera);
-        VkayInstancesDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances);
+        VkayInstancesDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);
         VkayRendererEndRenderPass(&vkr);
 
         //////////////////////////////////

@@ -1,10 +1,13 @@
+#define VKAY_DEBUG_ALLOCATIONS
+
 #include <VkayRenderer.h>
-#include "VkayTypes.h"
-#include "VkayTexture.h"
-#include "VkayInstances.h"
+#include <VkayTexture.h>
+#include <VkayInstances.h>
+#include <VkayCamera.h>
 
 #include <string>
-#include <thread>
+
+void UpdateAndRender();
 
 bool  _up = false, _down = false, _left = false, _right = false;
 bool  _key_r = false;
@@ -27,13 +30,7 @@ Texture   profile;
 Texture   itoldu;
 Camera    camera;
 
-// Compute
-BufferObject instance_data_storage_buffer;
-void        *instance_data_storage_buffer_ptr;
-
 VkayRenderer vkr;
-
-void UpdateAndRender();
 
 int main(int argc, char *argv[])
 {
@@ -41,20 +38,21 @@ int main(int argc, char *argv[])
 
     VkayTextureCreate("./assets/texture.png", &vkr, &profile);
     VkayTextureCreate("./assets/bjarn_itoldu.jpg", &vkr, &itoldu);
-    camera.MapDataPtr(vkr.allocator, vkr.device, vkr.chosen_gpu, &vkr);
+    VkayCameraCreate(&vkr, &camera);
 
     InstanceData instance_data;
 
-    const size_t ROW         = 100;
-    const size_t COL         = 100;
-    int          spacing     = 100;
-    int          MAX_ENTITES = ROW * COL;
-    SDL_Log("max entites: %d\n", MAX_ENTITES);
+    const uint32_t ROW          = 1000;
+    const uint32_t COL          = 1000;
+    const int      spacing      = 100;
+    uint32_t       SPRITE_COUNT = ROW * COL;
+    SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
 
-    for (size_t i = 0, j = 0; i < MAX_ENTITES; i++) {
+    // Generate InstanceData for each sprite
+    for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;
         static float _y     = 0;
-        float        _scale = .09f;
+        float        _scale = .03f;
 
         if (i > 0 && (i % ROW) == 0) j++;
         if (i == 0) _scale = .1f;
@@ -68,8 +66,7 @@ int main(int argc, char *argv[])
         instance_data.scale *= _scale;
         instances.m_data.push_back(instance_data);
     }
-
-    instances.Upload(&vkr);
+    VkayInstancesUpload(&vkr, &instances);
 
     UpdateAndRender();
 
@@ -81,39 +78,10 @@ int main(int argc, char *argv[])
     vmaDestroyBuffer(vkr.allocator, instances.m_quads_bo.buffer, instances.m_quads_bo.allocation);
     vmaUnmapMemory(vkr.allocator, instances.m_bo.allocation);
     vmaDestroyBuffer(vkr.allocator, instances.m_bo.buffer, instances.m_bo.allocation);
-    camera.Destroy(vkr.device, vkr.allocator);
+    VkayCameraDestroy(&vkr, &camera);
     VkayRendererCleanup(&vkr);
 
     return 0;
-}
-
-void ComputeDispatch()
-{
-    vkWaitForFences(vkr.device, 1, &vkr.frames[0].compute_fence, true, SECONDS(1));
-    vkResetFences(vkr.device, 1, &vkr.frames[0].compute_fence);
-    vkResetCommandBuffer(vkr.frames[0].cmd_buffer_cmp, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
-
-    VkCommandBufferBeginInfo begin_info = {};
-    begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(vkr.frames[0].cmd_buffer_cmp, &begin_info);
-    vkCmdBindPipeline(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline);
-    vkCmdBindDescriptorSets(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline_layout, 0, 1, vkr.compute_descriptor_sets.data(), 0, 0);
-    vkCmdPushConstants(vkr.frames[0].cmd_buffer_cmp, vkr.compute_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(float_t), &pos_x);
-    vkCmdDispatch(vkr.frames[0].cmd_buffer_cmp, (uint32_t)(instances.m_data.size()), 1, 1);
-    vkEndCommandBuffer(vkr.frames[0].cmd_buffer_cmp);
-
-    VkSubmitInfo submit_info         = {};
-    submit_info.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.waitSemaphoreCount   = 0;
-    submit_info.pWaitSemaphores      = NULL;
-    submit_info.pWaitDstStageMask    = NULL;
-    submit_info.commandBufferCount   = 1;
-    submit_info.pCommandBuffers      = &vkr.frames[0].cmd_buffer_cmp;
-    submit_info.signalSemaphoreCount = 0;
-    submit_info.pSignalSemaphores    = NULL;
-    vkQueueSubmit(vkr.compute_queue, 1, &submit_info, vkr.frames[0].compute_fence);
 }
 
 void UpdateAndRender()
@@ -173,18 +141,49 @@ void UpdateAndRender()
         if (_Q) pos_z -= player_speed * (float)dt_averaged;
         if (_E) pos_z += player_speed * (float)dt_averaged;
 
-        ComputeDispatch();
         static int i = 0;
         if (_key_r) {
-            instances.DestroyInstance(&vkr, i++);
+            VkayInstancesDestroy(&vkr, i++, &instances);
         }
 
+        ///////////////////////////////
+        // Compute dispatch
+        vkWaitForFences(vkr.device, 1, &vkr.frames[0].compute_fence, true, SECONDS(1));
+        vkResetFences(vkr.device, 1, &vkr.frames[0].compute_fence);
+        vkResetCommandBuffer(vkr.frames[0].cmd_buffer_cmp, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
+
+        VkCommandBufferBeginInfo begin_info = {};
+        begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(vkr.frames[0].cmd_buffer_cmp, &begin_info);
+        vkCmdBindPipeline(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline);
+        vkCmdBindDescriptorSets(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline_layout, 0, 1, vkr.compute_descriptor_sets.data(), 0, 0);
+        vkCmdPushConstants(vkr.frames[0].cmd_buffer_cmp, vkr.compute_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(float_t), &pos_x);
+        vkCmdDispatch(vkr.frames[0].cmd_buffer_cmp, (uint32_t)(instances.m_data.size()), 1, 1);
+        vkEndCommandBuffer(vkr.frames[0].cmd_buffer_cmp);
+
+        VkSubmitInfo submit_info         = {};
+        submit_info.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submit_info.waitSemaphoreCount   = 0;
+        submit_info.pWaitSemaphores      = NULL;
+        submit_info.pWaitDstStageMask    = NULL;
+        submit_info.commandBufferCount   = 1;
+        submit_info.pCommandBuffers      = &vkr.frames[0].cmd_buffer_cmp;
+        submit_info.signalSemaphoreCount = 0;
+        submit_info.pSignalSemaphores    = NULL;
+        vkQueueSubmit(vkr.compute_queue, 1, &submit_info, vkr.frames[0].compute_fence);
+
+        //////////////////////////////////
+        // Rendering
         VkayRendererBeginRenderPass(&vkr);
         camera.m_position = { camera_x, camera_y - 0.f, camera_z - 120.f };
-        camera.Update(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx);
-        instances.Draw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr);
+        VkayCameraUpdate(&vkr, &camera);
+        VkayInstancesDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances);
         VkayRendererEndRenderPass(&vkr);
 
+        //////////////////////////////////
+        // DeltaTime
         pos_x = pos_y = pos_z              = 0;
         uint64_t        end                = SDL_GetPerformanceCounter();
         static uint64_t idx                = 0;

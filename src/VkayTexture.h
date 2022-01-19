@@ -23,7 +23,7 @@ struct Texture
 
 void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture)
 {
-    texture->id = vkr->texture_array_index;
+    texture->id = vkr->texture_array_count;
 
     int tex_width, tex_height, texChannels;
 
@@ -165,13 +165,13 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     desc_image_image_info.sampler                         = NULL;
     desc_image_image_info.imageLayout                     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     desc_image_image_info.imageView                       = texture->view;
-    vkr->descriptor_image_infos[vkr->texture_array_index] = desc_image_image_info;
+    vkr->descriptor_image_infos[vkr->texture_array_count] = desc_image_image_info;
 
 
     // descriptorImageInfos requires VkImageView(s) which requires VkImage(s) backing actual texture data
     // we need to finish texture loading in vk_texture.h
     // we must be able to load textures whenever necessary
-    if (vkr->texture_array_index == 0) {
+    if (vkr->texture_array_count == 0) {
         VkDescriptorSetAllocateInfo desc_alloc_info = {};
         desc_alloc_info.sType                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         desc_alloc_info.descriptorPool              = vkr->descriptor_pool;
@@ -206,7 +206,7 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     setWrites[1].pBufferInfo     = 0;
     vkUpdateDescriptorSets(vkr->device, 2, setWrites, 0, NULL);
 
-    vkr->texture_array_index++;
+    vkr->texture_array_count++;
 }
 
 void VkayTextureDestroy(VkayRenderer *vkr, Texture *texture)

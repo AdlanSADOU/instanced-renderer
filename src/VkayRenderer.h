@@ -24,10 +24,11 @@
 struct VkayRenderer;
 
 #define FRAME_BUFFER_COUNT 2
+// this number reflects the texture array size set in the "shaders/textureArray.frag" shader
+// both must be equal
+#define MAX_TEXTURE_COUNT 80
 
 #define SECONDS(value) (1000000000 * value)
-
-
 
 EXPORT void       VkayRendererInit(VkayRenderer *vkr);
 EXPORT void       VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
@@ -37,16 +38,26 @@ EXPORT void       VkayRendererEndRenderPass(VkayRenderer *vkr);
 EXPORT void       VkayRendererCleanup(VkayRenderer *vkr);
 EXPORT FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr);
 
+EXPORT VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
+EXPORT VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage, short line, const char *filename);
+EXPORT VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
+EXPORT VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation, short line, const char *filename);
+EXPORT bool     AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
+EXPORT bool     AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory, short line, const char *filename);
+EXPORT bool     AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
+
+#if defined(VKAY_DEBUG_ALLOCATIONS)
+#define CreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage) CreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage, __LINE__, __FILE__)
+#define MapMemcpyMemory(src, size, allocator, allocation)                    MapMemcpyMemory(src, size, allocator, allocation, __LINE__, __FILE__)
+#define AllocateBufferMemory(device, gpu, buffer, memory)                    AllocateBufferMemory(device, gpu, buffer, memory, __LINE__, __FILE__)
+#define AllocateImageMemory(allocator, image, allocation, usage)             AllocateImageMemory(allocator, image, allocation, usage, __LINE__, __FILE__)
+#endif
+
 EXPORT VertexInputDescription GetVertexDescription();
 bool                          CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
-EXPORT VkResult               CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, ReleaseQueue *queue, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
 EXPORT bool                   CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
-EXPORT VkResult               MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
 EXPORT VkPipeline             CreateGraphicsPipeline(VkayRenderer *vkr);
 EXPORT VkPipeline             CreateComputePipeline(VkayRenderer *vkr);
-EXPORT bool                   AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
-EXPORT bool                   AllocateImageMemory(VkDevice device, VkPhysicalDevice gpu, VkImage image, VkDeviceMemory *memory);
-EXPORT bool                   AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
 EXPORT void                   CopyBuffer(VkCommandBuffer cmd_buffer, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
 EXPORT uint32_t               FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
 EXPORT VkResult               CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
@@ -60,24 +71,25 @@ struct VkayRenderer
 
     FrameData    frames[FRAME_BUFFER_COUNT];
     BufferObject triangle_SSBO[FRAME_BUFFER_COUNT];
-    //
+
+    ///////////////////////////
     // Vulkan initialization phase types
-    //
     VkInstance               instance;
     VkDebugUtilsMessengerEXT debug_messenger;
     VkPhysicalDevice         chosen_gpu;
     VkSurfaceKHR             surface;
-    //
+    /////////////////////////
     // Swapchain
-    //
     VkSwapchainKHR           swapchain;
     VkFormat                 swapchain_image_format; // image format expected by the windowing system
     std::vector<VkImage>     swapchain_images;
     std::vector<VkImageView> swapchain_image_views;
-
+    /////////////////////////
+    // Pools
     VkCommandPool command_pool_graphics = {};
     VkCommandPool command_pool_compute  = {};
-
+    ////////////////////////
+    // Queues
     uint32_t graphics_queue_family;
     uint32_t compute_queue_family;
     uint32_t present_queue_family;
@@ -98,7 +110,7 @@ struct VkayRenderer
     VkDescriptorSetLayout set_layout_global; // todo(ad): camera set layout
 
     // Do not modify this
-    uint32_t              texture_array_index = 0;
+    uint32_t              texture_array_count = 0;
     VkDescriptorSetLayout set_layout_array_of_textures;
     VkDescriptorSet       set_array_of_textures;
 
@@ -138,115 +150,6 @@ struct VkayRenderer
     uint32_t frame_idx_inflight = 0;
 };
 
-struct EXPORT Camera
-{
-    struct Data
-    {
-        glm::mat4 view       = {};
-        glm::mat4 projection = {};
-        glm::mat4 viewproj   = {};
-    } data {};
-
-    void           *m_data_ptr[FRAME_BUFFER_COUNT];
-    BufferObject    m_UBO[FRAME_BUFFER_COUNT];
-    VkDescriptorSet m_set_global[FRAME_BUFFER_COUNT] = {};
-    glm::vec3       m_position;
-    VkayRenderer   *m_vkr;
-
-    void MapDataPtr(VmaAllocator allocator, VkDevice device, VkPhysicalDevice gpu, VkayRenderer *vkr)
-    {
-        this->m_vkr = vkr;
-        for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
-
-            CreateBuffer(&m_UBO[i], m_vkr->allocator, &m_vkr->release_queue, sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-            VkDescriptorBufferInfo info_descriptor_camera_buffer;
-            AllocateDescriptorSets(m_vkr->device, m_vkr->descriptor_pool, 1, &m_vkr->set_layout_global, &m_set_global[i]);
-
-            info_descriptor_camera_buffer.buffer = m_UBO[i].buffer;
-            info_descriptor_camera_buffer.offset = 0;
-            info_descriptor_camera_buffer.range  = sizeof(Camera::Data);
-
-            VkWriteDescriptorSet write_camera_buffer = {};
-            write_camera_buffer.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write_camera_buffer.pNext                = NULL;
-            write_camera_buffer.dstBinding           = 0; // we are going to write into binding number 0
-            write_camera_buffer.dstSet               = m_set_global[i]; // of the global descriptor
-            write_camera_buffer.descriptorCount      = 1;
-            write_camera_buffer.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; // and the type is uniform buffer
-            write_camera_buffer.pBufferInfo          = &info_descriptor_camera_buffer;
-            vkUpdateDescriptorSets(m_vkr->device, 1, &write_camera_buffer, 0, NULL);
-
-            vmaMapMemory(allocator, m_UBO[i].allocation, &m_data_ptr[i]);
-        }
-    }
-
-    void Update(VkCommandBuffer cmd_buffer)
-    {
-        vkCmdBindDescriptorSets(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkr->default_pipeline_layout, 0, 1, &m_set_global[m_vkr->frame_idx_inflight], 0, NULL);
-
-        glm::mat4 translation = glm::translate(glm::mat4(1.f), m_position);
-        glm::mat4 rotation    = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(1, 0, 0));
-        glm::mat4 view        = rotation * translation;
-        // glm::mat4 projection  = glm::perspective(glm::radians(60.f), (float)m_vkr->window_extent.width / (float)m_vkr->window_extent.height, 0.1f, 1000.0f);
-        glm::mat4 projection = glm::ortho(0.f, (float)m_vkr->window_extent.width, 0.f, (float)m_vkr->window_extent.height, .1f, 200.f);
-        glm::mat4 V          = glm::lookAt(glm::vec3(0.f, 0.f, 2.0f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-        projection[1][1] *= -1;
-
-        data.projection = projection * V;
-        data.view       = view;
-        data.viewproj   = projection * view;
-        copyDataPtr(m_vkr->frame_idx_inflight);
-    }
-
-    void UnmapDataPtr(VmaAllocator allocator, uint32_t index)
-    {
-        vmaUnmapMemory(allocator, m_UBO[index].allocation);
-    }
-
-    /**
-     * @brief A convevience function to unmap every data ptr
-     */
-    void UnmapDataPtrs(VmaAllocator allocator)
-    {
-        for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
-            vmaUnmapMemory(allocator, m_UBO[i].allocation);
-        }
-    }
-
-    void copyDataPtr(uint32_t frame_idx)
-    {
-        memcpy(m_data_ptr[frame_idx], &data, sizeof(data));
-    }
-
-    void DestroyBuffers(VkDevice device)
-    {
-        for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
-            vkDestroyBuffer(device, m_UBO[i].buffer, NULL);
-        }
-    }
-
-    /**
-     ** @brief A convevience function to unmap every data ptr and destroy all buffers -
-     ** do not mix with UnmapDataPtrs/ UnmapDataPtr or DestroyBuffers
-     */
-    void Destroy(VkDevice device, VmaAllocator allocator)
-    {
-        vkDeviceWaitIdle(device);
-
-        UnmapDataPtrs(allocator);
-        for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
-            vmaDestroyBuffer(allocator, m_UBO[i].buffer, m_UBO[i].allocation);
-        }
-    }
-};
-
-// this number reflects the texture array size set in the "shaders/textureArray.frag" shader
-// both must be equal
-#define MAX_TEXTURE_COUNT 80
-
-// -1000011001
 static std::unordered_map<VkResult, std::string> vulkan_errors = {
     { (VkResult)0, "VK_SUCCESS" },
     { (VkResult)1, "VK_NOT_READY" },

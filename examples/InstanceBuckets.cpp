@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     InstanceData instance_data;
 
     const uint32_t ROW          = 1000;
-    const uint32_t COL          = 2000;
+    const uint32_t COL          = 1000;
     const int      spacing      = 100;
     uint32_t       SPRITE_COUNT = ROW * COL;
     SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);

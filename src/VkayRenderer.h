@@ -1,12 +1,12 @@
 ﻿#if !defined(VK_RENDERER)
 #define VK_RENDERER
 
-#if defined(WIN32)
+#ifdef _WIN32
 #define __func__ __FUNCTION__
 #endif
 
 #ifdef _WIN32
-#define EXPORT //__declspec(dllexport)
+#define EXPORT __declspec(dllexport)
 #elif __GNUC__
 #define EXPORT __attribute__((visibility("default")))
 // #define EXPORT
@@ -42,9 +42,10 @@ EXPORT VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, s
 EXPORT VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage, short line, const char *filename);
 EXPORT VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
 EXPORT VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation, short line, const char *filename);
-EXPORT bool     AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
-EXPORT bool     AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory, short line, const char *filename);
-EXPORT bool     AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
+
+EXPORT bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
+EXPORT bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory, short line, const char *filename);
+EXPORT bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
 
 #if defined(VKAY_DEBUG_ALLOCATIONS)
 #define CreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage) CreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage, __LINE__, __FILE__)
@@ -54,7 +55,7 @@ EXPORT bool     AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAl
 #endif
 
 EXPORT VertexInputDescription GetVertexDescription();
-bool                          CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
+EXPORT bool                   CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
 EXPORT bool                   CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
 EXPORT VkPipeline             CreateGraphicsPipeline(VkayRenderer *vkr);
 EXPORT VkPipeline             CreateComputePipeline(VkayRenderer *vkr);
@@ -66,11 +67,10 @@ EXPORT VkResult               AllocateDescriptorSets(VkDevice device, VkDescript
 struct VkayRenderer
 {
     SDL_Window *window = NULL;
-    // VkExtent2D  window_extent { 720, 480 };
-    VkExtent2D window_extent { 1920, 1000 };
+    VkExtent2D  window_extent { 720, 480 };
+    // VkExtent2D window_extent { 1920, 1000 };
 
     FrameData    frames[FRAME_BUFFER_COUNT];
-    BufferObject triangle_SSBO[FRAME_BUFFER_COUNT];
 
     ///////////////////////////
     // Vulkan initialization phase types

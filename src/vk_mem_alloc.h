@@ -23,6 +23,13 @@
 #ifndef AMD_VULKAN_MEMORY_ALLOCATOR_H
 #define AMD_VULKAN_MEMORY_ALLOCATOR_H
 
+#ifdef _WIN32
+#define EXPORT __declspec(dllexport)
+#elif __GNUC__
+#define EXPORT __attribute__((visibility("default")))
+// #define EXPORT
+#endif
+
 /** \mainpage Vulkan Memory Allocator
 
 <b>Version 3.0.0-development</b> (2020-03-23)
@@ -2000,7 +2007,7 @@ extern "C" {
 // #define VMA_CALL_PRE  __declspec(dllexport)
 // #define VMA_CALL_POST __cdecl
 #ifndef VMA_CALL_PRE
-#define VMA_CALL_PRE
+#define VMA_CALL_PRE EXPORT
 #endif
 #ifndef VMA_CALL_POST
 #define VMA_CALL_POST

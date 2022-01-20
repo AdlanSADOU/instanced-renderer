@@ -1,7 +1,7 @@
 
 <!-- <img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="44%" height="44%"> -->
 
-## Quick Warning Notice
+# Quick Warning Notice
 This project is still under heavy development and in early stage. I'm still working on & exploring techniques, thus the API is not yet fleshed out.
 This is not much of a library for now and I don't expect anybody to use it at this time. Do so at your own risk and peril. 
 

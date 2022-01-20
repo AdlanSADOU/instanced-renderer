@@ -26,7 +26,7 @@ void VkayInstanceBucketSetBaseMesh()
 
 }
 
-bool VkayInstancesUpload(VkayRenderer *vkr, InstanceBucket *bucket, Mesh base_mesh)
+bool VkayInstancesBucketUpload(VkayRenderer *vkr, InstanceBucket *bucket, Mesh base_mesh)
 {
     {
         VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;

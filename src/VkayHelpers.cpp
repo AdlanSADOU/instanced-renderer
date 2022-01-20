@@ -29,18 +29,18 @@ VertexInputDescription GetVertexDescription()
         normal_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
         normal_attribute.offset                            = offsetof(Vertex, normal);
 
-        // Color will be stored at Location 2
-        VkVertexInputAttributeDescription color_attribute = {};
-        color_attribute.binding                           = 0;
-        color_attribute.location                          = 2;
-        color_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
-        color_attribute.offset                            = offsetof(Vertex, color);
-
         VkVertexInputAttributeDescription tex_uv_attribute = {};
         tex_uv_attribute.binding                           = 0;
-        tex_uv_attribute.location                          = 3;
+        tex_uv_attribute.location                          = 2;
         tex_uv_attribute.format                            = VK_FORMAT_R32G32_SFLOAT;
         tex_uv_attribute.offset                            = offsetof(Vertex, tex_uv);
+
+        // Color will be stored at Location 3
+        VkVertexInputAttributeDescription color_attribute = {};
+        color_attribute.binding                           = 0;
+        color_attribute.location                          = 3;
+        color_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        color_attribute.offset                            = offsetof(Vertex, color);
 
 
         description.attributes.push_back(position_attribute);

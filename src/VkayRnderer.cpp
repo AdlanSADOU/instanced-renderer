@@ -773,7 +773,7 @@ VkPipeline CreateGraphicsPipeline(VkayRenderer *vkr)
         // todo(ad): error
         SDL_Log("Failed to build vertex shader module. Did you compile the shaders?\n");
     } else {
-        SDL_Log("vertex shader succesfully built\n");
+        SDL_Log("vertex ShadeModule build successful\n");
     }
 
     VkShaderModule fragmentShader;
@@ -781,7 +781,7 @@ VkPipeline CreateGraphicsPipeline(VkayRenderer *vkr)
         // todo(ad): error
         SDL_Log("Failed to built fragment shader module. Did you compile the shaders?\n");
     } else {
-        SDL_Log("fragment shader succesfully built\n");
+        SDL_Log("fragment ShadeModule build successful\n");
     }
 
     std::vector<VkPipelineShaderStageCreateInfo> create_info_shader_stages;
@@ -795,7 +795,7 @@ VkPipeline CreateGraphicsPipeline(VkayRenderer *vkr)
 
     ////////////////////////////
     /// Vertex Input Description
-    VertexInputDescription               vertexDescription = GetVertexDescription(); // horseshit, make this a useful function with arguments
+    VertexInputDescription               vertexDescription = GetVertexDescription(); // make this a useful function
     VkPipelineVertexInputStateCreateInfo create_info_vertex_input_state;
     create_info_vertex_input_state                                 = vkinit::VertexInputStateCreateInfo();
     create_info_vertex_input_state.pVertexAttributeDescriptions    = vertexDescription.attributes.data();
@@ -883,7 +883,7 @@ VkPipeline CreateComputePipeline(VkayRenderer *vkr)
         SDL_Log("Failed to build compute shader module. Did you compile the shaders?\n");
 
     } else {
-        SDL_Log("Compute shader built succesfully\n");
+        SDL_Log("Compute ShadeModule build successfull\n");
     }
 
     VkPipelineShaderStageCreateInfo ci_shader_stage = {};

@@ -20,8 +20,8 @@ struct Vertex
 {
     glm::vec3 position;
     glm::vec3 normal;
-    glm::vec3 color;
     glm::vec2 tex_uv;
+    glm::vec3 color;
 };
 
 struct Mesh
@@ -36,22 +36,13 @@ struct Quad
     Quad()
     {
         mesh.vertices.resize(6);
-        mesh.vertices[0] = { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }; // bot-left1
-        mesh.vertices[1] = { { -1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } }; // top-left
-        mesh.vertices[2] = { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }; // top-right1
-        mesh.vertices[3] = { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }; // bot-left2
-        mesh.vertices[4] = { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }; // top-right2
-        mesh.vertices[5] = { { +1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } }; // bot-right
+        mesh.vertices[0] = { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f } }; // bot-left1
+        mesh.vertices[1] = { { -1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } }; // top-left
+        mesh.vertices[2] = { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } }; // top-right1
+        mesh.vertices[3] = { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f } }; // bot-left2
+        mesh.vertices[4] = { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } }; // top-right2
+        mesh.vertices[5] = { { +1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f } }; // bot-right
     }
-};
-
-struct BufferObject
-{
-    VkBuffer buffer;
-
-    // union?
-    VmaAllocation  allocation;
-    VkDeviceMemory memory;
 };
 
 struct InstanceData
@@ -72,6 +63,15 @@ struct FrameData
     VkCommandBuffer cmd_buffer_cmp    = {};
     VkDescriptorSet set_model         = {};
     uint32_t        idx_swapchain_image;
+};
+
+struct BufferObject
+{
+    VkBuffer buffer;
+
+    // union?
+    VmaAllocation  allocation;
+    VkDeviceMemory memory;
 };
 
 struct AllocatedImage

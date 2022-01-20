@@ -1,11 +1,9 @@
-#define VKAY_DEBUG_ALLOCATIONS
+// #define VKAY_DEBUG_ALLOCATIONS
 
 #include <VkayRenderer.h>
 #include <VkayTexture.h>
 #include <VkayInstances.h>
 #include <VkayCamera.h>
-
-#include <string>
 
 void UpdateAndRender();
 
@@ -43,9 +41,9 @@ int main(int argc, char *argv[])
 
     InstanceData instance_data;
 
-    const uint32_t ROW          = 4;
-    const uint32_t COL          = 4;
-    const int      spacing      = 50;
+    const uint32_t ROW          = 1000;
+    const uint32_t COL          = 2000;
+    const int      spacing      = 100;
     uint32_t       SPRITE_COUNT = ROW * COL;
     SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
 
@@ -53,7 +51,7 @@ int main(int argc, char *argv[])
     for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;
         static float _y     = 0;
-        float        _scale = .06f;
+        float        _scale = .02f;
 
         if (i > 0 && (i % ROW) == 0) j++;
         if (i == 0) _scale = .1f;
@@ -68,12 +66,14 @@ int main(int argc, char *argv[])
         instances.instance_data_array.push_back(instance_data);
     }
 
-    VkayInstancesUpload(&vkr, &instances, quad.mesh);
+    VkayInstancesBucketUpload(&vkr, &instances, quad.mesh);
 
+    /////////////////////
+    // Main loop
     UpdateAndRender();
 
     //////////////////////
-    // Cleanup, some things are missings
+    // Cleanup
     vkDeviceWaitIdle(vkr.device);
     VkayTextureDestroy(&vkr, &profile);
     VkayTextureDestroy(&vkr, &itoldu);

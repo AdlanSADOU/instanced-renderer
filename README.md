@@ -8,9 +8,9 @@ So pretty big changes and refactorings are to come.
 
 - Instanced rendering
 - Array of textures: indexed inside fragment shader per primitive instance
-- compute dispatch
+- bare bones compute dispatch
 
-**Result**: a 2D renderer able to render more than 2 million sprites at high framerates (60+ fps) on relatively modern GPUs with only 1 draw call
+**Result**: as of now, a 2D renderer able to render more than 2 million sprites at high framerates (60+ fps) on relatively modern GPUs with only 1 draw call
 
 ---
 

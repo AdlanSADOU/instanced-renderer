@@ -3,14 +3,14 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
+#include <SDL2/SDL_vulkan.h>
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
-#include <vector>
 #include <unordered_map>
 #include <functional>
 #include <deque>
 
+class vector;
 
 #define PI 3.14159265358979323846264338327950288
 
@@ -20,29 +20,29 @@ struct Vertex
 {
     glm::vec3 position;
     glm::vec3 normal;
-    glm::vec3 color;
     glm::vec2 tex_uv;
+    glm::vec3 color;
+};
+
+struct Mesh
+{
+    std::vector<Vertex> vertices = {};
 };
 
 struct Quad
 {
-    Vertex vertices[6] = {
-        { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }, // bot-left 1
-        { { -1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f } }, // top-left
-        { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }, // top-right 1
-        { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } }, // bot-left 2
-        { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } }, // top-right 2
-        { { +1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } }, // bot-right
-    };
-};
+    Mesh mesh = {};
 
-struct BufferObject
-{
-    VkBuffer buffer;
-
-    // union?
-    VmaAllocation  allocation;
-    VkDeviceMemory memory;
+    Quad()
+    {
+        mesh.vertices.resize(6);
+        mesh.vertices[0] = { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f } }; // bot-left1
+        mesh.vertices[1] = { { -1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } }; // top-left
+        mesh.vertices[2] = { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } }; // top-right1
+        mesh.vertices[3] = { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f } }; // bot-left2
+        mesh.vertices[4] = { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } }; // top-right2
+        mesh.vertices[5] = { { +1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f } }; // bot-right
+    }
 };
 
 struct InstanceData
@@ -52,13 +52,6 @@ struct InstanceData
     alignas(16) glm::vec3 scale = {};
     int32_t texure_id;
 };
-
-
-struct ModelData
-{
-    glm::mat4 transform;
-};
-
 
 struct FrameData
 {
@@ -72,10 +65,13 @@ struct FrameData
     uint32_t        idx_swapchain_image;
 };
 
-struct MeshPushConstants
+struct BufferObject
 {
-    glm::vec4 data          = {};
-    glm::mat4 render_matrix = {};
+    VkBuffer buffer;
+
+    // union?
+    VmaAllocation  allocation;
+    VkDeviceMemory memory;
 };
 
 struct AllocatedImage
@@ -99,14 +95,14 @@ struct Material
 };
 
 
-struct Mesh
-{
-    std::vector<Vertex> vertices;
-    BufferObject        vertex_buffer;
-    BufferObject        index_buffer;
+// struct Mesh
+// {
+//     std::vector<Vertex> vertices;
+//     BufferObject        vertex_buffer;
+//     BufferObject        index_buffer;
 
-    bool LoadFromObj(const char *filename);
-};
+//     bool LoadFromObj(const char *filename);
+// };
 
 struct RenderObject
 {
@@ -145,13 +141,8 @@ struct ReleaseQueue
     }
 };
 
-// const char fence_status[][11] {
-//     "VK_SUCCESS",
-//     "VK_NOT_READY",
-//     "VK_ERROR_DEVICE_LOST",
-// };
-
 static std::unordered_map<VkResult, std::string> fence_status = {
     { VK_SUCCESS, "VK_SUCCESS" },
     { VK_NOT_READY, "VK_NOT_READY" },
+    { VK_ERROR_DEVICE_LOST, "VK_ERROR_DEVICE_LOST" },
 };

@@ -3,15 +3,15 @@
 
 layout (location = 0) in vec3 vPosition;
 layout (location = 1) in vec3 vNormal;
-layout (location = 2) in vec3 vColor;
-layout (location = 3) in vec2 vTexUV;
+layout (location = 2) in vec2 vTexUV;
+layout (location = 3) in vec3 vColor;
 
 layout (location = 4) in vec3 iPos;
 layout (location = 5) in vec3 iRot;
 layout (location = 6) in vec3 iScale;
 layout (location = 7) in int  iTexIdx;
 
-layout(set = 0, binding = 0) uniform  CameraBuffer
+layout(set = 0, binding = 0) uniform CameraBuffer
 {
 	mat4 view;
 	mat4 proj;

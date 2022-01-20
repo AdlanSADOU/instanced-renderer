@@ -1,7 +1,7 @@
 ﻿#if !defined(VK_INITIALIZERS)
 #define VK_INITIALIZERS
 
-#include <vk_types.h>
+#include <VkayTypes.h>
 
 namespace vkinit {
 

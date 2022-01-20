@@ -14,7 +14,8 @@ Please note that the examples might not run on your particular hardware **for no
 - bare bones compute dispatch
 
 **Result**: as of now, a 2D instanced renderer able to display more than 2 million sprites at high framerates (60+ fps) on entry level hardware, like a GTX 1050 ti.
-And more 
+And twice as much on a GTX 1070.
+
 ## Dependencies
 
 - ```SDL2```: cross platform Windowing & swapchain abstraction

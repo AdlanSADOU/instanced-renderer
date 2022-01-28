@@ -39,6 +39,8 @@ double dt_averaged                = 0;
 VkayRenderer vkr;
 cgltf_data  *data;
 VkayBuffer ibo = {};
+VkayBuffer vbo = {};
+
 
 
 int main(int argc, char *argv[])
@@ -49,17 +51,39 @@ int main(int argc, char *argv[])
     cgltf_options options = {};
     cgltf_parse_file(&options, "./assets/3D/khronos_logo/scene.gltf", &data);
 
-    uint32_t size = (uint32_t)data->meshes->primitives->indices->count * sizeof(uint32_t);
-    VK_CHECK(VkayCreateBuffer(&ibo, vkr.allocator, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY));
+    /////////////////
+    // Index Buffer
+    uint32_t indices_size = (uint32_t)data->meshes->primitives->indices->count * sizeof(uint32_t);
+    VK_CHECK(VkayCreateBuffer(&ibo, vkr.allocator, indices_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY));
 
     VkayBuffer staging_buffer = {};
-    VK_CHECK(VkayCreateBuffer(&staging_buffer, vkr.allocator, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
-    VK_CHECK(VkayMapMemcpyMemory(data->meshes->primitives->indices, size, vkr.allocator, staging_buffer.allocation));
+    VK_CHECK(VkayCreateBuffer(&staging_buffer, vkr.allocator, indices_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
+    VK_CHECK(VkayMapMemcpyMemory(data->meshes->primitives->indices, indices_size, vkr.allocator, staging_buffer.allocation));
 
     VkayBeginCommandBuffer(vkr.frames[0].cmd_buffer_gfx);
     VkBufferCopy region = {};
-    region.size = size;
+    region.size = indices_size;
     vkCmdCopyBuffer(vkr.frames[0].cmd_buffer_gfx, staging_buffer.buffer, ibo.buffer, 1, &region);
+    VkayEndCommandBuffer(vkr.frames[0].cmd_buffer_gfx);
+    VK_CHECK(VkayQueueSumbit(vkr.graphics_queue, &vkr.frames[0].cmd_buffer_gfx));
+    vkDeviceWaitIdle(vkr.device);
+
+    //////////////////
+    // Vertex Buffer
+    cgltf_data* vertex_data = {};
+
+    cgltf_result res = cgltf_load_buffers(&options, data, "./assets/3D/khronos_logo/scene.bin");
+    uint32_t size = (uint32_t)data->buffers[0].size;
+    VK_CHECK(VkayCreateBuffer(&ibo, vkr.allocator, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY));
+
+    VkayBuffer vertex_staging_buffer = {};
+    VK_CHECK(VkayCreateBuffer(&vertex_staging_buffer, vkr.allocator, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
+    VK_CHECK(VkayMapMemcpyMemory(data->buffers[0].data, size, vkr.allocator, vertex_staging_buffer.allocation));
+
+    VkayBeginCommandBuffer(vkr.frames[0].cmd_buffer_gfx);
+    VkBufferCopy vertex_buffer_region = {};
+    vertex_buffer_region.size = size;
+    vkCmdCopyBuffer(vkr.frames[0].cmd_buffer_gfx, vertex_staging_buffer.buffer, ibo.buffer, 1, &vertex_buffer_region);
     VkayEndCommandBuffer(vkr.frames[0].cmd_buffer_gfx);
     VK_CHECK(VkayQueueSumbit(vkr.graphics_queue, &vkr.frames[0].cmd_buffer_gfx));
     vkDeviceWaitIdle(vkr.device);
@@ -145,8 +169,9 @@ void UpdateAndRender()
         VkayRendererBeginRenderPass(&vkr);
         VkCommandBuffer cmd_buffer_gfx = vkr.frames[vkr.frame_idx_inflight].cmd_buffer_gfx;
         vkCmdBindPipeline(cmd_buffer_gfx, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr.default_pipeline);
-        // vkCmdBindIndexBuffer(cmd_buffer_gfx, index_buffer, 0, VK_INDEX_TYPE_UINT32);
-        // vkCmdDrawIndexed(cmd_buffer_gfx, data->meshes->primitives->indices->count, 1, 0, 0, 0);
+         vkCmdBindIndexBuffer(cmd_buffer_gfx, ibo.buffer, 0, VK_INDEX_TYPE_UINT32);
+         vkCmdBindVertexBuffers(cmd_buffer_gfx, 0, 1, &vbo.buffer, 0);
+         vkCmdDrawIndexed(cmd_buffer_gfx, data->meshes->primitives->indices->count, 1, 0, 0, 0);
         VkayRendererEndRenderPass(&vkr);
         VkayRendererEndCommandBuffer(&vkr);
         // DeltaTime

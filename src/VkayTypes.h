@@ -65,7 +65,7 @@ struct FrameData
     uint32_t        idx_swapchain_image;
 };
 
-struct BufferObject
+struct VkayBuffer
 {
     VkBuffer buffer;
 
@@ -76,7 +76,7 @@ struct BufferObject
 
 struct AllocatedImage
 {
-    VkImage       _image;
+    VkImage       image;
     VmaAllocation allocation;
 };
 
@@ -91,15 +91,15 @@ struct VertexInputDescription
 struct Material
 {
     VkPipeline       pipeline;
-    VkPipelineLayout pipelineLayout;
+    VkPipelineLayout pipeline_layout;
 };
 
 
 // struct Mesh
 // {
 //     std::vector<Vertex> vertices;
-//     BufferObject        vertex_buffer;
-//     BufferObject        index_buffer;
+//     VkayBuffer          vertex_buffer;
+//     VkayBuffer          index_buffer;
 
 //     bool LoadFromObj(const char *filename);
 // };

@@ -176,11 +176,16 @@ void UpdateAndRender()
 
         //////////////////////////////////
         // Rendering
+        VkayRendererBeginCommandBuffer(&vkr);
         VkayRendererBeginRenderPass(&vkr);
+
         camera.m_position = { camera_x, camera_y - 0.f, camera_z - 120.f };
         VkayCameraUpdate(&vkr, &camera);
         VkayInstancesDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);
+
         VkayRendererEndRenderPass(&vkr);
+        VkayRendererEndCommandBuffer(&vkr);
+        VkayRendererPresent(&vkr);
 
         //////////////////////////////////
         // DeltaTime

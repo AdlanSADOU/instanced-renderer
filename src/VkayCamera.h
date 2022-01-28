@@ -10,7 +10,7 @@ struct Camera
     } data {};
 
     void           *m_data_ptr[FRAME_BUFFER_COUNT];
-    BufferObject    m_UBO[FRAME_BUFFER_COUNT];
+    VkayBuffer    m_UBO[FRAME_BUFFER_COUNT];
     VkDescriptorSet m_set_global[FRAME_BUFFER_COUNT] = {};
     VkayRenderer   *m_vkr;
 
@@ -23,7 +23,7 @@ void VkayCameraCreate(VkayRenderer *vkr, Camera *camera)
 
     for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
 
-        CreateBuffer(&camera->m_UBO[i], vkr->allocator, sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        VkayCreateBuffer(&camera->m_UBO[i], vkr->allocator, sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         VkDescriptorBufferInfo info_descriptor_camera_buffer;
         AllocateDescriptorSets(vkr->device, vkr->descriptor_pool, 1, &vkr->set_layout_global, &camera->m_set_global[i]);

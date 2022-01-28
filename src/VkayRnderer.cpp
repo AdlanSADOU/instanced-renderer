@@ -257,7 +257,7 @@ void VkayRendererInit(VkayRenderer *vkr)
     create_info_swapchain.pNext                    = NULL;
     create_info_swapchain.flags                    = 0;
     create_info_swapchain.surface                  = vkr->surface;
-    create_info_swapchain.minImageCount            = 2;
+    create_info_swapchain.minImageCount            = FRAME_BUFFER_COUNT;
     create_info_swapchain.imageFormat              = surface_formats[0].format;
     create_info_swapchain.imageColorSpace          = surface_formats[0].colorSpace;
     create_info_swapchain.imageExtent              = surface_capabilities.currentExtent;
@@ -333,45 +333,18 @@ void VkayRendererInit(VkayRenderer *vkr)
     create_info_depth_image_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
     create_info_depth_image_allocation.requiredFlags           = (VkMemoryPropertyFlags)VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-    vmaCreateImage(vkr->allocator, &create_info_depth_image, &create_info_depth_image_allocation, &vkr->depth_image._image, &vkr->depth_image.allocation, NULL);
+    vmaCreateImage(vkr->allocator, &create_info_depth_image, &create_info_depth_image_allocation, &vkr->depth_image.image, &vkr->depth_image.allocation, NULL);
 
     // build an image-view for the depth image to use for rendering
-    VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(vkr->depth_format, vkr->depth_image._image, VK_IMAGE_ASPECT_DEPTH_BIT);
+    VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(vkr->depth_format, vkr->depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     VK_CHECK(vkCreateImageView(vkr->device, &dview_info, NULL, &vkr->depth_image_view));
 
     vkr->release_queue.push_function([=]() {
         vkDestroyImageView(vkr->device, vkr->depth_image_view, NULL);
-        vmaDestroyImage(vkr->allocator, vkr->depth_image._image, vkr->depth_image.allocation);
+        vmaDestroyImage(vkr->allocator, vkr->depth_image.image, vkr->depth_image.allocation);
     });
 
-
-
-
-
-    //////////////////////////////////////////////////////
-    // CommandPools & CommandBuffers creation
-    // Graphics
-    VkCommandPoolCreateInfo ci_graphics_cmd_pool = vkinit::CommandPoolCreateInfo(vkr->graphics_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    VK_CHECK(vkCreateCommandPool(vkr->device, &ci_graphics_cmd_pool, NULL, &vkr->command_pool_graphics));
-
-    // Compute
-    VkCommandPoolCreateInfo ci_compute_cmd_pool = vkinit::CommandPoolCreateInfo(vkr->compute_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    VK_CHECK(vkCreateCommandPool(vkr->device, &ci_compute_cmd_pool, NULL, &vkr->command_pool_compute));
-
-    for (int i = 0; i < FRAME_BUFFER_COUNT; i++) {
-        // allocate the default command buffer that we will use for rendering
-        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_graphics = vkinit::CommandBufferAllocateInfo(vkr->command_pool_graphics);
-        VK_CHECK(vkAllocateCommandBuffers(vkr->device, &cmd_buffer_alloc_info_graphics, &vkr->frames[i].cmd_buffer_gfx));
-
-        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_compute = vkinit::CommandBufferAllocateInfo(vkr->command_pool_compute);
-        VK_CHECK(vkAllocateCommandBuffers(vkr->device, &cmd_buffer_alloc_info_compute, &vkr->frames[i].cmd_buffer_cmp));
-    }
-
-    vkr->release_queue.push_function([=]() {
-        vkDestroyCommandPool(vkr->device, vkr->command_pool_graphics, NULL);
-        vkDestroyCommandPool(vkr->device, vkr->command_pool_compute, NULL);
-    });
 
 
 
@@ -421,12 +394,12 @@ void VkayRendererInit(VkayRenderer *vkr)
 
     /////
     // RenderPass creation
-    VkAttachmentDescription attachments[2] = { color_attachment, depth_attachment };
+    VkAttachmentDescription attachment_descriptions[2] = { color_attachment, depth_attachment };
 
     VkRenderPassCreateInfo render_pass_info = {};
     render_pass_info.sType                  = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_info.attachmentCount        = 2; // connect the color attachment to the info
-    render_pass_info.pAttachments           = &attachments[0];
+    render_pass_info.pAttachments           = &attachment_descriptions[0];
     render_pass_info.subpassCount           = 1; // connect the subpass to the info
     render_pass_info.pSubpasses             = &subpass;
     VK_CHECK(vkCreateRenderPass(vkr->device, &render_pass_info, NULL, &vkr->render_pass));
@@ -437,17 +410,11 @@ void VkayRendererInit(VkayRenderer *vkr)
 
 
 
+
+
     ///////////////////////////////////////////////
     // Framebuffer initialization
     // create the framebuffers for the swapchain images. This will connect the render-pass to the images for rendering
-    VkFramebufferCreateInfo fb_info = {};
-    fb_info.sType                   = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    fb_info.pNext                   = NULL;
-    fb_info.renderPass              = vkr->render_pass;
-    fb_info.attachmentCount         = 1;
-    fb_info.width                   = vkr->window_extent.width;
-    fb_info.height                  = vkr->window_extent.height;
-    fb_info.layers                  = 1;
 
     // grab how many images we have in the swapchain
     const size_t swapchain_imagecount = vkr->swapchain_images.size();
@@ -460,8 +427,16 @@ void VkayRendererInit(VkayRenderer *vkr)
         attachments[0] = vkr->swapchain_image_views[i];
         attachments[1] = vkr->depth_image_view;
 
-        fb_info.pAttachments    = attachments;
-        fb_info.attachmentCount = 2;
+        VkFramebufferCreateInfo fb_info = {};
+        fb_info.sType                   = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        fb_info.pNext                   = NULL;
+        fb_info.renderPass              = vkr->render_pass;
+        fb_info.attachmentCount         = 1;
+        fb_info.width                   = vkr->window_extent.width;
+        fb_info.height                  = vkr->window_extent.height;
+        fb_info.layers                  = 1;
+        fb_info.pAttachments            = attachments;
+        fb_info.attachmentCount         = 2;
 
         VK_CHECK(vkCreateFramebuffer(vkr->device, &fb_info, NULL, &vkr->framebuffers[i]));
 
@@ -470,6 +445,36 @@ void VkayRendererInit(VkayRenderer *vkr)
             vkDestroyImageView(vkr->device, vkr->swapchain_image_views[i], NULL);
         });
     }
+
+
+
+
+
+    //////////////////////////////////////////////////////
+    // CommandPools & CommandBuffers creation
+    // Graphics
+    VkCommandPoolCreateInfo ci_graphics_cmd_pool = vkinit::CommandPoolCreateInfo(vkr->graphics_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VK_CHECK(vkCreateCommandPool(vkr->device, &ci_graphics_cmd_pool, NULL, &vkr->command_pool_graphics));
+
+    // Compute
+    VkCommandPoolCreateInfo ci_compute_cmd_pool = vkinit::CommandPoolCreateInfo(vkr->compute_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VK_CHECK(vkCreateCommandPool(vkr->device, &ci_compute_cmd_pool, NULL, &vkr->command_pool_compute));
+
+    for (int i = 0; i < FRAME_BUFFER_COUNT; i++) {
+        // allocate the default command buffer that we will use for rendering
+        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_graphics = vkinit::CommandBufferAllocateInfo(vkr->command_pool_graphics);
+        VK_CHECK(vkAllocateCommandBuffers(vkr->device, &cmd_buffer_alloc_info_graphics, &vkr->frames[i].cmd_buffer_gfx));
+
+        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_compute = vkinit::CommandBufferAllocateInfo(vkr->command_pool_compute);
+        VK_CHECK(vkAllocateCommandBuffers(vkr->device, &cmd_buffer_alloc_info_compute, &vkr->frames[i].cmd_buffer_cmp));
+    }
+
+    vkr->release_queue.push_function([=]() {
+        vkDestroyCommandPool(vkr->device, vkr->command_pool_graphics, NULL);
+        vkDestroyCommandPool(vkr->device, vkr->command_pool_compute, NULL);
+    });
+
+
 
 
 
@@ -502,6 +507,8 @@ void VkayRendererInit(VkayRenderer *vkr)
             vkDestroySemaphore(vkr->device, vkr->frames[i].render_semaphore, NULL);
         });
     }
+
+
 
 
 
@@ -593,16 +600,33 @@ void VkayRendererInit(VkayRenderer *vkr)
 
 ////////////////////////////////////////////////////////////////////////
 /// Rendering
-
-void VkayRendererBeginCommandBuffer()
+void VkayBeginCommandBuffer(VkCommandBuffer cmd_buffer)
 {
+    VkCommandBufferBeginInfo cmd_begin_info = {};
+    cmd_begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmd_begin_info.pNext                    = NULL;
+    cmd_begin_info.pInheritanceInfo         = NULL;
+    cmd_begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // We will use this command buffer exactly once (per frame)
+    VK_CHECK(vkBeginCommandBuffer(cmd_buffer, &cmd_begin_info));
 }
 
-void VkayRendererEndCommandBuffer()
+void VkayEndCommandBuffer(VkCommandBuffer cmd_buffer)
 {
+    vkEndCommandBuffer(cmd_buffer);
 }
 
-void VkayRendererBeginRenderPass(VkayRenderer *vkr)
+
+// todo(ad): must take proper args (VkQueue, VkFence, ...)
+VkResult VkayQueueSumbit(VkQueue queue, VkCommandBuffer *cmd_buffer)
+{
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = cmd_buffer;
+    return vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+}
+
+void VkayRendererBeginCommandBuffer(VkayRenderer *vkr)
 {
     // wait until the GPU has finished rendering the last frame. Timeout of 1 second
     VkFence         *g_inflight_render_fence;
@@ -623,18 +647,8 @@ void VkayRendererBeginRenderPass(VkayRenderer *vkr)
 
 
     VK_CHECK(vkAcquireNextImageKHR(vkr->device, vkr->swapchain, SECONDS(1), *g_inflight_present_semaphore, NULL, &vkr->frames[vkr->frame_idx_inflight].idx_swapchain_image));
-    // VK_CHECK(vkResetCommandBuffer(*g_inflight_main_command_buffer, 0)); // now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
+    VK_CHECK(vkResetCommandBuffer(*g_inflight_main_command_buffer, 0)); // now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
 
-
-    VkClearValue clear_value;
-    clear_value.color = { { .1f, .1f, .1f } };
-
-    // float flash       = abs(sin(vkr->frame_idx_inflight / 120.f));
-    // clear_value.color = { { 0.0f, 0.0f, flash, 1.0f } };
-
-    VkClearValue depth_clear;
-    depth_clear.depth_stencil.depth   = 1.f;
-    VkClearValue union_clear_values[] = { clear_value, depth_clear };
 
 
 
@@ -646,27 +660,10 @@ void VkayRendererBeginRenderPass(VkayRenderer *vkr)
     cmd_begin_info.pInheritanceInfo         = NULL;
     cmd_begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // We will use this command buffer exactly once (per frame)
     VK_CHECK(vkBeginCommandBuffer(*g_inflight_main_command_buffer, &cmd_begin_info));
-
-    //////////////////////
-    // BEGIN renderpass
-    VkRenderPassBeginInfo rpInfo = {};
-    rpInfo.sType                 = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    rpInfo.pNext                 = NULL;
-    rpInfo.renderPass            = vkr->render_pass;
-    rpInfo.renderArea.offset.x   = 0;
-    rpInfo.renderArea.offset.y   = 0;
-    rpInfo.renderArea.extent     = vkr->window_extent;
-    rpInfo.framebuffer           = vkr->framebuffers[vkr->frames[vkr->frame_idx_inflight].idx_swapchain_image];
-    rpInfo.clear_value_count     = 2;
-    rpInfo.pClearValues          = &union_clear_values[0];
-    vkCmdBeginRenderPass(*g_inflight_main_command_buffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void VkayRendererEndRenderPass(VkayRenderer *vkr)
+void VkayRendererEndCommandBuffer(VkayRenderer *vkr)
 {
-    ////////////////////////////////////////////////
-    // END renderpass & command buffer recording
-    vkCmdEndRenderPass(VkayRendererGetCurrentFrameData(vkr)->cmd_buffer_gfx);
     VK_CHECK(vkEndCommandBuffer(VkayRendererGetCurrentFrameData(vkr)->cmd_buffer_gfx));
 
     VkSubmitInfo submit_info = {};
@@ -684,14 +681,47 @@ void VkayRendererEndRenderPass(VkayRenderer *vkr)
 
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers    = &VkayRendererGetCurrentFrameData(vkr)->cmd_buffer_gfx;
-
     // submit command buffer to the queue and execute it.
     //  g_inflight_render_fence will now block until the graphic commands finish execution
     VK_CHECK(vkQueueSubmit(vkr->graphics_queue, 1, &submit_info, VkayRendererGetCurrentFrameData(vkr)->render_fence));
+}
 
+void VkayRendererBeginRenderPass(VkayRenderer *vkr)
+{
+    VkCommandBuffer *g_inflight_main_command_buffer = &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT].cmd_buffer_gfx;
+
+    VkClearValue clear_value;
+    clear_value.color = { { .1f, .1f, .1f } };
+
+    // float flash       = abs(sin(vkr->frame_idx_inflight / 120.f));
+    // clear_value.color = { { 0.0f, 0.0f, flash, 1.0f } };
+
+    VkClearValue depth_clear;
+    depth_clear.depth_stencil.depth   = 1.f;
+    VkClearValue union_clear_values[] = { clear_value, depth_clear };
+
+
+    //////////////////////
+    // BEGIN renderpass
+    VkRenderPassBeginInfo rpInfo = {};
+    rpInfo.sType                 = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rpInfo.pNext                 = NULL;
+    rpInfo.renderPass            = vkr->render_pass;
+    rpInfo.renderArea.offset.x   = 0;
+    rpInfo.renderArea.offset.y   = 0;
+    rpInfo.renderArea.extent     = vkr->window_extent;
+    rpInfo.framebuffer           = vkr->framebuffers[vkr->frames[vkr->frame_idx_inflight].idx_swapchain_image];
+    rpInfo.clear_value_count     = 2;
+    rpInfo.pClearValues          = &union_clear_values[0];
+    vkCmdBeginRenderPass(*g_inflight_main_command_buffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+
+void VkayRendererPresent(VkayRenderer *vkr)
+{
     // this will put the image we just rendered into the visible window.
     // we want to g_inflight_render_semaphore for that,
-    // as it's necessary that drawing commands have finished before the image is displayed to the user
+    // as it's necessary that drawing commands have finished before the image is displayed
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType            = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.pNext            = NULL;
@@ -708,6 +738,13 @@ void VkayRendererEndRenderPass(VkayRenderer *vkr)
 
     vkr->frame_idx_inflight++;
     vkr->frame_idx_inflight = vkr->frame_idx_inflight % FRAME_BUFFER_COUNT;
+}
+
+void VkayRendererEndRenderPass(VkayRenderer *vkr)
+{
+    ////////////////////////////////////////////////
+    // END renderpass & command buffer recording
+    vkCmdEndRenderPass(VkayRendererGetCurrentFrameData(vkr)->cmd_buffer_gfx);
 }
 
 FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr)
@@ -769,7 +806,7 @@ VkPipeline CreateGraphicsPipeline(VkayRenderer *vkr)
     ////////////////////////////
     // ShaderModules
     VkShaderModule vertexShader;
-    if (!CreateShaderModule("./shaders/quad.vert.spv", &vertexShader, vkr->device)) {
+    if (!VkayCreateShaderModule("./shaders/quad.vert.spv", &vertexShader, vkr->device)) {
         // todo(ad): error
         SDL_Log("Failed to build vertex shader module. Did you compile the shaders?\n");
     } else {
@@ -777,7 +814,7 @@ VkPipeline CreateGraphicsPipeline(VkayRenderer *vkr)
     }
 
     VkShaderModule fragmentShader;
-    if (!CreateShaderModule("./shaders/textureArray.frag.spv", &fragmentShader, vkr->device)) {
+    if (!VkayCreateShaderModule("./shaders/textureArray.frag.spv", &fragmentShader, vkr->device)) {
         // todo(ad): error
         SDL_Log("Failed to built fragment shader module. Did you compile the shaders?\n");
     } else {
@@ -878,7 +915,7 @@ VkPipeline CreateGraphicsPipeline(VkayRenderer *vkr)
 VkPipeline CreateComputePipeline(VkayRenderer *vkr)
 {
     VkShaderModule compute_shader_module;
-    if (!CreateShaderModule("./shaders/basicComputeShader.comp.spv", &compute_shader_module, vkr->device)) {
+    if (!VkayCreateShaderModule("./shaders/basicComputeShader.comp.spv", &compute_shader_module, vkr->device)) {
         // todo(ad): error
         SDL_Log("Failed to build compute shader module. Did you compile the shaders?\n");
 
@@ -1007,7 +1044,11 @@ VkPipeline CreateComputePipeline(VkayRenderer *vkr)
     }
 }
 
-bool CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device)
+/* TODO(ad):
+ * VkDevice should be the first argument
+ * also ditch buffer vector, that's overkill, just allocate a raw array
+ */
+bool VkayCreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device)
 {
     std::ifstream file(filepath, std::ios::ate | std::ios::binary);
 
@@ -1033,7 +1074,6 @@ bool CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, 
     createInfo.codeSize = buffer.size() * sizeof(uint32_t);
     createInfo.pCode    = buffer.data();
 
-    // check that the creation goes well.
     VkShaderModule shaderModule;
     if (vkCreateShaderModule(device, &createInfo, NULL, &shaderModule) != VK_SUCCESS) {
         return false;

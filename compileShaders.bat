@@ -7,6 +7,7 @@ pushd shaders
 %PATH_VulkanSDK_bin%/glslc.exe textureArray.frag -o textureArray.frag.spv
 %PATH_VulkanSDK_bin%/glslc.exe quad.vert -o quad.vert.spv
 %PATH_VulkanSDK_bin%/glslc.exe basicComputeShader.comp -o basicComputeShader.comp.spv
+%PATH_VulkanSDK_bin%/glslc.exe writeRenderTarget.comp -o writeRenderTarget.comp.spv
 
 popd
 

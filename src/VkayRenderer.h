@@ -24,6 +24,7 @@
 struct VkayRenderer;
 
 #define FRAME_BUFFER_COUNT 2
+
 // this number reflects the texture array size set in the "shaders/textureArray.frag" shader
 // both must be equal
 #define MAX_TEXTURE_COUNT 80
@@ -35,27 +36,32 @@ EXPORT void       VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererEndCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererBeginRenderPass(VkayRenderer *vkr);
 EXPORT void       VkayRendererEndRenderPass(VkayRenderer *vkr);
+void              VkayRendererPresent(VkayRenderer *vkr);
 EXPORT void       VkayRendererCleanup(VkayRenderer *vkr);
 EXPORT FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr);
 
-EXPORT VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
-EXPORT VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage, short line, const char *filename);
-EXPORT VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
-EXPORT VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation, short line, const char *filename);
+EXPORT void VkayBeginCommandBuffer(VkCommandBuffer cmd_buffer);
+EXPORT void VkayEndCommandBuffer(VkCommandBuffer cmd_buffer);
+VkResult    VkayQueueSumbit(VkQueue queue, VkCommandBuffer *cmd_buffer);
 
-EXPORT bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
-EXPORT bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory, short line, const char *filename);
-EXPORT bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
+EXPORT VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
+EXPORT VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage, short line, const char *filename);
+EXPORT VkResult VkayMapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
+EXPORT VkResult VkayMapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation, short line, const char *filename);
+
+EXPORT bool VkayAllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
+EXPORT bool VkayAllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory, short line, const char *filename);
+EXPORT bool VkayAllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
 
 #if defined(VKAY_DEBUG_ALLOCATIONS)
-#define CreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage) CreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage, __LINE__, __FILE__)
-#define MapMemcpyMemory(src, size, allocator, allocation)                    MapMemcpyMemory(src, size, allocator, allocation, __LINE__, __FILE__)
-#define AllocateBufferMemory(device, gpu, buffer, memory)                    AllocateBufferMemory(device, gpu, buffer, memory, __LINE__, __FILE__)
-#define AllocateImageMemory(allocator, image, allocation, usage)             AllocateImageMemory(allocator, image, allocation, usage, __LINE__, __FILE__)
+#define VkayCreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage) VkayCreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage, __LINE__, __FILE__)
+#define VkayMapMemcpyMemory(src, size, allocator, allocation)                    VkayMapMemcpyMemory(src, size, allocator, allocation, __LINE__, __FILE__)
+#define VkayAllocateBufferMemory(device, gpu, buffer, memory)                    VkayAllocateBufferMemory(device, gpu, buffer, memory, __LINE__, __FILE__)
+#define VkayAllocateImageMemory(allocator, image, allocation, usage)             VkayAllocateImageMemory(allocator, image, allocation, usage, __LINE__, __FILE__)
 #endif
 
 EXPORT VertexInputDescription GetVertexDescription();
-EXPORT bool                   CreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
+EXPORT bool                   VkayCreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
 EXPORT bool                   CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
 EXPORT VkPipeline             CreateGraphicsPipeline(VkayRenderer *vkr);
 EXPORT VkPipeline             CreateComputePipeline(VkayRenderer *vkr);
@@ -70,7 +76,7 @@ struct VkayRenderer
     VkExtent2D  window_extent { 720, 480 };
     // VkExtent2D window_extent { 1920, 1000 };
 
-    FrameData    frames[FRAME_BUFFER_COUNT];
+    FrameData frames[FRAME_BUFFER_COUNT];
 
     ///////////////////////////
     // Vulkan initialization phase types
@@ -81,7 +87,7 @@ struct VkayRenderer
     /////////////////////////
     // Swapchain
     VkSwapchainKHR           swapchain;
-    VkFormat                 swapchain_image_format; // image format expected by the windowing system
+    VkFormat                 swapchain_image_format;
     std::vector<VkImage>     swapchain_images;
     std::vector<VkImageView> swapchain_image_views;
     /////////////////////////

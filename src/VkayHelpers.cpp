@@ -160,7 +160,7 @@ VkResult AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_poo
 
 
 
-VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
+VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
 {
     assert(alloc_size != 0 && "alloc_size is 0");
 
@@ -180,7 +180,7 @@ VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, size_t a
     return res;
 }
 
-VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage, short line, const char *filename)
+VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage, short line, const char *filename)
 {
     assert(alloc_size != 0 && "alloc_size is 0");
 
@@ -202,7 +202,7 @@ VkResult CreateBuffer(BufferObject *dst_buffer, VmaAllocator allocator, size_t a
     return res;
 }
 
-bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory)
+bool VkayAllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory)
 {
 
     VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -226,7 +226,7 @@ bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer
     return false;
 }
 
-bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory, short line, const char *filename)
+bool VkayAllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory, short line, const char *filename)
 {
 
     VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -252,7 +252,7 @@ bool AllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer
     return false;
 }
 
-bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage)
+bool VkayAllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage)
 {
     VmaAllocationCreateInfo vma_ci_allocation = {};
     vma_ci_allocation.usage                   = usage; // VMA_MEMORY_USAGE_GPU_ONLY
@@ -263,7 +263,7 @@ bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *a
     return false;
 }
 
-bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage, short line, const char *filename)
+bool VkayAllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage, short line, const char *filename)
 {
     VmaAllocationCreateInfo vma_ci_allocation = {};
     vma_ci_allocation.usage                   = usage; // VMA_MEMORY_USAGE_GPU_ONLY
@@ -277,7 +277,7 @@ bool AllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *a
 }
 
 
-VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation)
+VkResult VkayMapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation)
 {
 
     void    *data;
@@ -288,7 +288,7 @@ VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllo
     return result;
 }
 
-VkResult MapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation, short line, const char *filename)
+VkResult VkayMapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation, short line, const char *filename)
 {
     void    *data;
     VkResult result = (vmaMapMemory(allocator, allocation, &data));

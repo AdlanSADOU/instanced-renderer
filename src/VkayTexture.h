@@ -79,7 +79,7 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     bufferInfo.size               = imageSize;
     bufferInfo.usage              = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-    BufferObject staging_buffer;
+    VkayBuffer staging_buffer;
     VK_CHECK(vmaCreateBuffer(vkr->allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer, &staging_buffer.allocation, NULL));
 
     void *staging_data;
@@ -186,8 +186,8 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     VkDescriptorImageInfo samplerInfo = {};
     samplerInfo.sampler               = vkr->sampler;
     setWrites[0]                      = {};
-    setWrites[0].dstSet               = vkr->set_array_of_textures;
     setWrites[0].sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    setWrites[0].dstSet               = vkr->set_array_of_textures;
     setWrites[0].dstBinding           = 0;
     setWrites[0].dstArrayElement      = 0;
     setWrites[0].descriptorCount      = 1;

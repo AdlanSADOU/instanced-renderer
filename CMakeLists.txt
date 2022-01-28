@@ -20,7 +20,7 @@ set(INCLUDES
 )
 
 add_library(vkay STATIC ${SOURCES})
-# target_compile_options(vkay PRIVATE -FC -GR- -EHa- -EHsc -EHs -nologo -Zi -Zf /MP)
+target_compile_options(vkay PRIVATE -FC -GR- -EHa- -EHsc -EHs -nologo -Zi -Zf /MP)
 target_link_options(vkay PRIVATE -time)
 target_link_directories(vkay PUBLIC ${THIRD_PARTY_LINK_DIRS})
 target_link_libraries(vkay SDL2 SDL2main vulkan-1)

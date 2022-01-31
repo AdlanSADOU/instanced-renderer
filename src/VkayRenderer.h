@@ -22,6 +22,7 @@
 #include <VkayTypes.h>
 
 struct VkayRenderer;
+struct VkayContext;
 
 #define FRAME_BUFFER_COUNT 2
 
@@ -31,7 +32,12 @@ struct VkayRenderer;
 
 #define SECONDS(value) (1000000000 * value)
 
-EXPORT void       VkayRendererInit(VkayRenderer *vkr);
+void VkayContextInit(VkayContext *vkc);
+void VkayContextCleanup(VkayContext *vkr);
+
+
+
+EXPORT void       VkayRendererInit(VkayContext vkc, VkayRenderer *vkr);
 EXPORT void       VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererEndCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererBeginRenderPass(VkayRenderer *vkr);
@@ -70,13 +76,12 @@ EXPORT uint32_t               FindProperties(const VkPhysicalDeviceMemoryPropert
 EXPORT VkResult               CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
 EXPORT VkResult               AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
 
-struct VkayRenderer
+struct VkayContext
 {
     SDL_Window *window = NULL;
     VkExtent2D  window_extent { 720, 480 };
     // VkExtent2D window_extent { 1920, 1000 };
 
-    FrameData frames[FRAME_BUFFER_COUNT];
 
     ///////////////////////////
     // Vulkan initialization phase types
@@ -86,10 +91,11 @@ struct VkayRenderer
     VkSurfaceKHR             surface;
     /////////////////////////
     // Swapchain
-    VkSwapchainKHR           swapchain;
+    // VkSwapchainKHR           swapchain;
     VkFormat                 swapchain_image_format;
     std::vector<VkImage>     swapchain_images;
     std::vector<VkImageView> swapchain_image_views;
+
     /////////////////////////
     // Pools
     VkCommandPool command_pool_graphics = {};
@@ -105,14 +111,45 @@ struct VkayRenderer
     VkBool32 is_present_queue_separate;
     // todo(ad): must also check is_compute_queue_separate
 
-    VkDevice         device;
+    VkDevice device;
+
+    VkImageView    depth_image_view;
+    AllocatedImage depth_image;
+    VkFormat       depth_format;
+
+
+    ReleaseQueue release_queue;
+
+    // todo(ad): delete this at some point
+    VmaAllocator allocator;
+
+    bool is_initialized = false;
+};
+
+struct VkayRenderer
+{
+    VkDevice       device;
+    ReleaseQueue   release_queue;
+    VkSwapchainKHR swapchain;
+    VkQueue        graphics_queue;
+    VkQueue        compute_queue;
+    VkQueue        present_queue;
+    VkExtent2D     window_extent;
+
+    //
+    // RenderPass & Framebuffers
+    //
+    VkRenderPass               render_pass;
+    std::vector<VkFramebuffer> framebuffers; // these are created for a specific renderpass
+
+    FrameData frames[FRAME_BUFFER_COUNT];
+    uint32_t  frame_idx_inflight = 0;
+
     VkPipeline       default_pipeline;
     VkPipelineLayout default_pipeline_layout;
-
     ////////////////////
     // Graphics
-    VkDescriptorPool descriptor_pool;
-
+    VkDescriptorPool      descriptor_pool;
     VkDescriptorSetLayout set_layout_global; // todo(ad): camera set layout
 
     // Do not modify this
@@ -130,30 +167,6 @@ struct VkayRenderer
     VkDescriptorPool             descriptor_pool_compute;
     VkDescriptorSetLayout        set_layout_instanced_data;
     std::vector<VkDescriptorSet> compute_descriptor_sets;
-
-    //
-    // RenderPass & Framebuffers
-    //
-    VkRenderPass               render_pass;
-    std::vector<VkFramebuffer> framebuffers; // these are created for a specific renderpass
-
-    VkImageView    depth_image_view;
-    AllocatedImage depth_image;
-    VkFormat       depth_format;
-
-    ReleaseQueue release_queue;
-
-    // todo(ad): delete this at some point
-    VmaAllocator allocator;
-
-    // todo(ad): must rethink these
-    std::vector<RenderObject>                 renderables;
-    std::unordered_map<std::string, Material> materials;
-    std::unordered_map<std::string, Mesh>     meshes;
-    ///////////////////////////////////
-
-    bool     is_initialized     = false;
-    uint32_t frame_idx_inflight = 0;
 };
 
 static std::unordered_map<VkResult, std::string> vulkan_errors = {

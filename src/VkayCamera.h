@@ -18,14 +18,14 @@ struct Camera
 	glm::vec3 m_position;
 };
 
-void VkayCameraCreate(VkayRenderer* vkr, VkPipelineLayout pipeline_layout, Camera* camera)
+void VkayCameraCreate(VkayRenderer* vkr, VmaAllocator allocator, VkPipelineLayout pipeline_layout, Camera* camera)
 {
 	camera->m_vkr = vkr;
 	camera->m_pipeline_layout = pipeline_layout;
 
 	for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
 
-		VkayCreateBuffer(&camera->m_UBO[i], vkr->allocator, sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+		VkayCreateBuffer(&camera->m_UBO[i], allocator, sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
 		VkDescriptorBufferInfo info_descriptor_camera_buffer;
 		AllocateDescriptorSets(vkr->device, vkr->descriptor_pool, 1, &vkr->set_layout_global, &camera->m_set_global[i]);
@@ -44,7 +44,7 @@ void VkayCameraCreate(VkayRenderer* vkr, VkPipelineLayout pipeline_layout, Camer
 		write_camera_buffer.pBufferInfo = &info_descriptor_camera_buffer;
 		vkUpdateDescriptorSets(vkr->device, 1, &write_camera_buffer, 0, NULL);
 
-		vmaMapMemory(vkr->allocator, camera->m_UBO[i].allocation, &camera->m_data_ptr[i]);
+		vmaMapMemory(allocator, camera->m_UBO[i].allocation, &camera->m_data_ptr[i]);
 	}
 }
 
@@ -67,13 +67,13 @@ void VkayCameraUpdate(VkayRenderer* vkr, Camera* camera)
 	memcpy(camera->m_data_ptr[vkr->frame_idx_inflight], &camera->data, sizeof(camera->data));
 }
 
-void VkayCameraDestroy(VkayRenderer* vkr, Camera* camera)
+void VkayCameraDestroy(VkayRenderer* vkr, VmaAllocator allocator, Camera* camera)
 {
 	vkDeviceWaitIdle(vkr->device);
 
 
 	for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++) {
-		vmaUnmapMemory(vkr->allocator, camera->m_UBO[i].allocation);
-		vmaDestroyBuffer(vkr->allocator, camera->m_UBO[i].buffer, camera->m_UBO[i].allocation);
+		vmaUnmapMemory(allocator, camera->m_UBO[i].allocation);
+		vmaDestroyBuffer(allocator, camera->m_UBO[i].buffer, camera->m_UBO[i].allocation);
 	}
 }

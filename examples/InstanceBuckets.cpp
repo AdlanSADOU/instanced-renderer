@@ -28,21 +28,23 @@ Texture        profile;
 Texture        itoldu;
 Camera         camera;
 
+VkayContext vkc;
 VkayRenderer vkr;
 Quad         quad;
 
 int main(int argc, char *argv[])
 {
-    VkayRendererInit(&vkr);
+    VkayContextInit(&vkc);
+    VkayRendererInit(vkc, &vkr);
 
 
     vkr.default_pipeline = CreateGraphicsPipelineInstanced(&vkr);
     vkr.compute_pipeline = CreateComputePipeline(&vkr);
 
 
-    VkayTextureCreate("./assets/texture.png", &vkr, &profile);
-    VkayTextureCreate("./assets/bjarn_itoldu.jpg", &vkr, &itoldu);
-    VkayCameraCreate(&vkr, vkr.default_pipeline_layout, &camera);
+    VkayTextureCreate("./assets/texture.png", &vkr, vkc, &profile);
+    VkayTextureCreate("./assets/bjarn_itoldu.jpg", &vkr, vkc, &itoldu);
+    VkayCameraCreate(&vkr, vkc.allocator, vkr.default_pipeline_layout, &camera);
 
     InstanceData instance_data;
 
@@ -64,14 +66,14 @@ int main(int argc, char *argv[])
         _y = (float)((profile.height + spacing) * j) * _scale + 50;
 
         instance_data.pos = { _x, -_y, 1 };
-        if (i == 0) instance_data.pos = { _x + vkr.window_extent.width / 2 - profile.width * .1f, -_y - vkr.window_extent.height / 2, 1.1f };
+        if (i == 0) instance_data.pos = { _x + vkc.window_extent.width / 2 - profile.width * .1f, -_y - vkc.window_extent.height / 2, 1.1f };
         instance_data.texure_id = profile.id;
         instance_data.scale     = { profile.width, profile.height, 0 };
         instance_data.scale *= _scale;
         instances.instance_data_array.push_back(instance_data);
     }
 
-    VkayInstancesBucketUpload(&vkr, &instances, quad.mesh);
+    VkayInstancesBucketUpload(&vkr, vkc.allocator, &instances, quad.mesh);
 
     /////////////////////
     // Main loop
@@ -80,12 +82,12 @@ int main(int argc, char *argv[])
     //////////////////////
     // Cleanup
     vkDeviceWaitIdle(vkr.device);
-    VkayTextureDestroy(&vkr, &profile);
-    VkayTextureDestroy(&vkr, &itoldu);
-    VkayInstancesDestroy(&vkr, &instances);
-    VkayCameraDestroy(&vkr, &camera);
+    VkayTextureDestroy(&vkr, vkc, &profile);
+    VkayTextureDestroy(&vkr, vkc, &itoldu);
+    VkayInstancesDestroy(&vkr, vkc.allocator, &instances);
+    VkayCameraDestroy(&vkr, vkc.allocator, &camera);
     VkayRendererCleanup(&vkr);
-
+    VkayContextCleanup(&vkc);
     return 0;
 }
 
@@ -148,7 +150,7 @@ void UpdateAndRender()
 
         static int i = 0;
         if (_key_r) {
-            VkayInstancesDestroyInstance(&vkr, i++, &instances);
+            VkayInstancesDestroyInstance(&vkr, vkc.allocator,  i++, &instances);
         }
 
         ///////////////////////////////

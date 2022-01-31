@@ -25,18 +25,18 @@ void VkayInstanceBucketSetBaseMesh()
 {
 }
 
-bool VkayInstancesBucketUpload(VkayRenderer *vkr, InstanceBucket *bucket, Mesh base_mesh)
+bool VkayInstancesBucketUpload(VkayRenderer *vkr, VmaAllocator allocator, InstanceBucket *bucket, Mesh base_mesh)
 {
     {
         VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        VK_CHECK(VkayCreateBuffer(&bucket->quad_buffer_object, vkr->allocator, sizeof(Vertex) * base_mesh.vertices.size(), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
-        VK_CHECK(VkayMapMemcpyMemory(base_mesh.vertices.data(), sizeof(Vertex) * base_mesh.vertices.size(), vkr->allocator, bucket->quad_buffer_object.allocation));
+        VK_CHECK(VkayCreateBuffer(&bucket->quad_buffer_object, allocator, sizeof(Vertex) * base_mesh.vertices.size(), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
+        VK_CHECK(VkayMapMemcpyMemory(base_mesh.vertices.data(), sizeof(Vertex) * base_mesh.vertices.size(), allocator, bucket->quad_buffer_object.allocation));
     }
 
     {
         VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        VK_CHECK(VkayCreateBuffer(&bucket->instance_buffer_object, vkr->allocator, bucket->instance_data_array.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
-        VK_CHECK(vmaMapMemory(vkr->allocator, bucket->instance_buffer_object.allocation, &bucket->mapped_data_ptr));
+        VK_CHECK(VkayCreateBuffer(&bucket->instance_buffer_object, allocator, bucket->instance_data_array.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
+        VK_CHECK(vmaMapMemory(allocator, bucket->instance_buffer_object.allocation, &bucket->mapped_data_ptr));
         memcpy(bucket->mapped_data_ptr, bucket->instance_data_array.data(), bucket->instance_data_array.size() * sizeof(InstanceData));
 
         assert(bucket->mapped_data_ptr != NULL && "mapped_data_ptr is NULL");
@@ -63,7 +63,7 @@ bool VkayInstancesBucketUpload(VkayRenderer *vkr, InstanceBucket *bucket, Mesh b
     return true;
 }
 
-void VkayInstancesDestroyInstance(VkayRenderer *vkr, uint32_t instance_index, InstanceBucket *bucket)
+void VkayInstancesDestroyInstance(VkayRenderer *vkr, VmaAllocator allocator, uint32_t instance_index, InstanceBucket *bucket)
 {
     if (instance_index >= bucket->instance_data_array.size()) {
         SDL_Log("InstanceData : element %d does not exist\n", instance_index);
@@ -71,7 +71,7 @@ void VkayInstancesDestroyInstance(VkayRenderer *vkr, uint32_t instance_index, In
     }
 
     bucket->instance_data_array.erase(bucket->instance_data_array.begin() + instance_index);
-    vmaResizeAllocation(vkr->allocator, bucket->instance_buffer_object.allocation, bucket->instance_data_array.size() * sizeof(InstanceData));
+    vmaResizeAllocation(allocator, bucket->instance_buffer_object.allocation, bucket->instance_data_array.size() * sizeof(InstanceData));
     memcpy(bucket->mapped_data_ptr, bucket->instance_data_array.data(), bucket->instance_data_array.size() * sizeof(InstanceData));
 }
 
@@ -89,9 +89,9 @@ void VkayInstancesDraw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr, InstanceBu
     vkCmdDraw(cmd_buffer, (uint32_t)base_mesh.vertices.size(), (uint32_t)bucket->instance_data_array.size(), 0, 0);
 }
 
-void VkayInstancesDestroy(VkayRenderer *vkr, InstanceBucket *bucket)
+void VkayInstancesDestroy(VkayRenderer *vkr, VmaAllocator allocator, InstanceBucket *bucket)
 {
-    vmaDestroyBuffer(vkr->allocator, bucket->quad_buffer_object.buffer, bucket->quad_buffer_object.allocation);
-    vmaUnmapMemory(vkr->allocator, bucket->instance_buffer_object.allocation);
-    vmaDestroyBuffer(vkr->allocator, bucket->instance_buffer_object.buffer, bucket->instance_buffer_object.allocation);
+    vmaDestroyBuffer(allocator, bucket->quad_buffer_object.buffer, bucket->quad_buffer_object.allocation);
+    vmaUnmapMemory(allocator, bucket->instance_buffer_object.allocation);
+    vmaDestroyBuffer(allocator, bucket->instance_buffer_object.buffer, bucket->instance_buffer_object.allocation);
 }

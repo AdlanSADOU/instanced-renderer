@@ -21,7 +21,7 @@ struct Texture
     uint32_t id;
 };
 
-void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture)
+void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, VkayContext vkc, Texture *texture)
 {
     texture->id = vkr->texture_array_count;
 
@@ -57,7 +57,7 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     VmaAllocationCreateInfo ci_allocation = {};
     ci_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
 
-    VK_CHECK(vmaCreateImage(vkr->allocator, &ci_image, &ci_allocation, &texture->image, &texture->allocation, NULL));
+    VK_CHECK(vmaCreateImage(vkc.allocator, &ci_image, &ci_allocation, &texture->image, &texture->allocation, NULL));
 
 
     VkImageViewCreateInfo ci_image_view = {};
@@ -80,13 +80,13 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     bufferInfo.usage              = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
     VkayBuffer staging_buffer;
-    VK_CHECK(vmaCreateBuffer(vkr->allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer, &staging_buffer.allocation, NULL));
+    VK_CHECK(vmaCreateBuffer(vkc.allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer, &staging_buffer.allocation, NULL));
 
     void *staging_data;
-    vmaMapMemory(vkr->allocator, staging_buffer.allocation, &staging_data);
+    vmaMapMemory(vkc.allocator, staging_buffer.allocation, &staging_data);
     memcpy(staging_data, pixels, imageSize);
-    vmaFlushAllocation(vkr->allocator, staging_buffer.allocation, 0, VK_WHOLE_SIZE);
-    vmaUnmapMemory(vkr->allocator, staging_buffer.allocation);
+    vmaFlushAllocation(vkc.allocator, staging_buffer.allocation, 0, VK_WHOLE_SIZE);
+    vmaUnmapMemory(vkc.allocator, staging_buffer.allocation);
 
     stbi_image_free(pixels);
 
@@ -157,7 +157,7 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     VK_CHECK(vkQueueSubmit(vkr->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
 
     vkDeviceWaitIdle(vkr->device);
-    vmaDestroyBuffer(vkr->allocator, staging_buffer.buffer, staging_buffer.allocation);
+    vmaDestroyBuffer(vkc.allocator, staging_buffer.buffer, staging_buffer.allocation);
 
 
 
@@ -213,10 +213,10 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     vkr->texture_array_count++;
 }
 
-void VkayTextureDestroy(VkayRenderer *vkr, Texture *texture)
+void VkayTextureDestroy(VkayRenderer *vkr, VkayContext vkc, Texture *texture)
 {
     vkDestroyImageView(vkr->device, texture->view, NULL);
-    vmaDestroyImage(vkr->allocator, texture->image, texture->allocation);
+    vmaDestroyImage(vkc.allocator, texture->image, texture->allocation);
 }
 
 #endif // VK_TEXTURE_H

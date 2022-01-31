@@ -31,12 +31,12 @@ target_link_options(InstanceBuckets PRIVATE -SUBSYSTEM:CONSOLE -time)
 target_link_libraries(InstanceBuckets vkay)
 target_include_directories(InstanceBuckets PUBLIC ./src)
 
-add_executable(gltf ./examples/gltf.cpp)
-target_compile_options(gltf PRIVATE -FC -GR- -EHa- -EHsc -EHs -nologo -Zi -Zf /MP)
-target_compile_definitions(gltf PRIVATE _CRT_SECURE_NO_WARNINGS)
-target_link_options(gltf PRIVATE -SUBSYSTEM:CONSOLE -time)
-target_link_libraries(gltf vkay)
-target_include_directories(gltf PUBLIC ./src)
+# add_executable(gltf ./examples/gltf.cpp)
+# target_compile_options(gltf PRIVATE -FC -GR- -EHa- -EHsc -EHs -nologo -Zi -Zf /MP)
+# target_compile_definitions(gltf PRIVATE _CRT_SECURE_NO_WARNINGS)
+# target_link_options(gltf PRIVATE -SUBSYSTEM:CONSOLE -time)
+# target_link_libraries(gltf vkay)
+# target_include_directories(gltf PUBLIC ./src)
 
 set(OUT_DIR $<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>)
 

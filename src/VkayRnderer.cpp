@@ -6,18 +6,18 @@
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
-void VkayRendererInit(VkayRenderer *vkr)
+void VkayContextInit(VkayContext *vkc)
 {
     SDL_Init(SDL_INIT_VIDEO);
 
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
 
-    vkr->window = SDL_CreateWindow(
+    vkc->window = SDL_CreateWindow(
         "Vulkan Engine",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
-        vkr->window_extent.width,
-        vkr->window_extent.height,
+        vkc->window_extent.width,
+        vkc->window_extent.height,
         window_flags);
 
 
@@ -33,10 +33,10 @@ void VkayRendererInit(VkayRenderer *vkr)
     vkEnumerateInstanceExtensionProperties(NULL, &supported_extension_properties_count, supported_extention_properties.data());
 
     uint32_t required_extensions_count;
-    SDL_Vulkan_GetInstanceExtensions(vkr->window, &required_extensions_count, NULL);
+    SDL_Vulkan_GetInstanceExtensions(vkc->window, &required_extensions_count, NULL);
     // std::vector<char *> required_instance_extensions(required_extensions_count);
     const char **required_instance_extensions = new const char *[required_extensions_count];
-    SDL_Vulkan_GetInstanceExtensions(vkr->window, &required_extensions_count, required_instance_extensions);
+    SDL_Vulkan_GetInstanceExtensions(vkc->window, &required_extensions_count, required_instance_extensions);
 
     const char *validation_layers[] = {
 #if _DEBUG
@@ -63,11 +63,11 @@ void VkayRendererInit(VkayRenderer *vkr)
     create_info_instance.pApplicationInfo        = &application_info;
     create_info_instance.enabledExtensionCount   = required_extensions_count;
     create_info_instance.ppEnabledExtensionNames = required_instance_extensions;
-    VK_CHECK(vkCreateInstance(&create_info_instance, NULL, &vkr->instance));
+    VK_CHECK(vkCreateInstance(&create_info_instance, NULL, &vkc->instance));
 
 
 
-    if (!SDL_Vulkan_CreateSurface(vkr->window, vkr->instance, &vkr->surface)) {
+    if (!SDL_Vulkan_CreateSurface(vkc->window, vkc->instance, &vkc->surface)) {
         SDL_Log("SDL Failed to create Surface");
     }
 
@@ -75,13 +75,13 @@ void VkayRendererInit(VkayRenderer *vkr)
     ////////////////////////////////////
     /// GPU Selection
     uint32_t gpu_count = 0;
-    VK_CHECK(vkEnumeratePhysicalDevices(vkr->instance, &gpu_count, NULL));
+    VK_CHECK(vkEnumeratePhysicalDevices(vkc->instance, &gpu_count, NULL));
 
     // todo(ad): we're arbitrarily picking the first gpu we encounter right now
     // wich often is the one we want anyways. Must be improved to let user chose based features/extensions and whatnot
     std::vector<VkPhysicalDevice> gpus(gpu_count);
-    VK_CHECK(vkEnumeratePhysicalDevices(vkr->instance, &gpu_count, gpus.data()));
-    vkr->chosen_gpu = gpus[0];
+    VK_CHECK(vkEnumeratePhysicalDevices(vkc->instance, &gpu_count, gpus.data()));
+    vkc->chosen_gpu = gpus[0];
 
 
 
@@ -89,9 +89,9 @@ void VkayRendererInit(VkayRenderer *vkr)
     /// Query for graphics & present Queue/s
     // for each queue family idx, try to find one that supports presenting
     uint32_t queue_family_properties_count = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(vkr->chosen_gpu, &queue_family_properties_count, NULL);
+    vkGetPhysicalDeviceQueueFamilyProperties(vkc->chosen_gpu, &queue_family_properties_count, NULL);
     VkQueueFamilyProperties *queue_family_properties = new VkQueueFamilyProperties[queue_family_properties_count];
-    vkGetPhysicalDeviceQueueFamilyProperties(vkr->chosen_gpu, &queue_family_properties_count, queue_family_properties);
+    vkGetPhysicalDeviceQueueFamilyProperties(vkc->chosen_gpu, &queue_family_properties_count, queue_family_properties);
 
     if (queue_family_properties == NULL) {
         // some error message
@@ -100,7 +100,7 @@ void VkayRendererInit(VkayRenderer *vkr)
 
     VkBool32 *queue_idx_supports_present = new VkBool32[queue_family_properties_count];
     for (uint32_t i = 0; i < queue_family_properties_count; i++) {
-        vkGetPhysicalDeviceSurfaceSupportKHR(vkr->chosen_gpu, i, vkr->surface, &queue_idx_supports_present[i]);
+        vkGetPhysicalDeviceSurfaceSupportKHR(vkc->chosen_gpu, i, vkc->surface, &queue_idx_supports_present[i]);
     }
 
     uint32_t graphics_queue_family_idx = UINT32_MAX;
@@ -147,9 +147,9 @@ void VkayRendererInit(VkayRenderer *vkr)
         SDL_LogError(0, "Failed to find Graphics and Present queues");
     }
 
-    vkr->graphics_queue_family     = graphics_queue_family_idx;
-    vkr->present_queue_family      = present_queue_family_idx;
-    vkr->is_present_queue_separate = (graphics_queue_family_idx != present_queue_family_idx);
+    vkc->graphics_queue_family     = graphics_queue_family_idx;
+    vkc->present_queue_family      = present_queue_family_idx;
+    vkc->is_present_queue_separate = (graphics_queue_family_idx != present_queue_family_idx);
 
     const float queue_priorities[] = {
         { 1.0 }
@@ -160,13 +160,13 @@ void VkayRendererInit(VkayRenderer *vkr)
     /////////////////////////////
     /// Device
     VkPhysicalDeviceFeatures supported_gpu_features = {};
-    vkGetPhysicalDeviceFeatures(vkr->chosen_gpu, &supported_gpu_features);
+    vkGetPhysicalDeviceFeatures(vkc->chosen_gpu, &supported_gpu_features);
 
     // todo(ad): not used right now
     uint32_t device_properties_count = 0;
-    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkr->chosen_gpu, NULL, &device_properties_count, NULL));
+    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkc->chosen_gpu, NULL, &device_properties_count, NULL));
     VkExtensionProperties *device_extension_properties = new VkExtensionProperties[device_properties_count];
-    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkr->chosen_gpu, NULL, &device_properties_count, device_extension_properties));
+    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkc->chosen_gpu, NULL, &device_properties_count, device_extension_properties));
 
     const char *enabled_device_extension_names[] = {
         "VK_KHR_swapchain",
@@ -214,49 +214,67 @@ void VkayRendererInit(VkayRenderer *vkr)
     create_info_device.ppEnabledExtensionNames = enabled_device_extension_names;
     create_info_device.pEnabledFeatures        = &supported_gpu_features;
 
-    VK_CHECK(vkCreateDevice(vkr->chosen_gpu, &create_info_device, NULL, &vkr->device));
+    VK_CHECK(vkCreateDevice(vkc->chosen_gpu, &create_info_device, NULL, &vkc->device));
 
-    if (!vkr->is_present_queue_separate) {
-        vkGetDeviceQueue(vkr->device, graphics_queue_family_idx, 0, &vkr->graphics_queue);
+    if (!vkc->is_present_queue_separate) {
+        vkGetDeviceQueue(vkc->device, graphics_queue_family_idx, 0, &vkc->graphics_queue);
     } else {
         // todo(ad): get seperate present queue
     }
 
-    vkGetDeviceQueue(vkr->device, vkr->compute_queue_family, 0, &vkr->compute_queue);
+    vkGetDeviceQueue(vkc->device, vkc->compute_queue_family, 0, &vkc->compute_queue);
 
 
     ///////////////////////////
     /// VMA Allocator
     VmaAllocatorCreateInfo allocatorInfo = {};
 
-    allocatorInfo.physicalDevice = vkr->chosen_gpu;
-    allocatorInfo.device         = vkr->device;
-    allocatorInfo.instance       = vkr->instance;
-    vmaCreateAllocator(&allocatorInfo, &vkr->allocator);
+    allocatorInfo.physicalDevice = vkc->chosen_gpu;
+    allocatorInfo.device         = vkc->device;
+    allocatorInfo.instance       = vkc->instance;
+    vmaCreateAllocator(&allocatorInfo, &vkc->allocator);
+
+
+
+
+
+
+    vkc->is_initialized = true;
+}
+
+
+void VkayRendererInit(VkayContext vkc, VkayRenderer *vkr)
+{
+    vkr->device         = vkc.device;
+    vkr->graphics_queue = vkc.graphics_queue;
+    vkr->compute_queue = vkc.compute_queue;
+    vkr->present_queue = vkc.present_queue;
+    vkr->window_extent  = vkc.window_extent;
+
 
 
 
     ////////////////////////////////////////////
     /// Swapchain
     uint32_t surface_format_count = 0;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(vkr->chosen_gpu, vkr->surface, &surface_format_count, NULL);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(vkc.chosen_gpu, vkc.surface, &surface_format_count, NULL);
     std::vector<VkSurfaceFormatKHR> surface_formats(surface_format_count);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(vkr->chosen_gpu, vkr->surface, &surface_format_count, surface_formats.data());
+    vkGetPhysicalDeviceSurfaceFormatsKHR(vkc.chosen_gpu, vkc.surface, &surface_format_count, surface_formats.data());
 
     // todo(ad): .presentMode arbitrarily set right now, we need to check what the OS supports and pick one
     uint32_t present_modes_count = 0;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(vkr->chosen_gpu, vkr->surface, &present_modes_count, NULL);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(vkc.chosen_gpu, vkc.surface, &present_modes_count, NULL);
     std::vector<VkPresentModeKHR> present_modes(present_modes_count);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(vkr->chosen_gpu, vkr->surface, &present_modes_count, present_modes.data());
+    vkGetPhysicalDeviceSurfacePresentModesKHR(vkc.chosen_gpu, vkc.surface, &present_modes_count, present_modes.data());
 
     VkSurfaceCapabilitiesKHR surface_capabilities;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vkr->chosen_gpu, vkr->surface, &surface_capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vkc.chosen_gpu, vkc.surface, &surface_capabilities);
 
     VkSwapchainCreateInfoKHR create_info_swapchain = {};
     create_info_swapchain.sType                    = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     create_info_swapchain.pNext                    = NULL;
     create_info_swapchain.flags                    = 0;
-    create_info_swapchain.surface                  = vkr->surface;
+    create_info_swapchain.surface                  = vkc.surface;
     create_info_swapchain.minImageCount            = FRAME_BUFFER_COUNT;
     create_info_swapchain.imageFormat              = surface_formats[0].format;
     create_info_swapchain.imageColorSpace          = surface_formats[0].colorSpace;
@@ -274,10 +292,10 @@ void VkayRendererInit(VkayRenderer *vkr)
     create_info_swapchain.clipped      = VK_TRUE;
     create_info_swapchain.oldSwapchain = 0;
 
-    vkCreateSwapchainKHR(vkr->device, &create_info_swapchain, NULL, &vkr->swapchain);
+    vkCreateSwapchainKHR(vkc.device, &create_info_swapchain, NULL, &vkr->swapchain);
 
-    vkr->release_queue.push_function([=]() {
-        vkDestroySwapchainKHR(vkr->device, vkr->swapchain, NULL);
+    vkc.release_queue.push_function([=]() {
+        vkDestroySwapchainKHR(vkc.device, vkr->swapchain, NULL);
     });
 
 
@@ -285,16 +303,16 @@ void VkayRendererInit(VkayRenderer *vkr)
     //////////////////////////////////////
     /// Swapchain Images acquisition
     uint32_t swapchain_image_count = 0;
-    vkGetSwapchainImagesKHR(vkr->device, vkr->swapchain, &swapchain_image_count, NULL);
-    vkr->swapchain_images.resize(swapchain_image_count);
-    vkGetSwapchainImagesKHR(vkr->device, vkr->swapchain, &swapchain_image_count, vkr->swapchain_images.data());
+    vkGetSwapchainImagesKHR(vkc.device, vkr->swapchain, &swapchain_image_count, NULL);
+    vkc.swapchain_images.resize(swapchain_image_count);
+    vkGetSwapchainImagesKHR(vkc.device, vkr->swapchain, &swapchain_image_count, vkc.swapchain_images.data());
 
-    vkr->swapchain_image_views.resize(swapchain_image_count);
+    vkc.swapchain_image_views.resize(swapchain_image_count);
 
-    for (size_t i = 0; i < vkr->swapchain_image_views.size(); i++) {
+    for (size_t i = 0; i < vkc.swapchain_image_views.size(); i++) {
         VkImageViewCreateInfo image_view_create_info           = {};
         image_view_create_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        image_view_create_info.image                           = vkr->swapchain_images[i];
+        image_view_create_info.image                           = vkc.swapchain_images[i];
         image_view_create_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
         image_view_create_info.format                          = surface_formats[0].format;
         image_view_create_info.components.r                    = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -307,10 +325,10 @@ void VkayRendererInit(VkayRenderer *vkr)
         image_view_create_info.subresourceRange.baseArrayLayer = 0;
         image_view_create_info.subresourceRange.layerCount     = 1;
 
-        vkCreateImageView(vkr->device, &image_view_create_info, NULL, &vkr->swapchain_image_views[i]);
+        vkCreateImageView(vkc.device, &image_view_create_info, NULL, &vkc.swapchain_image_views[i]);
     }
 
-    vkr->swapchain_image_format = surface_formats[0].format;
+    vkc.swapchain_image_format = surface_formats[0].format;
 
 
 
@@ -320,29 +338,29 @@ void VkayRendererInit(VkayRenderer *vkr)
     /// Depth Image
     // depth image size will match the window
     VkExtent3D depthImageExtent = {
-        vkr->window_extent.width,
-        vkr->window_extent.height,
+        vkc.window_extent.width,
+        vkc.window_extent.height,
         1
     };
 
-    vkr->depth_format = VK_FORMAT_D32_SFLOAT; // hardcoding the depth format to 32 bit float
+    vkc.depth_format = VK_FORMAT_D32_SFLOAT; // hardcoding the depth format to 32 bit float
     // the depth image will be an image with the format we selected and Depth Attachment usage flag
-    VkImageCreateInfo create_info_depth_image = vkinit::image_create_info(vkr->depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, depthImageExtent);
+    VkImageCreateInfo create_info_depth_image = vkinit::image_create_info(vkc.depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, depthImageExtent);
 
     VmaAllocationCreateInfo create_info_depth_image_allocation = {}; // for the depth image, we want to allocate it from GPU local memory
     create_info_depth_image_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
     create_info_depth_image_allocation.requiredFlags           = (VkMemoryPropertyFlags)VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-    vmaCreateImage(vkr->allocator, &create_info_depth_image, &create_info_depth_image_allocation, &vkr->depth_image.image, &vkr->depth_image.allocation, NULL);
+    vmaCreateImage(vkc.allocator, &create_info_depth_image, &create_info_depth_image_allocation, &vkc.depth_image.image, &vkc.depth_image.allocation, NULL);
 
     // build an image-view for the depth image to use for rendering
-    VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(vkr->depth_format, vkr->depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+    VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(vkc.depth_format, vkc.depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    VK_CHECK(vkCreateImageView(vkr->device, &dview_info, NULL, &vkr->depth_image_view));
+    VK_CHECK(vkCreateImageView(vkc.device, &dview_info, NULL, &vkc.depth_image_view));
 
-    vkr->release_queue.push_function([=]() {
-        vkDestroyImageView(vkr->device, vkr->depth_image_view, NULL);
-        vmaDestroyImage(vkr->allocator, vkr->depth_image.image, vkr->depth_image.allocation);
+    vkc.release_queue.push_function([=]() {
+        vkDestroyImageView(vkc.device, vkc.depth_image_view, NULL);
+        vmaDestroyImage(vkc.allocator, vkc.depth_image.image, vkc.depth_image.allocation);
     });
 
 
@@ -353,7 +371,7 @@ void VkayRendererInit(VkayRenderer *vkr)
     // Default renderpass
     // Color attachment
     VkAttachmentDescription color_attachment = {};
-    color_attachment.format                  = vkr->swapchain_image_format; // the attachment will have the format needed by the swapchain
+    color_attachment.format                  = vkc.swapchain_image_format; // the attachment will have the format needed by the swapchain
     color_attachment.samples                 = VK_SAMPLE_COUNT_1_BIT; // 1 sample, we won't be doing MSAA
     color_attachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR; // we Clear when this attachment is loaded
     color_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE; // we keep the attachment stored when the renderpass ends
@@ -366,7 +384,7 @@ void VkayRendererInit(VkayRenderer *vkr)
     // Depth attachment
     VkAttachmentDescription depth_attachment = {};
     depth_attachment.flags                   = 0;
-    depth_attachment.format                  = vkr->depth_format;
+    depth_attachment.format                  = vkc.depth_format;
     depth_attachment.samples                 = VK_SAMPLE_COUNT_1_BIT;
     depth_attachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depth_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
@@ -402,10 +420,10 @@ void VkayRendererInit(VkayRenderer *vkr)
     render_pass_info.pAttachments           = &attachment_descriptions[0];
     render_pass_info.subpassCount           = 1; // connect the subpass to the info
     render_pass_info.pSubpasses             = &subpass;
-    VK_CHECK(vkCreateRenderPass(vkr->device, &render_pass_info, NULL, &vkr->render_pass));
+    VK_CHECK(vkCreateRenderPass(vkc.device, &render_pass_info, NULL, &vkr->render_pass));
 
-    vkr->release_queue.push_function([=]() {
-        vkDestroyRenderPass(vkr->device, vkr->render_pass, NULL);
+    vkc.release_queue.push_function([=]() {
+        vkDestroyRenderPass(vkc.device, vkr->render_pass, NULL);
     });
 
 
@@ -417,61 +435,57 @@ void VkayRendererInit(VkayRenderer *vkr)
     // create the framebuffers for the swapchain images. This will connect the render-pass to the images for rendering
 
     // grab how many images we have in the swapchain
-    const size_t swapchain_imagecount = vkr->swapchain_images.size();
+    const size_t swapchain_imagecount = vkc.swapchain_images.size();
     vkr->framebuffers                 = std::vector<VkFramebuffer>(swapchain_imagecount);
 
     // create framebuffers for each of the swapchain image views
     for (size_t i = 0; i < swapchain_imagecount; i++) {
         VkImageView attachments[2] = {};
 
-        attachments[0] = vkr->swapchain_image_views[i];
-        attachments[1] = vkr->depth_image_view;
+        attachments[0] = vkc.swapchain_image_views[i];
+        attachments[1] = vkc.depth_image_view;
 
         VkFramebufferCreateInfo fb_info = {};
         fb_info.sType                   = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         fb_info.pNext                   = NULL;
         fb_info.renderPass              = vkr->render_pass;
         fb_info.attachmentCount         = 1;
-        fb_info.width                   = vkr->window_extent.width;
-        fb_info.height                  = vkr->window_extent.height;
+        fb_info.width                   = vkc.window_extent.width;
+        fb_info.height                  = vkc.window_extent.height;
         fb_info.layers                  = 1;
         fb_info.pAttachments            = attachments;
         fb_info.attachmentCount         = 2;
 
-        VK_CHECK(vkCreateFramebuffer(vkr->device, &fb_info, NULL, &vkr->framebuffers[i]));
+        VK_CHECK(vkCreateFramebuffer(vkc.device, &fb_info, NULL, &vkr->framebuffers[i]));
 
-        vkr->release_queue.push_function([=]() {
-            vkDestroyFramebuffer(vkr->device, vkr->framebuffers[i], NULL);
-            vkDestroyImageView(vkr->device, vkr->swapchain_image_views[i], NULL);
+        vkc.release_queue.push_function([=]() {
+            vkDestroyFramebuffer(vkc.device, vkr->framebuffers[i], NULL);
+            vkDestroyImageView(vkc.device, vkc.swapchain_image_views[i], NULL);
         });
     }
-
-
-
-
 
     //////////////////////////////////////////////////////
     // CommandPools & CommandBuffers creation
     // Graphics
-    VkCommandPoolCreateInfo ci_graphics_cmd_pool = vkinit::CommandPoolCreateInfo(vkr->graphics_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    VK_CHECK(vkCreateCommandPool(vkr->device, &ci_graphics_cmd_pool, NULL, &vkr->command_pool_graphics));
+    VkCommandPoolCreateInfo ci_graphics_cmd_pool = vkinit::CommandPoolCreateInfo(vkc.graphics_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VK_CHECK(vkCreateCommandPool(vkr->device, &ci_graphics_cmd_pool, NULL, &vkc.command_pool_graphics));
 
     // Compute
-    VkCommandPoolCreateInfo ci_compute_cmd_pool = vkinit::CommandPoolCreateInfo(vkr->compute_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    VK_CHECK(vkCreateCommandPool(vkr->device, &ci_compute_cmd_pool, NULL, &vkr->command_pool_compute));
+    VkCommandPoolCreateInfo ci_compute_cmd_pool = vkinit::CommandPoolCreateInfo(vkc.compute_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VK_CHECK(vkCreateCommandPool(vkr->device, &ci_compute_cmd_pool, NULL, &vkc.command_pool_compute));
 
     for (int i = 0; i < FRAME_BUFFER_COUNT; i++) {
         // allocate the default command buffer that we will use for rendering
-        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_graphics = vkinit::CommandBufferAllocateInfo(vkr->command_pool_graphics);
+        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_graphics = vkinit::CommandBufferAllocateInfo(vkc.command_pool_graphics);
         VK_CHECK(vkAllocateCommandBuffers(vkr->device, &cmd_buffer_alloc_info_graphics, &vkr->frames[i].cmd_buffer_gfx));
 
-        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_compute = vkinit::CommandBufferAllocateInfo(vkr->command_pool_compute);
+        VkCommandBufferAllocateInfo cmd_buffer_alloc_info_compute = vkinit::CommandBufferAllocateInfo(vkc.command_pool_compute);
         VK_CHECK(vkAllocateCommandBuffers(vkr->device, &cmd_buffer_alloc_info_compute, &vkr->frames[i].cmd_buffer_cmp));
     }
 
-    vkr->release_queue.push_function([=]() {
-        vkDestroyCommandPool(vkr->device, vkr->command_pool_graphics, NULL);
-        vkDestroyCommandPool(vkr->device, vkr->command_pool_compute, NULL);
+    vkc.release_queue.push_function([=]() {
+        vkDestroyCommandPool(vkr->device, vkc.command_pool_graphics, NULL);
+        vkDestroyCommandPool(vkr->device, vkc.command_pool_compute, NULL);
     });
 
 
@@ -553,11 +567,7 @@ void VkayRendererInit(VkayRenderer *vkr)
         //// Set allocation
         // allocate one descriptor set for each frame
     }
-
-    vkr->is_initialized = true;
 }
-
-
 
 
 
@@ -1088,7 +1098,8 @@ bool VkayCreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModu
 
 void VkayRendererCleanup(VkayRenderer *vkr)
 {
-    if (vkr->is_initialized) {
+    // if (vkr->is_initialized)
+    {
         vkWaitForFences(vkr->device, 1, &vkr->frames[0].render_fence, true, SECONDS(1));
         vkWaitForFences(vkr->device, 1, &vkr->frames[1].render_fence, true, SECONDS(1));
 
@@ -1096,10 +1107,8 @@ void VkayRendererCleanup(VkayRenderer *vkr)
 
         vkr->release_queue.flush();
 
-        vmaDestroyAllocator(vkr->allocator);
 
         vkDestroySampler(vkr->device, vkr->sampler, NULL);
-        vkDestroySurfaceKHR(vkr->instance, vkr->surface, NULL);
 
         vkDestroyPipelineLayout(vkr->device, vkr->compute_pipeline_layout, NULL);
         vkDestroyPipelineLayout(vkr->device, vkr->default_pipeline_layout, NULL);
@@ -1110,6 +1119,20 @@ void VkayRendererCleanup(VkayRenderer *vkr)
         vkDestroyDescriptorSetLayout(vkr->device, vkr->set_layout_array_of_textures, NULL);
         vkDestroyDescriptorPool(vkr->device, vkr->descriptor_pool_compute, NULL);
         vkDestroyDescriptorPool(vkr->device, vkr->descriptor_pool, NULL);
+    }
+}
+
+void VkayContextCleanup(VkayContext *vkr)
+{
+    if (vkr->is_initialized) {
+        vkDeviceWaitIdle(vkr->device);
+
+        vkr->release_queue.flush();
+
+        vmaDestroyAllocator(vkr->allocator);
+
+        vkDestroySurfaceKHR(vkr->instance, vkr->surface, NULL);
+
         vkDestroyDevice(vkr->device, NULL);
         vkDestroyInstance(vkr->instance, NULL);
         SDL_DestroyWindow(vkr->window);

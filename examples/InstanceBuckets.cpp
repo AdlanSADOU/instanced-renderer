@@ -35,9 +35,14 @@ int main(int argc, char *argv[])
 {
     VkayRendererInit(&vkr);
 
+
+    vkr.default_pipeline = CreateGraphicsPipelineInstanced(&vkr);
+    vkr.compute_pipeline = CreateComputePipeline(&vkr);
+
+
     VkayTextureCreate("./assets/texture.png", &vkr, &profile);
     VkayTextureCreate("./assets/bjarn_itoldu.jpg", &vkr, &itoldu);
-    VkayCameraCreate(&vkr, &camera);
+    VkayCameraCreate(&vkr, vkr.default_pipeline_layout, &camera);
 
     InstanceData instance_data;
 

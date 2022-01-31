@@ -114,6 +114,7 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     image_memory_barrier_from_undefined_to_transfer_dst.subresourceRange     = image_subresource_range;
     image_memory_barrier_from_undefined_to_transfer_dst.srcQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
     image_memory_barrier_from_undefined_to_transfer_dst.dstQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
+
     {
         VkPipelineStageFlags src_stage_flags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         VkPipelineStageFlags dst_stage_flags = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -153,12 +154,13 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers    = &vkr->frames[0].cmd_buffer_gfx;
-
     VK_CHECK(vkQueueSubmit(vkr->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
 
     vkDeviceWaitIdle(vkr->device);
-
     vmaDestroyBuffer(vkr->allocator, staging_buffer.buffer, staging_buffer.allocation);
+
+
+
 
 
     VkDescriptorImageInfo desc_image_image_info           = {};
@@ -205,6 +207,8 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, Texture *texture
     setWrites[1].pImageInfo      = vkr->descriptor_image_infos.data();
     setWrites[1].pBufferInfo     = 0;
     vkUpdateDescriptorSets(vkr->device, 2, setWrites, 0, NULL);
+
+
 
     vkr->texture_array_count++;
 }

@@ -63,7 +63,7 @@ EXPORT bool VkayAllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAl
 EXPORT VertexInputDescription GetVertexDescription();
 EXPORT bool                   VkayCreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
 EXPORT bool                   CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
-EXPORT VkPipeline             CreateGraphicsPipeline(VkayRenderer *vkr);
+EXPORT VkPipeline             CreateGraphicsPipelineInstanced(VkayRenderer *vkr);
 EXPORT VkPipeline             CreateComputePipeline(VkayRenderer *vkr);
 EXPORT void                   CopyBuffer(VkCommandBuffer cmd_buffer, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
 EXPORT uint32_t               FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);

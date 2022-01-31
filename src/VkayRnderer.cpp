@@ -516,8 +516,8 @@ void VkayRendererInit(VkayRenderer *vkr)
     // Descriptors
     std::vector<VkDescriptorPoolSize> sizes = {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4 },
-        { VK_DESCRIPTOR_TYPE_SAMPLER, 1 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1 },
+        //{ VK_DESCRIPTOR_TYPE_SAMPLER, 1 },
+        //{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1 },
     };
 
     ////////////////////////////
@@ -554,44 +554,7 @@ void VkayRendererInit(VkayRenderer *vkr)
         // allocate one descriptor set for each frame
     }
 
-
-    /// Set 1
-    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampler = {};
-    desc_set_layout_binding_sampler.binding                      = 0;
-    desc_set_layout_binding_sampler.descriptorCount              = 1;
-    desc_set_layout_binding_sampler.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLER;
-    desc_set_layout_binding_sampler.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampled_image = {};
-    desc_set_layout_binding_sampled_image.binding                      = 1;
-    desc_set_layout_binding_sampled_image.descriptorCount              = (uint32_t)80; // texture count
-    desc_set_layout_binding_sampled_image.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    desc_set_layout_binding_sampled_image.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    /// layout > array of textures & sampler
-    std::vector<VkDescriptorSetLayoutBinding> array_of_textures_set_layout_bindings;
-    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampler);
-    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampled_image);
-    CreateDescriptorSetLayout(vkr->device, NULL, &vkr->set_layout_array_of_textures, array_of_textures_set_layout_bindings.data(), (uint32_t)array_of_textures_set_layout_bindings.size());
-
-    // Sampler
-    VkSamplerCreateInfo ci_sampler = {};
-    ci_sampler.sType               = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    ci_sampler.minFilter           = VK_FILTER_NEAREST;
-    ci_sampler.magFilter           = VK_FILTER_NEAREST;
-    ci_sampler.addressModeU        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    ci_sampler.addressModeV        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    ci_sampler.addressModeW        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    ci_sampler.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    VK_CHECK(vkCreateSampler(vkr->device, &ci_sampler, NULL, &vkr->sampler));
-
-    vkr->default_pipeline = CreateGraphicsPipeline(vkr);
-    vkr->compute_pipeline = CreateComputePipeline(vkr);
-
     vkr->is_initialized = true;
-
-    vkr->descriptor_image_infos.resize(MAX_TEXTURE_COUNT);
-    memset(vkr->descriptor_image_infos.data(), VK_NULL_HANDLE, vkr->descriptor_image_infos.size() * sizeof(VkDescriptorImageInfo));
 }
 
 
@@ -615,14 +578,13 @@ void VkayEndCommandBuffer(VkCommandBuffer cmd_buffer)
     vkEndCommandBuffer(cmd_buffer);
 }
 
-
 // todo(ad): must take proper args (VkQueue, VkFence, ...)
 VkResult VkayQueueSumbit(VkQueue queue, VkCommandBuffer *cmd_buffer)
 {
-    VkSubmitInfo submit_info = {};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    VkSubmitInfo submit_info       = {};
+    submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = cmd_buffer;
+    submit_info.pCommandBuffers    = cmd_buffer;
     return vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
 }
 
@@ -752,7 +714,7 @@ FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr)
     return &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT];
 }
 
-VkPipeline CreateGraphicsPipeline(VkayRenderer *vkr)
+VkPipeline CreateGraphicsPipelineInstanced(VkayRenderer *vkr)
 {
     VkPipelineColorBlendAttachmentState attachment_state_color_blend;
     attachment_state_color_blend = vkinit::color_blend_attachment_state(); // a single blend attachment with no blending and writing to RGBA
@@ -854,6 +816,46 @@ VkPipeline CreateGraphicsPipeline(VkayRenderer *vkr)
     /// Multisample State
     VkPipelineMultisampleStateCreateInfo create_info_multisample_state;
     create_info_multisample_state = vkinit::multisampling_state_create_info(); // we don't use multisampling, so just run the default one
+
+
+
+
+
+    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampler = {};
+    desc_set_layout_binding_sampler.binding                      = 0;
+    desc_set_layout_binding_sampler.descriptorCount              = 1;
+    desc_set_layout_binding_sampler.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLER;
+    desc_set_layout_binding_sampler.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding desc_set_layout_binding_sampled_image = {};
+    desc_set_layout_binding_sampled_image.binding                      = 1;
+    desc_set_layout_binding_sampled_image.descriptorCount              = MAX_TEXTURE_COUNT; // texture count
+    desc_set_layout_binding_sampled_image.descriptorType               = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    desc_set_layout_binding_sampled_image.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    /// layout > array of textures & sampler
+    std::vector<VkDescriptorSetLayoutBinding> array_of_textures_set_layout_bindings;
+    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampler);
+    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampled_image);
+    CreateDescriptorSetLayout(vkr->device, NULL, &vkr->set_layout_array_of_textures, array_of_textures_set_layout_bindings.data(), (uint32_t)array_of_textures_set_layout_bindings.size());
+
+    // Sampler
+    VkSamplerCreateInfo ci_sampler = {};
+    ci_sampler.sType               = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    ci_sampler.minFilter           = VK_FILTER_NEAREST;
+    ci_sampler.magFilter           = VK_FILTER_NEAREST;
+    ci_sampler.addressModeU        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    ci_sampler.addressModeV        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    ci_sampler.addressModeW        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    ci_sampler.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    VK_CHECK(vkCreateSampler(vkr->device, &ci_sampler, NULL, &vkr->sampler));
+
+
+    vkr->descriptor_image_infos.resize(MAX_TEXTURE_COUNT);
+    memset(vkr->descriptor_image_infos.data(), VK_NULL_HANDLE, vkr->descriptor_image_infos.size() * sizeof(VkDescriptorImageInfo));
+
+
+
 
 
     ///////

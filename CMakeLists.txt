@@ -1,10 +1,7 @@
 # https://cristianadam.eu/20170709/speeding-up-cmake/
 
 cmake_minimum_required(VERSION 3.10)
-set(CMAKE_CXX_STANDARD 20)
-if (UNIX)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -lpthread")
-endif()
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(vkay VERSION 0.1.0)
@@ -36,6 +33,7 @@ target_include_directories(InstanceBuckets PUBLIC ./src)
 
 add_executable(gltf ./examples/gltf.cpp)
 target_compile_options(gltf PRIVATE -FC -GR- -EHa- -EHsc -EHs -nologo -Zi -Zf /MP)
+target_compile_definitions(gltf PRIVATE _CRT_SECURE_NO_WARNINGS)
 target_link_options(gltf PRIVATE -SUBSYSTEM:CONSOLE -time)
 target_link_libraries(gltf vkay)
 target_include_directories(gltf PUBLIC ./src)

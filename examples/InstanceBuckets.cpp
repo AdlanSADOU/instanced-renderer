@@ -1,6 +1,5 @@
 // #define VKAY_DEBUG_ALLOCATIONS
-
-#include <VkayRenderer.h>
+#include <Vkay.h>
 #include <VkayTexture.h>
 #include <VkayInstances.h>
 #include <VkayCamera.h>
@@ -28,23 +27,20 @@ Texture        profile;
 Texture        itoldu;
 Camera         camera;
 
-VkayContext vkc;
+VkayContext  vkc;
 VkayRenderer vkr;
 Quad         quad;
 
 int main(int argc, char *argv[])
 {
     VkayContextInit(&vkc);
-    VkayRendererInit(vkc, &vkr);
-
-
-    vkr.default_pipeline = CreateGraphicsPipelineInstanced(&vkr);
-    vkr.compute_pipeline = CreateComputePipeline(&vkr);
-
+    VkayRendererInit(&vkc, &vkr);
 
     VkayTextureCreate("./assets/texture.png", &vkr, vkc, &profile);
     VkayTextureCreate("./assets/bjarn_itoldu.jpg", &vkr, vkc, &itoldu);
-    VkayCameraCreate(&vkr, vkc.allocator, vkr.default_pipeline_layout, &camera);
+    
+    VkayCameraCreate(&vkr, &camera);
+    camera.m_projection = Camera::ORTHO;
 
     InstanceData instance_data;
 
@@ -73,7 +69,7 @@ int main(int argc, char *argv[])
         instances.instance_data_array.push_back(instance_data);
     }
 
-    VkayInstancesBucketUpload(&vkr, vkc.allocator, &instances, quad.mesh);
+    VkayInstancesBucketUpload(&vkr, &instances, quad.mesh);
 
     /////////////////////
     // Main loop
@@ -84,8 +80,8 @@ int main(int argc, char *argv[])
     vkDeviceWaitIdle(vkr.device);
     VkayTextureDestroy(&vkr, vkc, &profile);
     VkayTextureDestroy(&vkr, vkc, &itoldu);
-    VkayInstancesDestroy(&vkr, vkc.allocator, &instances);
-    VkayCameraDestroy(&vkr, vkc.allocator, &camera);
+    VkayInstancesDestroy(&vkr, &instances);
+    VkayCameraDestroy(&vkr, &camera);
     VkayRendererCleanup(&vkr);
     VkayContextCleanup(&vkc);
     return 0;
@@ -150,7 +146,7 @@ void UpdateAndRender()
 
         static int i = 0;
         if (_key_r) {
-            VkayInstancesDestroyInstance(&vkr, vkc.allocator,  i++, &instances);
+            VkayInstancesDestroyInstance(&vkr, i++, &instances);
         }
 
         ///////////////////////////////
@@ -187,8 +183,8 @@ void UpdateAndRender()
         VkayRendererBeginRenderPass(&vkr);
 
         camera.m_position = { camera_x, camera_y - 0.f, camera_z - 120.f };
-        VkayCameraUpdate(&vkr, &camera);
-        VkayInstancesDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);
+        VkayCameraUpdate(&vkr, &camera, vkr.instanced_pipeline_layout);
+        VkayDrawInstanceBucket(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);
 
         VkayRendererEndRenderPass(&vkr);
         VkayRendererEndCommandBuffer(&vkr);

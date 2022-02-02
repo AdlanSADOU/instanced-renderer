@@ -35,9 +35,7 @@ struct VkayContext;
 void VkayContextInit(VkayContext *vkc);
 void VkayContextCleanup(VkayContext *vkr);
 
-
-
-EXPORT void       VkayRendererInit(VkayContext vkc, VkayRenderer *vkr);
+EXPORT void       VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr);
 EXPORT void       VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererEndCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererBeginRenderPass(VkayRenderer *vkr);
@@ -50,17 +48,22 @@ EXPORT void VkayBeginCommandBuffer(VkCommandBuffer cmd_buffer);
 EXPORT void VkayEndCommandBuffer(VkCommandBuffer cmd_buffer);
 VkResult    VkayQueueSumbit(VkQueue queue, VkCommandBuffer *cmd_buffer);
 
+#if !defined(VKAY_DEBUG_ALLOCATIONS)
 EXPORT VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
-EXPORT VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage, short line, const char *filename);
+EXPORT void     VkayDestroyBuffer(VmaAllocator allocator, VkBuffer buffer, VmaAllocation allocation);
 EXPORT VkResult VkayMapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation);
-EXPORT VkResult VkayMapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation, short line, const char *filename);
+#endif
 
 EXPORT bool VkayAllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory);
-EXPORT bool VkayAllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory, short line, const char *filename);
 EXPORT bool VkayAllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAllocation *allocation, VmaMemoryUsage usage);
 
 #if defined(VKAY_DEBUG_ALLOCATIONS)
+EXPORT VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage, short line, const char *filename);
+EXPORT void     VkayDestroyBuffer(VmaAllocator allocator, VkBuffer buffer, VmaAllocation allocation, short line, const char *filename);
+EXPORT bool     VkayAllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory, short line, const char *filename);
+EXPORT VkResult VkayMapMemcpyMemory(void *src, size_t size, VmaAllocator allocator, VmaAllocation allocation, short line, const char *filename);
 #define VkayCreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage) VkayCreateBuffer(dst_buffer, allocator, alloc_size, usage, memory_usage, __LINE__, __FILE__)
+#define VkayDestroyBuffer(allocator, buffer, allocation)                         VkayDestroyBuffer(allocator, buffer, allocation, __LINE__, __FILE__)
 #define VkayMapMemcpyMemory(src, size, allocator, allocation)                    VkayMapMemcpyMemory(src, size, allocator, allocation, __LINE__, __FILE__)
 #define VkayAllocateBufferMemory(device, gpu, buffer, memory)                    VkayAllocateBufferMemory(device, gpu, buffer, memory, __LINE__, __FILE__)
 #define VkayAllocateImageMemory(allocator, image, allocation, usage)             VkayAllocateImageMemory(allocator, image, allocation, usage, __LINE__, __FILE__)
@@ -69,7 +72,7 @@ EXPORT bool VkayAllocateImageMemory(VmaAllocator allocator, VkImage image, VmaAl
 EXPORT VertexInputDescription GetVertexDescription();
 EXPORT bool                   VkayCreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
 EXPORT bool                   CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
-EXPORT VkPipeline             CreateGraphicsPipelineInstanced(VkayRenderer *vkr);
+EXPORT VkPipeline             VkayCreateGraphicsPipelineInstanced(VkayRenderer *vkr);
 EXPORT VkPipeline             CreateComputePipeline(VkayRenderer *vkr);
 EXPORT void                   CopyBuffer(VkCommandBuffer cmd_buffer, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
 EXPORT uint32_t               FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
@@ -79,7 +82,8 @@ EXPORT VkResult               AllocateDescriptorSets(VkDevice device, VkDescript
 struct VkayContext
 {
     SDL_Window *window = NULL;
-    VkExtent2D  window_extent { 720, 480 };
+    // VkExtent2D  window_extent { 720, 480 };
+    VkExtent2D  window_extent { 1280, 720 };
     // VkExtent2D window_extent { 1920, 1000 };
 
 
@@ -89,12 +93,6 @@ struct VkayContext
     VkDebugUtilsMessengerEXT debug_messenger;
     VkPhysicalDevice         chosen_gpu;
     VkSurfaceKHR             surface;
-    /////////////////////////
-    // Swapchain
-    // VkSwapchainKHR           swapchain;
-    VkFormat                 swapchain_image_format;
-    std::vector<VkImage>     swapchain_images;
-    std::vector<VkImageView> swapchain_image_views;
 
     /////////////////////////
     // Pools
@@ -113,15 +111,7 @@ struct VkayContext
 
     VkDevice device;
 
-    VkImageView    depth_image_view;
-    AllocatedImage depth_image;
-    VkFormat       depth_format;
-
-
     ReleaseQueue release_queue;
-
-    // todo(ad): delete this at some point
-    VmaAllocator allocator;
 
     bool is_initialized = false;
 };
@@ -135,6 +125,17 @@ struct VkayRenderer
     VkQueue        compute_queue;
     VkQueue        present_queue;
     VkExtent2D     window_extent;
+    VmaAllocator   allocator;
+    /////////////////////////
+    // Swapchain
+    // VkSwapchainKHR           swapchain;
+    VkFormat                 swapchain_image_format;
+    std::vector<VkImage>     swapchain_images;
+    std::vector<VkImageView> swapchain_image_views;
+
+    VkImageView    depth_image_view;
+    AllocatedImage depth_image;
+    VkFormat       depth_format;
 
     //
     // RenderPass & Framebuffers
@@ -145,6 +146,8 @@ struct VkayRenderer
     FrameData frames[FRAME_BUFFER_COUNT];
     uint32_t  frame_idx_inflight = 0;
 
+    VkPipeline       instanced_pipeline;
+    VkPipelineLayout instanced_pipeline_layout;
     VkPipeline       default_pipeline;
     VkPipelineLayout default_pipeline_layout;
     ////////////////////

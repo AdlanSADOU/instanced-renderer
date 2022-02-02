@@ -70,7 +70,7 @@ void main()
 
 	mat3 rotMat = _mz * _my * _mx;
 
-    vec4 v_pos = vec4(vPosition *20, 1.0);
+    vec4 v_pos = vec4(vPosition, 1.0);
     vec4 pos = vec4(v_pos.xyz + trConstants.tr.position, 1.0);
 
 	gl_Position = cameraData.proj * cameraData.view * pos;

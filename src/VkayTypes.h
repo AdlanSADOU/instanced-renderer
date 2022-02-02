@@ -30,14 +30,14 @@ struct Vertex2
     //glm::vec3 normal;
 };
 
-struct Mesh
+struct BaseMesh
 {
     std::vector<Vertex> vertices = {};
 };
 
 struct Quad
 {
-    Mesh mesh = {};
+    BaseMesh mesh = {};
 
     Quad()
     {
@@ -53,7 +53,7 @@ struct Quad
 
 struct Triangle
 {
-    Mesh mesh = {};
+    BaseMesh mesh = {};
 
     Triangle()
     {
@@ -117,27 +117,17 @@ struct Material
     VkPipelineLayout pipeline_layout;
 };
 
-
-// struct Mesh
-// {
-//     std::vector<Vertex> vertices;
-//     VkayBuffer          vertex_buffer;
-//     VkayBuffer          index_buffer;
-
-//     bool LoadFromObj(const char *filename);
-// };
-
 struct Transform
 {
     glm::vec3 position;
 };
 
-struct RenderObject
-{
-    Mesh     *mesh            = {};
-    Material *material        = {};
-    glm::mat4 transformMatrix = {};
-};
+// struct RenderObject
+// {
+//     Mesh     *mesh            = {};
+//     Material *material        = {};
+//     glm::mat4 transformMatrix = {};
+// };
 
 ////////////////////////////
 // todo(ad): cleanup

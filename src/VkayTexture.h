@@ -1,7 +1,7 @@
 #if !defined(VK_TEXTURE_H)
 #define VK_TEXTURE_H
 
-#include "VkayRenderer.h"
+#include "Vkay.h"
 #include <stdint.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -57,7 +57,7 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, VkayContext vkc,
     VmaAllocationCreateInfo ci_allocation = {};
     ci_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
 
-    VK_CHECK(vmaCreateImage(vkc.allocator, &ci_image, &ci_allocation, &texture->image, &texture->allocation, NULL));
+    VK_CHECK(vmaCreateImage(vkr->allocator, &ci_image, &ci_allocation, &texture->image, &texture->allocation, NULL));
 
 
     VkImageViewCreateInfo ci_image_view = {};
@@ -80,13 +80,14 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, VkayContext vkc,
     bufferInfo.usage              = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
     VkayBuffer staging_buffer;
-    VK_CHECK(vmaCreateBuffer(vkc.allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer, &staging_buffer.allocation, NULL));
+    // VK_CHECK(vmaCreateBuffer(vkr->allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer, &staging_buffer.allocation, NULL));
+    VK_CHECK(VkayCreateBuffer(&staging_buffer, vkr->allocator, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
 
     void *staging_data;
-    vmaMapMemory(vkc.allocator, staging_buffer.allocation, &staging_data);
+    vmaMapMemory(vkr->allocator, staging_buffer.allocation, &staging_data);
     memcpy(staging_data, pixels, imageSize);
-    vmaFlushAllocation(vkc.allocator, staging_buffer.allocation, 0, VK_WHOLE_SIZE);
-    vmaUnmapMemory(vkc.allocator, staging_buffer.allocation);
+    vmaFlushAllocation(vkr->allocator, staging_buffer.allocation, 0, VK_WHOLE_SIZE);
+    vmaUnmapMemory(vkr->allocator, staging_buffer.allocation);
 
     stbi_image_free(pixels);
 
@@ -157,7 +158,7 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, VkayContext vkc,
     VK_CHECK(vkQueueSubmit(vkr->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
 
     vkDeviceWaitIdle(vkr->device);
-    vmaDestroyBuffer(vkc.allocator, staging_buffer.buffer, staging_buffer.allocation);
+    VkayDestroyBuffer(vkr->allocator, staging_buffer.buffer, staging_buffer.allocation);
 
 
 
@@ -216,7 +217,7 @@ void VkayTextureCreate(const char *filepath, VkayRenderer *vkr, VkayContext vkc,
 void VkayTextureDestroy(VkayRenderer *vkr, VkayContext vkc, Texture *texture)
 {
     vkDestroyImageView(vkr->device, texture->view, NULL);
-    vmaDestroyImage(vkc.allocator, texture->image, texture->allocation);
+    vmaDestroyImage(vkr->allocator, texture->image, texture->allocation);
 }
 
 #endif // VK_TEXTURE_H

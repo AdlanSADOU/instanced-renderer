@@ -158,7 +158,10 @@ VkResult AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_poo
     return vkAllocateDescriptorSets(device, &allocInfo, descriptor_set);
 }
 
-
+VkResult VkayCreateImage()
+{
+    return VK_SUCCESS;
+}
 
 VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
 {
@@ -197,9 +200,20 @@ VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t
     // bind buffer to allocation
     VkResult res = vmaCreateBuffer(allocator, &bufferInfo, &vmaallocInfo, &dst_buffer->buffer, &dst_buffer->allocation, NULL);
 
-    SDL_Log("%s:%d: Created Buffer: handle[%d] size[%ld]\n", filename, line, dst_buffer->buffer, alloc_size);
+    SDL_Log("%s:%d: Created Buffer: handle[%ld] allocation[%ld]\n", filename, line, dst_buffer->buffer, dst_buffer->allocation);
 
     return res;
+}
+
+void VkayDestroyBuffer(VmaAllocator allocator, VkBuffer buffer, VmaAllocation allocation)
+{
+    vmaDestroyBuffer(allocator, buffer, allocation);
+}
+
+void VkayDestroyBuffer(VmaAllocator allocator, VkBuffer buffer, VmaAllocation allocation, short line, const char *filename)
+{
+    vmaDestroyBuffer(allocator, buffer, allocation);
+    SDL_Log("%s:%d: Destroyed Buffer: handle[%ld] allocation[%ld]\n", filename, line, buffer, allocation);
 }
 
 bool VkayAllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer buffer, VkDeviceMemory *memory)

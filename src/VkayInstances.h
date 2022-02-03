@@ -10,7 +10,11 @@
     This is particularly useful for something like a particle system.
 */
 
+#if !defined(VKAY_INSTANCES)
+#define VKAY_INSTANCES
+
 #include "Vkay.h"
+#include "VkaySprite.h"
 
 struct InstanceBucket
 {
@@ -19,6 +23,15 @@ struct InstanceBucket
     VkayBuffer              instance_buffer_object = {};
 
     VkayBuffer quad_buffer_object = {};
+
+    void AddSpriteInstance(vky::Sprite &sprite) {
+        InstanceData idata = {};
+        idata.pos = sprite.transform.position;
+        idata.rot = sprite.transform.rotation;
+        idata.scale = sprite.transform.scale;
+        idata.texure_id = sprite.texture->id;
+        instance_data_array.push_back(idata);
+    }
 };
 
 void VkayInstanceBucketSetBaseMesh()
@@ -95,3 +108,5 @@ void VkayInstancesDestroy(VkayRenderer *vkr, InstanceBucket *bucket)
     vmaUnmapMemory(vkr->allocator, bucket->instance_buffer_object.allocation);
     VkayDestroyBuffer(vkr->allocator, bucket->instance_buffer_object.buffer, bucket->instance_buffer_object.allocation);
 }
+
+#endif // VKAY_INSTANCES

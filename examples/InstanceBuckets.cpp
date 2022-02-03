@@ -38,11 +38,11 @@ int main(int argc, char *argv[])
 
     VkayTextureCreate("./assets/texture.png", &vkr, vkc, &profile);
     VkayTextureCreate("./assets/bjarn_itoldu.jpg", &vkr, vkc, &itoldu);
-    
+
     VkayCameraCreate(&vkr, &camera);
     camera.m_projection = Camera::ORTHO;
 
-    InstanceData instance_data;
+    // InstanceData instance_data;
 
     const uint32_t ROW          = 1000;
     const uint32_t COL          = 1000;
@@ -50,6 +50,7 @@ int main(int argc, char *argv[])
     uint32_t       SPRITE_COUNT = ROW * COL;
     SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
 
+    vky::Sprite sprite = {};
     // Generate InstanceData for each sprite
     for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;
@@ -61,12 +62,13 @@ int main(int argc, char *argv[])
         _x = (float)((profile.width + spacing) * (i % ROW) * _scale + 50);
         _y = (float)((profile.height + spacing) * j) * _scale + 50;
 
-        instance_data.pos = { _x, -_y, 1 };
-        if (i == 0) instance_data.pos = { _x + vkc.window_extent.width / 2 - profile.width * .1f, -_y - vkc.window_extent.height / 2, 1.1f };
-        instance_data.texure_id = profile.id;
-        instance_data.scale     = { profile.width, profile.height, 0 };
-        instance_data.scale *= _scale;
-        instances.instance_data_array.push_back(instance_data);
+        sprite.transform.position = { _x, -_y, 1 };
+        if (i == 0) sprite.transform.position = { _x + vkc.window_extent.width / 2 - profile.width * .1f, -_y - vkc.window_extent.height / 2, 1.1f };
+        sprite.texture = &profile;
+        sprite.texture->id = profile.id;
+        sprite.transform.scale     = { profile.width, profile.height, 0 };
+        sprite.transform.scale *= _scale;
+        instances.AddSpriteInstance(sprite);
     }
 
     VkayInstancesBucketUpload(&vkr, &instances, quad.mesh);

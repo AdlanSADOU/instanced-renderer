@@ -26,7 +26,8 @@ layout(push_constant) uniform InTransform {
 //    Pixel imageData[];
 // };
 
-void main() {
+void main()
+{
   /*
   In order to fit the work into workgroups, some unnecessary threads are launched.
   We terminate those threads here.

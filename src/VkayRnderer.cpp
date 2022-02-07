@@ -343,7 +343,7 @@ void VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr)
 
 
     vkr->instanced_pipeline = VkayCreateGraphicsPipelineInstanced(vkr);
-    vkr->compute_pipeline = CreateComputePipeline(vkr);
+    vkr->compute_pipeline   = CreateComputePipeline(vkr);
 }
 
 
@@ -439,15 +439,14 @@ void VkayRendererBeginRenderPass(VkayRenderer *vkr)
 {
     VkCommandBuffer *g_inflight_main_command_buffer = &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT].cmd_buffer_gfx;
 
-    VkClearValue clear_value;
-    clear_value.color = { { .1f, .1f, .1f } };
+    // vkr->clear_value.color = { { .1f, .1f, .1f } };
 
     // float flash       = abs(sin(vkr->frame_idx_inflight / 120.f));
     // clear_value.color = { { 0.0f, 0.0f, flash, 1.0f } };
 
     VkClearValue depth_clear;
     depth_clear.depth_stencil.depth   = 1.f;
-    VkClearValue union_clear_values[] = { clear_value, depth_clear };
+    VkClearValue union_clear_values[] = { vkr->clear_value, depth_clear };
 
 
     //////////////////////
@@ -465,6 +464,13 @@ void VkayRendererBeginRenderPass(VkayRenderer *vkr)
     vkCmdBeginRenderPass(*g_inflight_main_command_buffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
+void VkayRendererClearColor(VkayRenderer *vkr, Color color)
+{
+    vkr->clear_value.color.float32[3] =  color.a;
+    vkr->clear_value.color.float32[0] =  color.r;
+    vkr->clear_value.color.float32[1] =  color.g;
+    vkr->clear_value.color.float32[2] =  color.b;
+}
 
 void VkayRendererPresent(VkayRenderer *vkr)
 {

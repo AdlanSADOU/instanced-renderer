@@ -6,21 +6,21 @@ struct Camera
     {
         PERSPECTIVE = 0,
         ORTHO,
-    } m_projection
-        = PERSPECTIVE;
+    };
 
     struct Data
     {
         glm::mat4 view       = {};
         glm::mat4 projection = {};
         glm::mat4 viewproj   = {};
-    } data {};
+    } m_data {};
 
     void            *m_data_ptr[FRAME_BUFFER_COUNT];
     VkayBuffer       m_UBO[FRAME_BUFFER_COUNT];
     VkDescriptorSet  m_set_global[FRAME_BUFFER_COUNT] = {};
     VkPipelineLayout m_pipeline_layout;
     VkayRenderer    *m_vkr;
+    Projection       m_projection = PERSPECTIVE;
 
     glm::vec3 m_position;
 };
@@ -72,10 +72,10 @@ void VkayCameraUpdate(VkayRenderer *vkr, Camera *camera, VkPipelineLayout pipeli
     glm::mat4 V = glm::lookAt(glm::vec3(0.f, 0.f, 2.0f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f));
     projection[1][1] *= -1;
 
-    camera->data.projection = projection * V;
-    camera->data.view       = view;
-    camera->data.viewproj   = projection * view;
-    memcpy(camera->m_data_ptr[vkr->frame_idx_inflight], &camera->data, sizeof(camera->data));
+    camera->m_data.projection = projection * V;
+    camera->m_data.view       = view;
+    camera->m_data.viewproj   = projection * view;
+    memcpy(camera->m_data_ptr[vkr->frame_idx_inflight], &camera->m_data, sizeof(camera->m_data));
 }
 
 void VkayCameraDestroy(VkayRenderer *vkr, Camera *camera)

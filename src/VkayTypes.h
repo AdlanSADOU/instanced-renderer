@@ -16,6 +16,27 @@ class vector;
 
 #define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
 
+struct Color
+{
+    float r;
+    float g;
+    float b;
+    float a;
+
+    Color()
+    {
+        a = r = g = b = 0;
+    }
+
+    Color(float r, float g, float b, float a)
+    {
+        this->r = r;
+        this->g = g;
+        this->b = b;
+        this->a = a;
+    }
+};
+
 struct Vertex
 {
     glm::vec3 position;
@@ -27,7 +48,7 @@ struct Vertex
 struct Vertex2
 {
     glm::vec3 position;
-    //glm::vec3 normal;
+    // glm::vec3 normal;
 };
 
 struct BaseMesh
@@ -64,7 +85,7 @@ struct Triangle
     }
 
     uint32_t indicies[3] = {
-        0,1,2
+        0, 1, 2
     };
 };
 

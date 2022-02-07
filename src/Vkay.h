@@ -33,14 +33,15 @@ struct VkayContext;
 #define SECONDS(value) (1000000000 * value)
 
 void VkayContextInit(VkayContext *vkc);
-void VkayContextCleanup(VkayContext *vkr);
+void VkayContextCleanup(VkayContext *vkc);
 
 EXPORT void       VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr);
 EXPORT void       VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererEndCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererBeginRenderPass(VkayRenderer *vkr);
 EXPORT void       VkayRendererEndRenderPass(VkayRenderer *vkr);
-void              VkayRendererPresent(VkayRenderer *vkr);
+EXPORT void       VkayRendererClearColor(VkayRenderer *vkr, Color color);
+EXPORT void       VkayRendererPresent(VkayRenderer *vkr);
 EXPORT void       VkayRendererCleanup(VkayRenderer *vkr);
 EXPORT FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr);
 
@@ -83,7 +84,7 @@ struct VkayContext
 {
     SDL_Window *window = NULL;
     // VkExtent2D  window_extent { 720, 480 };
-    VkExtent2D  window_extent { 1280, 720 };
+    VkExtent2D window_extent { 1280, 720 };
     // VkExtent2D window_extent { 1920, 1000 };
 
 
@@ -132,6 +133,8 @@ struct VkayRenderer
     VkFormat                 swapchain_image_format;
     std::vector<VkImage>     swapchain_images;
     std::vector<VkImageView> swapchain_image_views;
+
+    VkClearValue clear_value;
 
     VkImageView    depth_image_view;
     AllocatedImage depth_image;

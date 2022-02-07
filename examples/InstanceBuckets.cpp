@@ -44,18 +44,18 @@ int main(int argc, char *argv[])
 
     // InstanceData instance_data;
 
-    const uint32_t ROW          = 1000;
+    const uint32_t ROW          = 2000;
     const uint32_t COL          = 1000;
-    const int      spacing      = 100;
+    const int      spacing      = 10;
     uint32_t       SPRITE_COUNT = ROW * COL;
     SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
 
-    vky::Sprite sprite = {};
+    Sprite sprite = {};
     // Generate InstanceData for each sprite
     for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;
         static float _y     = 0;
-        float        _scale = .02f;
+        float        _scale = .002f;
 
         if (i > 0 && (i % ROW) == 0) j++;
         if (i == 0) _scale = .1f;

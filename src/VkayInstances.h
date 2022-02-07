@@ -20,16 +20,17 @@ struct InstanceBucket
 {
     void                     *mapped_data_ptr        = {};
     std::vector<InstanceData> instance_data_array    = {};
-    VkayBuffer              instance_buffer_object = {};
+    VkayBuffer                instance_buffer_object = {};
 
     VkayBuffer quad_buffer_object = {};
 
-    void AddSpriteInstance(vky::Sprite &sprite) {
+    void AddSpriteInstance(Sprite &sprite)
+    {
         InstanceData idata = {};
-        idata.pos = sprite.transform.position;
-        idata.rot = sprite.transform.rotation;
-        idata.scale = sprite.transform.scale;
-        idata.texure_id = sprite.texture->id;
+        idata.pos          = sprite.transform.position;
+        idata.rot          = sprite.transform.rotation;
+        idata.scale        = sprite.transform.scale;
+        idata.texure_id    = sprite.texture->id;
         instance_data_array.push_back(idata);
     }
 };

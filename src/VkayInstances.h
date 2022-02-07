@@ -24,7 +24,7 @@ struct InstanceBucket
 
     VkayBuffer quad_buffer_object = {};
 
-    void AddSpriteInstance(Sprite &sprite)
+    void AddSpriteInstance(vkay::Sprite &sprite)
     {
         InstanceData idata = {};
         idata.pos          = sprite.transform.position;

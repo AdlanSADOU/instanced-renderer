@@ -6,9 +6,15 @@
 #include "VkayTypes.h"
 #include "VkayTexture.h"
 
-struct Sprite {
-    Texture  *texture;
-    Transform transform;
-};
+namespace vkay {
 
+    class Sprite {
+    public:
+        Sprite() {};
+        ~Sprite() {};
+
+        Texture  *texture;
+        Transform transform;
+    };
+}
 #endif // VKAY_SPRITE_H

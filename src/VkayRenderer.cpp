@@ -518,14 +518,14 @@ VkPipeline VkayCreateGraphicsPipelineInstanced(VkayRenderer *vkr)
 
     colorBlending.sType             = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.pNext             = NULL;
-    colorBlending.logicOpEnable     = VK_FALSE;
-    colorBlending.logicOp           = VK_LOGIC_OP_COPY;
+    colorBlending.logicOpEnable     = VK_FALSE; // ?
+    colorBlending.logicOp           = VK_LOGIC_OP_OR; // ?
     colorBlending.pAttachments      = &attachment_state_color_blend;
     colorBlending.attachmentCount   = 1;
-    colorBlending.blendConstants[0] = 0.0;
-    colorBlending.blendConstants[1] = 0.0;
-    colorBlending.blendConstants[2] = 0.0;
-    colorBlending.blendConstants[3] = 0.0;
+    colorBlending.blendConstants[0] = 0.f; // ?
+    colorBlending.blendConstants[1] = 0.f; // ?
+    colorBlending.blendConstants[2] = 0.f; // ?
+    colorBlending.blendConstants[3] = 0.f; // ?
 
     VkPipelineDepthStencilStateCreateInfo create_info_depth_stencil_state;
     create_info_depth_stencil_state = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);

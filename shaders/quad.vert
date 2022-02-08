@@ -72,7 +72,7 @@ void main()
 	mat3 rotMat = _mz * _my * _mx;
 
     vec4 v_pos = vec4(vPosition * rotMat, 1.0);
-    vec4 pos = vec4((v_pos.xyz * iScale/2) + iPos, 1.0) ;
+    vec4 pos = vec4((v_pos.xyz * iScale) + iPos, 1.0) ;
 
 	gl_Position = cameraData.proj * ( cameraData.view * pos);
 	outColor = vColor;

@@ -238,7 +238,7 @@ namespace vkay {
         uint32_t num_channels;
         uint32_t id;
 
-        Texture(/* args */) {};
+        Texture() {};
         ~Texture() {};
 
         // todo(ad): *vkr is only needed for keeping track of how many texture assets count for

@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     // VkayTextureCreate();
     _textureRedShip.Create("./assets/spaceships/red_01.png", &vkr, vkc);
     _spritePlayerShip.texture = &_textureRedShip;
-    _spritePlayerShip.transform.scale = {1, 1, 1};
+    _spritePlayerShip.transform.scale = {_textureRedShip.width, _textureRedShip.height, 1};
 
     _bucket.AddSpriteInstance(_spritePlayerShip);
     VkayInstancesBucketUpload(&vkr, &_bucket, Quad().mesh);

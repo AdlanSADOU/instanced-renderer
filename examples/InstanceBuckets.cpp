@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     uint32_t       SPRITE_COUNT = ROW * COL;
     SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
 
-    Sprite sprite = {};
+    vkay::Sprite sprite = {};
     // Generate InstanceData for each sprite
     for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;

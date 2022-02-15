@@ -7,6 +7,8 @@
 
 #include "VkayTypes.h"
 
+struct Texture;
+
 struct Mesh
 {
     std::vector<Vertex>   vertices;

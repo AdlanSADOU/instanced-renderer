@@ -2,7 +2,7 @@
 #include <VkayCamera.h>
 #include <VkayTexture.h>
 #include <VkaySprite.h>
-#include <VkayInstances.h>
+#include <VkayInstancesBucket.h>
 
 VkayContext  vkc;
 VkayRenderer vkr;
@@ -11,7 +11,7 @@ bool   _bQuit       = false;
 Color  _clear_color = Color(.22f, .22f, .22f, 0.f);
 Camera _camera;
 
-InstanceBucket _bucket;
+vkay::InstanceBucket _bucket;
 vkay::Sprite   _spritePlayerShip;
 vkay::Texture  _textureRedShip;
 // BaseMesh quad = BaseMesh();
@@ -23,12 +23,12 @@ int main(int argc, char *argv[])
     VkayCameraCreate(&vkr, &_camera);
 
     // VkayTextureCreate();
-    _textureRedShip.Create("./assets/spaceships/red_01.png", &vkr, vkc);
+    vkay::TextureCreate("./assets/spaceships/red_01.png", &vkr, vkc, &_textureRedShip);
     _spritePlayerShip.texture = &_textureRedShip;
     _spritePlayerShip.transform.scale = {_textureRedShip.width, _textureRedShip.height, 1};
 
-    _bucket.AddSpriteInstance(_spritePlayerShip);
-    VkayInstancesBucketUpload(&vkr, &_bucket, Quad().mesh);
+    vkay::InstancesBucketAddSpriteInstance(&_bucket, &_spritePlayerShip);
+    vkay::InstancesBucketUpload(&vkr, &_bucket, Quad().mesh);
 
     while (!_bQuit) {
         SDL_Event e;
@@ -47,14 +47,15 @@ int main(int argc, char *argv[])
 
         VkayRendererClearColor(&vkr, _clear_color);
         VkayCameraUpdate(&vkr, &_camera, vkr.instanced_pipeline_layout);
-        VkayDrawInstanceBucket(vkr.frames[vkr.frame_idx_inflight].cmd_buffer_gfx, &vkr, &_bucket, Quad().mesh);
+        vkay::InstancesBucketDraw(vkr.frames[vkr.frame_idx_inflight].cmd_buffer_gfx, &vkr, &_bucket, Quad().mesh);
 
         VkayRendererEndRenderPass(&vkr);
         VkayRendererEndCommandBuffer(&vkr);
         VkayRendererPresent(&vkr);
     }
 
-    VkayInstancesDestroy(&vkr, &_bucket);
+    vkay::InstancesDestroy(&vkr, &_bucket);
+    vkay::TextureDestroy(&vkr, vkc, &_textureRedShip);
     VkayCameraDestroy(&vkr, &_camera);
     VkayRendererCleanup(&vkr);
     VkayContextCleanup(&vkc);

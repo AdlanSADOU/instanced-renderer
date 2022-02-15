@@ -3,16 +3,13 @@
 #if !defined(VKAY_SPRITE_H)
 #define VKAY_SPRITE_H
 
-#include "VkayTypes.h"
-#include "VkayTexture.h"
+#include <VkayTypes.h>
 
 namespace vkay {
+    struct Texture;
 
-    class Sprite {
-    public:
-        Sprite() {};
-        ~Sprite() {};
-
+    struct Sprite
+    {
         Texture  *texture;
         Transform transform;
     };

@@ -1,7 +1,8 @@
 // #define VKAY_DEBUG_ALLOCATIONS
-#include <Vkay.h>
+#include <VkayInstancesBucket.h>
 #include <VkayTexture.h>
-#include <VkayInstances.h>
+#include <VkaySprite.h>
+#include <Vkay.h>
 #include <VkayCamera.h>
 
 void UpdateAndRender();
@@ -22,10 +23,12 @@ const uint64_t MAX_DT_SAMPLES = 256;
 double dt_samples[MAX_DT_SAMPLES] = {};
 double dt_averaged                = 0;
 
-InstanceBucket instances;
-Texture        profile;
-Texture        itoldu;
-Camera         camera;
+vkay::InstanceBucket instances;
+
+vkay::Texture profile;
+vkay::Texture itoldu;
+
+Camera camera;
 
 VkayContext  vkc;
 VkayRenderer vkr;
@@ -36,8 +39,8 @@ int main(int argc, char *argv[])
     VkayContextInit(&vkc);
     VkayRendererInit(&vkc, &vkr);
 
-    VkayTextureCreate("./assets/texture.png", &vkr, vkc, &profile);
-    VkayTextureCreate("./assets/bjarn_itoldu.jpg", &vkr, vkc, &itoldu);
+    vkay::TextureCreate("./assets/texture.png", &vkr, vkc, &profile);
+    vkay::TextureCreate("./assets/bjarn_itoldu.jpg", &vkr, vkc, &itoldu);
 
     VkayCameraCreate(&vkr, &camera);
     camera.m_projection = Camera::ORTHO;
@@ -55,7 +58,7 @@ int main(int argc, char *argv[])
     for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;
         static float _y     = 0;
-        float        _scale = .002f;
+        float        _scale = .001f;
 
         if (i > 0 && (i % ROW) == 0) j++;
         if (i == 0) _scale = .1f;
@@ -64,14 +67,15 @@ int main(int argc, char *argv[])
 
         sprite.transform.position = { _x, -_y, 1 };
         if (i == 0) sprite.transform.position = { _x + vkc.window_extent.width / 2 - profile.width * .1f, -_y - vkc.window_extent.height / 2, 1.1f };
-        sprite.texture = &profile;
-        sprite.texture->id = profile.id;
-        sprite.transform.scale     = { profile.width, profile.height, 0 };
+        sprite.texture         = &profile;
+        sprite.texture->id     = profile.id;
+        sprite.transform.scale = { profile.width, profile.height, 0 };
         sprite.transform.scale *= _scale;
-        instances.AddSpriteInstance(sprite);
+        vkay::InstancesBucketAddSpriteInstance(&instances, &sprite);
     }
 
-    VkayInstancesBucketUpload(&vkr, &instances, quad.mesh);
+
+    vkay::InstancesBucketUpload(&vkr, &instances, quad.mesh);
 
     /////////////////////
     // Main loop
@@ -80,9 +84,9 @@ int main(int argc, char *argv[])
     //////////////////////
     // Cleanup
     vkDeviceWaitIdle(vkr.device);
-    VkayTextureDestroy(&vkr, vkc, &profile);
-    VkayTextureDestroy(&vkr, vkc, &itoldu);
-    VkayInstancesDestroy(&vkr, &instances);
+    vkay::TextureDestroy(&vkr, vkc, &profile);
+    vkay::TextureDestroy(&vkr, vkc, &itoldu);
+    vkay::InstancesDestroy(&vkr, &instances);
     VkayCameraDestroy(&vkr, &camera);
     VkayRendererCleanup(&vkr);
     VkayContextCleanup(&vkc);
@@ -148,7 +152,7 @@ void UpdateAndRender()
 
         static int i = 0;
         if (_key_r) {
-            VkayInstancesDestroyInstance(&vkr, i++, &instances);
+            vkay::InstancesDestroyInstance(&vkr, i++, &instances);
         }
 
         ///////////////////////////////
@@ -186,7 +190,7 @@ void UpdateAndRender()
 
         camera.m_position = { camera_x, camera_y - 0.f, camera_z - 120.f };
         VkayCameraUpdate(&vkr, &camera, vkr.instanced_pipeline_layout);
-        VkayDrawInstanceBucket(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);
+        vkay::InstancesBucketDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);
 
         VkayRendererEndRenderPass(&vkr);
         VkayRendererEndCommandBuffer(&vkr);

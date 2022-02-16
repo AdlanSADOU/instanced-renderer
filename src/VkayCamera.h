@@ -64,15 +64,16 @@ void VkayCameraUpdate(VkayRenderer *vkr, Camera *camera, VkPipelineLayout pipeli
 
     glm::mat4 projection;
     if (camera->m_projection == Camera::PERSPECTIVE) {
-        projection = glm::perspective(glm::radians(60.f), (float)vkr->window_extent.width / (float)vkr->window_extent.height, 0.1f, 1000.0f);
+        projection = glm::perspective<float>(glm::radians(60.f), (float)vkr->window_extent.width / (float)vkr->window_extent.height, 0.1f, 1000.0f);
     } else if (camera->m_projection == Camera::ORTHO) {
-        projection = glm::ortho(0.f, (float)vkr->window_extent.width, 0.f, (float)vkr->window_extent.height, .1f, 200.f);
+        projection = glm::ortho<float>(0.f, (float)vkr->window_extent.width, (float)vkr->window_extent.height, 0.f, -1.f, 1.f);
     }
 
-    glm::mat4 V = glm::lookAt(glm::vec3(0.f, 0.f, 2.0f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f));
-    projection[1][1] *= -1;
+    // glm::mat4 V = glm::lookAt(glm::vec3(0.f, 0.f, 2.0f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f));
+    // projection[1][1] *= 1;
 
-    camera->m_data.projection = projection * V;
+    // camera->m_data.projection = projection * V;
+    camera->m_data.projection = projection;
     camera->m_data.view       = view;
     camera->m_data.viewproj   = projection * view;
     memcpy(camera->m_data_ptr[vkr->frame_idx_inflight], &camera->m_data, sizeof(camera->m_data));

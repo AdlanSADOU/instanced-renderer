@@ -69,12 +69,18 @@ void main()
         0.0,  -s,   c
     );
 
-	mat3 rotMat = _mz * _my * _mx;
+    mat3 _scale = mat3(
+        iScale.x, 0.0, 0.0,
+        0.0, iScale.y, 0.0,
+        0.0,  0.0, iScale.z
+    );
 
-    vec4 v_pos = vec4(vPosition * rotMat, 1.0);
-    vec4 pos = vec4((v_pos.xyz * iScale) + iPos, 1.0) ;
+	mat3 rotMat = _mx * _mz * _my;
 
-	gl_Position = cameraData.proj * ( cameraData.view * pos);
+    vec4 v_pos = vec4(vPosition * rotMat * _scale/2.0 + iPos, 1.0);
+    // vec4 pos = vec4((v_pos.xyz) + iPos, 1.0) ;
+
+	gl_Position = cameraData.proj * (  v_pos);
 	outColor = vColor;
     outTexIdx = iTexIdx;
     outTexUV = vTexUV;

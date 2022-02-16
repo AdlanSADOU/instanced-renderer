@@ -72,7 +72,7 @@ VertexInputDescription GetVertexDescription()
         tex_idx_attribute.binding                           = 1;
         tex_idx_attribute.location                          = 7;
         tex_idx_attribute.format                            = VK_FORMAT_R32_SINT;
-        tex_idx_attribute.offset                            = offsetof(InstanceData, texure_id);
+        tex_idx_attribute.offset                            = offsetof(InstanceData, texure_idx);
 
         description.attributes.push_back(position_attribute);
         description.attributes.push_back(rotation_attribute);

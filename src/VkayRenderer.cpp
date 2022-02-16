@@ -637,10 +637,10 @@ VkPipeline VkayCreateGraphicsPipelineInstanced(VkayRenderer *vkr)
     ci_sampler.sType               = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     ci_sampler.minFilter           = VK_FILTER_NEAREST;
     ci_sampler.magFilter           = VK_FILTER_NEAREST;
-    ci_sampler.addressModeU        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    ci_sampler.addressModeV        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    ci_sampler.addressModeW        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    ci_sampler.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    ci_sampler.addressModeU        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    ci_sampler.addressModeV        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    ci_sampler.addressModeW        = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    ci_sampler.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_NEAREST;
     VK_CHECK(vkCreateSampler(vkr->device, &ci_sampler, NULL, &vkr->sampler));
 
 

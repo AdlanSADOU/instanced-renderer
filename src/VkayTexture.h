@@ -17,14 +17,14 @@ namespace vkay {
         VkImageView    view;
         VkFormat       format;
 
-        uint32_t width;
-        uint32_t height;
+        int width;
+        int height;
         uint32_t num_channels;
         uint32_t id;
     };
 
-    void TextureCreate(const char *filepath, VkayRenderer *vkr, VkayContext vkc, Texture *texture);
-    void TextureDestroy(VkayRenderer *vkr, VkayContext vkc, Texture *texture);
+    void TextureCreate(const char *filepath,  Texture *texture, VkayRenderer *vkr);
+    void TextureDestroy( Texture *texture, VkayRenderer *vkr);
 }
 
 ///////////////////////////////////////////////

@@ -11,7 +11,7 @@ namespace vkay {
         idata.pos          = sprite->transform.position;
         idata.rot          = sprite->transform.rotation;
         idata.scale        = sprite->transform.scale;
-        idata.texure_id    = sprite->texture->id;
+        idata.texure_idx    = sprite->texture_idx;
         instanceBucket->instance_data_array.push_back(idata);
     }
     void InstanceBucketSetBaseMesh()
@@ -22,14 +22,14 @@ namespace vkay {
     {
         {
             VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-            VK_CHECK(VkayCreateBuffer(&bucket->quad_buffer_object, vkr->allocator, sizeof(Vertex) * base_mesh.vertices.size(), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
-            VK_CHECK(VkayMapMemcpyMemory(base_mesh.vertices.data(), sizeof(Vertex) * base_mesh.vertices.size(), vkr->allocator, bucket->quad_buffer_object.allocation));
+            VK_CHECK(VkayCreateBuffer(&bucket->mesh_buffer, vkr->allocator, sizeof(Vertex) * base_mesh.vertices.size(), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
+            VK_CHECK(VkayMapMemcpyMemory(base_mesh.vertices.data(), sizeof(Vertex) * base_mesh.vertices.size(), vkr->allocator, bucket->mesh_buffer.allocation));
         }
 
         {
             VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-            VK_CHECK(VkayCreateBuffer(&bucket->instance_buffer_object, vkr->allocator, bucket->instance_data_array.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
-            VK_CHECK(vmaMapMemory(vkr->allocator, bucket->instance_buffer_object.allocation, &bucket->mapped_data_ptr));
+            VK_CHECK(VkayCreateBuffer(&bucket->instance_buffer, vkr->allocator, bucket->instance_data_array.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
+            VK_CHECK(vmaMapMemory(vkr->allocator, bucket->instance_buffer.allocation, &bucket->mapped_data_ptr));
             memcpy(bucket->mapped_data_ptr, bucket->instance_data_array.data(), bucket->instance_data_array.size() * sizeof(InstanceData));
 
             assert(bucket->mapped_data_ptr != NULL && "mapped_data_ptr is NULL");
@@ -37,7 +37,7 @@ namespace vkay {
 
         VkDescriptorBufferInfo storage_buffer_info = {};
         // storage_buffer_info.buffer                 = instance_data_storage_buffer.buffer;
-        storage_buffer_info.buffer = bucket->instance_buffer_object.buffer;
+        storage_buffer_info.buffer = bucket->instance_buffer.buffer;
         storage_buffer_info.offset = 0;
         storage_buffer_info.range  = bucket->instance_data_array.size() * sizeof(InstanceData);
 
@@ -64,28 +64,30 @@ namespace vkay {
         }
 
         bucket->instance_data_array.erase(bucket->instance_data_array.begin() + instance_index);
-        vmaResizeAllocation(vkr->allocator, bucket->instance_buffer_object.allocation, bucket->instance_data_array.size() * sizeof(InstanceData));
+        vmaResizeAllocation(vkr->allocator, bucket->instance_buffer.allocation, bucket->instance_data_array.size() * sizeof(InstanceData));
         memcpy(bucket->mapped_data_ptr, bucket->instance_data_array.data(), bucket->instance_data_array.size() * sizeof(InstanceData));
     }
 
+    // todo(ad): we added BaseMesh here to basically be able to pass in any mesh to be instanced, not just Quads
+    // 
     void InstancesBucketDraw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh)
     {
         // todo(ad): the issue is that for each InstanceBucket drawn we are redundently re-binding these
         vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr->instanced_pipeline);
         vkCmdBindDescriptorSets(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr->instanced_pipeline_layout, 1, 1, &vkr->set_array_of_textures, 0, NULL);
 
-        VkBuffer     buffers[] = { bucket->quad_buffer_object.buffer };
+        VkBuffer     buffers[] = { bucket->mesh_buffer.buffer };
         VkDeviceSize offsets[] = { 0 };
         vkCmdBindVertexBuffers(cmd_buffer, 0, 1, buffers, offsets);
-        vkCmdBindVertexBuffers(cmd_buffer, 1, 1, &bucket->instance_buffer_object.buffer, offsets);
+        vkCmdBindVertexBuffers(cmd_buffer, 1, 1, &bucket->instance_buffer.buffer, offsets);
 
         vkCmdDraw(cmd_buffer, (uint32_t)base_mesh.vertices.size(), (uint32_t)bucket->instance_data_array.size(), 0, 0);
     }
 
     void InstancesDestroy(VkayRenderer *vkr, InstanceBucket *bucket)
     {
-        VkayDestroyBuffer(vkr->allocator, bucket->quad_buffer_object.buffer, bucket->quad_buffer_object.allocation);
-        vmaUnmapMemory(vkr->allocator, bucket->instance_buffer_object.allocation);
-        VkayDestroyBuffer(vkr->allocator, bucket->instance_buffer_object.buffer, bucket->instance_buffer_object.allocation);
+        VkayDestroyBuffer(vkr->allocator, bucket->mesh_buffer.buffer, bucket->mesh_buffer.allocation);
+        vmaUnmapMemory(vkr->allocator, bucket->instance_buffer.allocation);
+        VkayDestroyBuffer(vkr->allocator, bucket->instance_buffer.buffer, bucket->instance_buffer.allocation);
     }
 }

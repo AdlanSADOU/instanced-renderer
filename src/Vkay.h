@@ -85,7 +85,7 @@ struct VkayContext
     SDL_Window *window = NULL;
     // VkExtent2D  window_extent { 720, 480 };
     VkExtent2D window_extent { 1280, 720 };
-    // VkExtent2D window_extent { 1920, 1000 };
+    // VkExtent2D window_extent { 1920, 1080 };
 
 
     ///////////////////////////

@@ -10,7 +10,7 @@ namespace vkay {
 
     struct Sprite
     {
-        Texture  *texture;
+        uint32_t texture_idx;
         Transform transform;
     };
 }

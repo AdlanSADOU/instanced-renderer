@@ -94,7 +94,7 @@ struct InstanceData
     alignas(16) glm::vec3 pos   = {};
     alignas(16) glm::vec3 rot   = {};
     alignas(16) glm::vec3 scale = {};
-    int32_t texure_id;
+    int32_t texure_idx;
 };
 
 struct FrameData
@@ -140,9 +140,9 @@ struct Material
 
 struct Transform
 {
-    glm::vec3 position;
-    glm::vec3 rotation;
-    glm::vec3 scale;
+    alignas(16) glm::vec3 position;
+    alignas(16) glm::vec3 rotation;
+    alignas(16) glm::vec3 scale;
 };
 
 // struct RenderObject

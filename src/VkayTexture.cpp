@@ -3,24 +3,11 @@
 #include <stdint.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include "VkayTexture.h"
 
 namespace vkay {
 
-        struct Texture
-        {
-            VkImage        image;
-            VkDeviceMemory memory;
-            VmaAllocation  allocation;
-            VkImageView    view;
-            VkFormat       format;
-
-            uint32_t width;
-            uint32_t height;
-            uint32_t num_channels;
-            uint32_t id;
-        };
-
-        void TextureCreate(const char *filepath, VkayRenderer *vkr, VkayContext vkc, Texture *texture)
+        void TextureCreate(const char *filepath, Texture *texture, VkayRenderer *vkr)
         {
             texture->id = vkr->texture_array_count;
 
@@ -33,7 +20,6 @@ namespace vkay {
 
             size_t imageSize = tex_width * tex_height * 4;
 
-
             texture->width        = tex_width;
             texture->height       = tex_height;
             texture->num_channels = texChannels;
@@ -44,7 +30,7 @@ namespace vkay {
             ci_image.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
             ci_image.imageType         = VK_IMAGE_TYPE_2D;
             ci_image.format            = VK_FORMAT_R8G8B8A8_UNORM;
-            ci_image.extent            = { texture->width, texture->height, 1 };
+            ci_image.extent            = { (uint32_t)texture->width, (uint32_t)texture->height, 1 };
             ci_image.mipLevels         = 1;
             ci_image.arrayLayers       = 1;
             ci_image.samples           = VK_SAMPLE_COUNT_1_BIT;
@@ -55,7 +41,6 @@ namespace vkay {
 
             VmaAllocationCreateInfo ci_allocation = {};
             ci_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
-
             VK_CHECK(vmaCreateImage(vkr->allocator, &ci_image, &ci_allocation, &texture->image, &texture->allocation, NULL));
 
 
@@ -88,7 +73,9 @@ namespace vkay {
             vmaFlushAllocation(vkr->allocator, staging_buffer.allocation, 0, VK_WHOLE_SIZE);
             vmaUnmapMemory(vkr->allocator, staging_buffer.allocation);
 
+
             stbi_image_free(pixels);
+
 
             // begin staging command buffer
             VkCommandBufferBeginInfo cmd_buffer_begin_info = {};
@@ -160,9 +147,6 @@ namespace vkay {
             VkayDestroyBuffer(vkr->allocator, staging_buffer.buffer, staging_buffer.allocation);
 
 
-
-
-
             VkDescriptorImageInfo desc_image_image_info           = {};
             desc_image_image_info.sampler                         = NULL;
             desc_image_image_info.imageLayout                     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -209,11 +193,10 @@ namespace vkay {
             vkUpdateDescriptorSets(vkr->device, 2, setWrites, 0, NULL);
 
 
-
             vkr->texture_array_count++;
         }
 
-        void TextureDestroy(VkayRenderer *vkr, VkayContext vkc, Texture *texture)
+        void TextureDestroy(Texture *texture, VkayRenderer *vkr)
         {
             vkDestroyImageView(vkr->device, texture->view, NULL);
             vmaDestroyImage(vkr->allocator, texture->image, texture->allocation);

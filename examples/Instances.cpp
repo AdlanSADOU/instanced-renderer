@@ -39,16 +39,16 @@ int main(int argc, char *argv[])
     VkayContextInit(&vkc);
     VkayRendererInit(&vkc, &vkr);
 
-    vkay::TextureCreate("./assets/texture.png", &vkr, vkc, &profile);
-    vkay::TextureCreate("./assets/bjarn_itoldu.jpg", &vkr, vkc, &itoldu);
+    vkay::TextureCreate("./assets/texture.png", &profile, &vkr);
+    vkay::TextureCreate("./assets/bjarn_itoldu.jpg", &itoldu, &vkr);
 
     VkayCameraCreate(&vkr, &camera);
     camera.m_projection = Camera::ORTHO;
 
     // InstanceData instance_data;
 
-    const uint32_t ROW          = 2000;
-    const uint32_t COL          = 1000;
+    const uint32_t ROW          = 200;
+    const uint32_t COL          = 100;
     const int      spacing      = 10;
     uint32_t       SPRITE_COUNT = ROW * COL;
     SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
@@ -58,22 +58,21 @@ int main(int argc, char *argv[])
     for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;
         static float _y     = 0;
-        float        _scale = .001f;
+        float        _scale = .01f;
 
         if (i > 0 && (i % ROW) == 0) j++;
-        if (i == 0) _scale = .1f;
+        if (i == 0) _scale = 1.f;
         _x = (float)((profile.width + spacing) * (i % ROW) * _scale + 50);
         _y = (float)((profile.height + spacing) * j) * _scale + 50;
 
-        sprite.transform.position = { _x, -_y, 1 };
-        if (i == 0) sprite.transform.position = { _x + vkc.window_extent.width / 2 - profile.width * .1f, -_y - vkc.window_extent.height / 2, 1.1f };
-        sprite.texture         = &profile;
-        sprite.texture->id     = profile.id;
+        sprite.transform.position = { _x, _y, 0.f };
+        if (i == 0) sprite.transform.position = { 100, 100, 0.f };
+        // if (i == 0) sprite.transform.position = { _x + vkc.window_extent.width / 2 - profile.width , -_y - vkc.window_extent.height / 2, 0.f };
+        sprite.texture_idx     = profile.id;
         sprite.transform.scale = { profile.width, profile.height, 0 };
         sprite.transform.scale *= _scale;
         vkay::InstancesBucketAddSpriteInstance(&instances, &sprite);
     }
-
 
     vkay::InstancesBucketUpload(&vkr, &instances, quad.mesh);
 
@@ -83,9 +82,10 @@ int main(int argc, char *argv[])
 
     //////////////////////
     // Cleanup
+    vkay::TextureDestroy(&profile, &vkr);
+    vkay::TextureDestroy(&itoldu, &vkr);
+
     vkDeviceWaitIdle(vkr.device);
-    vkay::TextureDestroy(&vkr, vkc, &profile);
-    vkay::TextureDestroy(&vkr, vkc, &itoldu);
     vkay::InstancesDestroy(&vkr, &instances);
     VkayCameraDestroy(&vkr, &camera);
     VkayRendererCleanup(&vkr);
@@ -143,12 +143,17 @@ void UpdateAndRender()
         if (_key_left) camera_x += camera_speed * (float)dt_averaged;
         if (_key_right) camera_x -= camera_speed * (float)dt_averaged;
 
+        if (_key_up) camera_z -= .01f;
+        if (_key_down) camera_z += .01f;
+
         if (_key_W) pos_y += player_speed * (float)dt_averaged;
         if (_key_S) pos_y -= player_speed * (float)dt_averaged;
         if (_key_A) pos_x -= player_speed * (float)dt_averaged;
         if (_key_D) pos_x += player_speed * (float)dt_averaged;
         if (_key_Q) pos_z -= player_speed * (float)dt_averaged;
         if (_key_E) pos_z += player_speed * (float)dt_averaged;
+
+
 
         static int i = 0;
         if (_key_r) {
@@ -188,7 +193,9 @@ void UpdateAndRender()
         VkayRendererBeginCommandBuffer(&vkr);
         VkayRendererBeginRenderPass(&vkr);
 
-        camera.m_position = { camera_x, camera_y - 0.f, camera_z - 120.f };
+        // ((InstanceData *)instances.mapped_data_ptr)[0].pos.z = camera_z;
+
+        camera.m_position = { camera_x, camera_y - 0.f, camera_z};
         VkayCameraUpdate(&vkr, &camera, vkr.instanced_pipeline_layout);
         vkay::InstancesBucketDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);
 

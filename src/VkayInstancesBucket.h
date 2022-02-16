@@ -28,9 +28,9 @@ namespace vkay {
     {
         void                     *mapped_data_ptr        = {};
         std::vector<InstanceData> instance_data_array    = {};
-        VkayBuffer                instance_buffer_object = {};
+        VkayBuffer                instance_buffer = {};
 
-        VkayBuffer quad_buffer_object = {};
+        VkayBuffer mesh_buffer = {};
     };
 
     void InstancesBucketAddSpriteInstance(InstanceBucket *instanceBucket, Sprite *sprite);
@@ -42,4 +42,3 @@ namespace vkay {
 }
 
 #endif // VKAY_INSTANCES
- 

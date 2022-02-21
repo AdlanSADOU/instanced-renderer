@@ -116,9 +116,21 @@ void VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr)
         1
     };
 
-    vkr->depth_format = VK_FORMAT_D32_SFLOAT; // hardcoding the depth format to 32 bit float
+    vkr->depth_format = VK_FORMAT_D16_UNORM; // hardcoding the depth format to 32 bit float
     // the depth image will be an image with the format we selected and Depth Attachment usage flag
-    VkImageCreateInfo create_info_depth_image = vkinit::image_create_info(vkr->depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, depthImageExtent);
+    // VkImageCreateInfo create_info_depth_image = vkinit::image_create_info(vkr->depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, depthImageExtent);
+    VkImageCreateInfo create_info_depth_image = {};
+    create_info_depth_image.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    create_info_depth_image.pNext             = NULL;
+    create_info_depth_image.imageType         = VK_IMAGE_TYPE_2D;
+    create_info_depth_image.format            = vkr->depth_format;
+    create_info_depth_image.extent            = depthImageExtent;
+    create_info_depth_image.mipLevels         = 1;
+    create_info_depth_image.arrayLayers       = 1;
+    create_info_depth_image.samples           = VK_SAMPLE_COUNT_1_BIT;
+    create_info_depth_image.tiling            = VK_IMAGE_TILING_OPTIMAL;
+    create_info_depth_image.usage             = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    create_info_depth_image.flags             = 0;
 
     VmaAllocationCreateInfo create_info_depth_image_allocation = {}; // for the depth image, we want to allocate it from GPU local memory
     create_info_depth_image_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -127,7 +139,22 @@ void VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr)
     vmaCreateImage(vkr->allocator, &create_info_depth_image, &create_info_depth_image_allocation, &vkr->depth_image.image, &vkr->depth_image.allocation, NULL);
 
     // build an image-view for the depth image to use for rendering
-    VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(vkr->depth_format, vkr->depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+    // VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(vkr->depth_format, vkr->depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+    VkImageSubresourceRange depth_image_view_subrange = {};
+    depth_image_view_subrange.aspectMask              = VK_IMAGE_ASPECT_DEPTH_BIT;
+    depth_image_view_subrange.baseMipLevel            = 0;
+    depth_image_view_subrange.levelCount              = 1;
+    depth_image_view_subrange.baseArrayLayer          = 0;
+    depth_image_view_subrange.layerCount              = 1;
+
+    VkImageViewCreateInfo dview_info = {};
+    dview_info.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    dview_info.pNext                 = NULL;
+    dview_info.image                 = vkr->depth_image.image;
+    dview_info.format                = vkr->depth_format;
+    dview_info.subresourceRange      = depth_image_view_subrange;
+    dview_info.flags                 = 0;
+    dview_info.viewType              = VK_IMAGE_VIEW_TYPE_2D;
 
     VK_CHECK(vkCreateImageView(vkc->device, &dview_info, NULL, &vkr->depth_image_view));
 
@@ -160,8 +187,8 @@ void VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr)
     depth_attachment.format                  = vkr->depth_format;
     depth_attachment.samples                 = VK_SAMPLE_COUNT_1_BIT;
     depth_attachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depth_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
-    depth_attachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth_attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depth_attachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depth_attachment.initialLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
     depth_attachment.finalLayout             = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -183,6 +210,27 @@ void VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr)
     subpass.pColorAttachments       = &color_attachment_ref;
     subpass.pDepthStencilAttachment = &depth_attachment_ref;
 
+    VkSubpassDependency attachmentDependencies[2] = {};
+    // Depth buffer is shared between swapchain images
+    attachmentDependencies[0].srcSubpass      = VK_SUBPASS_EXTERNAL;
+    attachmentDependencies[0].dstSubpass      = 0;
+    attachmentDependencies[0].srcStageMask    = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    attachmentDependencies[0].dstStageMask    = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    attachmentDependencies[0].srcAccessMask   = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    attachmentDependencies[0].dstAccessMask   = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    attachmentDependencies[0].dependencyFlags = 0;
+
+    // Image Layout Transition
+    attachmentDependencies[1].srcSubpass      = VK_SUBPASS_EXTERNAL;
+    attachmentDependencies[1].dstSubpass      = 0;
+    attachmentDependencies[1].srcStageMask    = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    attachmentDependencies[1].dstStageMask    = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    attachmentDependencies[1].srcAccessMask   = 0;
+    attachmentDependencies[1].dstAccessMask   = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+    attachmentDependencies[1].dependencyFlags = 0;
+
+
+
     /////
     // RenderPass creation
     VkAttachmentDescription attachment_descriptions[2] = { color_attachment, depth_attachment };
@@ -193,6 +241,9 @@ void VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr)
     render_pass_info.pAttachments           = &attachment_descriptions[0];
     render_pass_info.subpassCount           = 1; // connect the subpass to the info
     render_pass_info.pSubpasses             = &subpass;
+    render_pass_info.dependencyCount = 2;
+    render_pass_info.pDependencies = attachmentDependencies;
+
     VK_CHECK(vkCreateRenderPass(vkc->device, &render_pass_info, NULL, &vkr->render_pass));
 
     vkc->release_queue.push_function([=]() {
@@ -444,7 +495,7 @@ void VkayRendererBeginRenderPass(VkayRenderer *vkr)
     // float flash       = abs(sin(vkr->frame_idx_inflight / 120.f));
     // clear_value.color = { { 0.0f, 0.0f, flash, 1.0f } };
 
-    VkClearValue depth_clear;
+    VkClearValue depth_clear          = {};
     depth_clear.depth_stencil.depth   = 1.f;
     VkClearValue union_clear_values[] = { vkr->clear_value, depth_clear };
 
@@ -460,16 +511,16 @@ void VkayRendererBeginRenderPass(VkayRenderer *vkr)
     rpInfo.renderArea.extent     = vkr->window_extent;
     rpInfo.framebuffer           = vkr->framebuffers[vkr->frames[vkr->frame_idx_inflight].idx_swapchain_image];
     rpInfo.clear_value_count     = 2;
-    rpInfo.pClearValues          = &union_clear_values[0];
+    rpInfo.pClearValues          = union_clear_values;
     vkCmdBeginRenderPass(*g_inflight_main_command_buffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void VkayRendererClearColor(VkayRenderer *vkr, Color color)
 {
-    vkr->clear_value.color.float32[3] =  color.a;
-    vkr->clear_value.color.float32[0] =  color.r;
-    vkr->clear_value.color.float32[1] =  color.g;
-    vkr->clear_value.color.float32[2] =  color.b;
+    vkr->clear_value.color.float32[3] = color.a;
+    vkr->clear_value.color.float32[0] = color.r;
+    vkr->clear_value.color.float32[1] = color.g;
+    vkr->clear_value.color.float32[2] = color.b;
 }
 
 void VkayRendererPresent(VkayRenderer *vkr)

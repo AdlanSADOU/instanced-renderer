@@ -7,9 +7,9 @@
 
 void UpdateAndRender();
 
-bool  _key_r  = false;
+bool  _key_p  = false;
 bool  _key_up = false, _key_down = false, _key_left = false, _key_right = false;
-bool  _key_W = false, _key_A = false, _key_S = false, _key_D = false, _key_Q = false, _key_E = false;
+bool  _key_W = false, _key_A = false, _key_S = false, _key_D = false, _key_Q = false, _key_E = false, _key_R = false, _key_F = false;
 float camera_x = 0, camera_y = 0, camera_z = 0;
 
 float pos_x        = 0;
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
         _y = (float)((profile.height + spacing) * j) * _scale + 50;
 
         sprite.transform.position = { _x, _y, 0.f };
-        if (i == 0) sprite.transform.position = { 100, 100, 0.f };
+        if (i == 0) sprite.transform.position = { 100, 100, -1.f };
         // if (i == 0) sprite.transform.position = { _x + vkc.window_extent.width / 2 - profile.width , -_y - vkc.window_extent.height / 2, 0.f };
         sprite.texture_idx     = profile.id;
         sprite.transform.scale = { profile.width, profile.height, 0 };
@@ -119,7 +119,10 @@ void UpdateAndRender()
                 if (key == SDLK_d) _key_D = false;
                 if (key == SDLK_q) _key_Q = false;
                 if (key == SDLK_e) _key_E = false;
-                if (key == SDLK_r) _key_r = false;
+                if (key == SDLK_p) _key_p = false;
+
+                if (key == SDLK_r) _key_R = false;
+                if (key == SDLK_f) _key_F = false;
             }
 
             if (e.type == SDL_KEYDOWN) {
@@ -134,29 +137,41 @@ void UpdateAndRender()
                 if (key == SDLK_d) _key_D = true;
                 if (key == SDLK_q) _key_Q = true;
                 if (key == SDLK_e) _key_E = true;
-                if (key == SDLK_r) _key_r = true;
+                if (key == SDLK_p) _key_p = true;
+
+                if (key == SDLK_r) _key_R = true;
+                if (key == SDLK_f) _key_F = true;
             }
         }
 
-        if (_key_up) camera_y -= camera_speed * (float)dt_averaged;
-        if (_key_down) camera_y += camera_speed * (float)dt_averaged;
+        // if (camera.m_projection == Camera::ORTHO) {
+        //     if (_key_up) camera_y -= camera_speed * (float)dt_averaged;
+        //     if (_key_down) camera_y += camera_speed * (float)dt_averaged;
+        // } else
+        {
+            if (_key_R) camera_y -= camera_speed * (float)dt_averaged;
+            if (_key_F) camera_y += camera_speed * (float)dt_averaged;
+
+            if (_key_up) camera_z -= camera_speed * (float)dt_averaged;
+            if (_key_down) camera_z += camera_speed * (float)dt_averaged;
+        }
+
         if (_key_left) camera_x += camera_speed * (float)dt_averaged;
         if (_key_right) camera_x -= camera_speed * (float)dt_averaged;
-
-        if (_key_up) camera_z -= .01f;
-        if (_key_down) camera_z += .01f;
 
         if (_key_W) pos_y += player_speed * (float)dt_averaged;
         if (_key_S) pos_y -= player_speed * (float)dt_averaged;
         if (_key_A) pos_x -= player_speed * (float)dt_averaged;
         if (_key_D) pos_x += player_speed * (float)dt_averaged;
-        if (_key_Q) pos_z -= player_speed * (float)dt_averaged;
-        if (_key_E) pos_z += player_speed * (float)dt_averaged;
+        // if (_key_Q) pos_z -= player_speed * (float)dt_averaged;
+        // if (_key_E) pos_z += player_speed * (float)dt_averaged;
+        if (_key_Q) pos_z -= .01f;
+        if (_key_E) pos_z += .01f;
 
 
 
         static int i = 0;
-        if (_key_r) {
+        if (_key_p) {
             vkay::InstancesDestroyInstance(&vkr, i++, &instances);
         }
 
@@ -193,9 +208,12 @@ void UpdateAndRender()
         VkayRendererBeginCommandBuffer(&vkr);
         VkayRendererBeginRenderPass(&vkr);
 
-        // ((InstanceData *)instances.mapped_data_ptr)[0].pos.z = camera_z;
+        ((InstanceData *)instances.mapped_data_ptr)[0].pos.z += pos_z;
 
-        camera.m_position = { camera_x, camera_y - 0.f, camera_z};
+        camera.m_position.x += camera_x;
+        camera.m_position.y += camera_y;
+        camera.m_position.z += camera_z;
+
         VkayCameraUpdate(&vkr, &camera, vkr.instanced_pipeline_layout);
         vkay::InstancesBucketDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);
 

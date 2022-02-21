@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     VkayRendererInit(&vkc, &vkr);
     VkayCameraCreate(&vkr, &_camera);
     _camera.m_projection = Camera::ORTHO;
-    _camera.m_position   = { 0, 0, 0.f };
+    _camera.m_position   = { 0, 0, 10.f };
 
     vkay::TextureCreate("./assets/spaceships/red_01.png", &_textureRedShip, &vkr);
     _spritePlayerShip.texture_idx        = _textureRedShip.id;

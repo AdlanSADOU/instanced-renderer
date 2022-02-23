@@ -53,16 +53,15 @@ set(OUT_DIR $<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>)
 add_custom_command(TARGET vkay POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/SDL2/lib/x64/SDL2.dll
-        ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR}/SDL2.dll
-
-        )
+        ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR}/SDL2.dll)
 
 add_custom_command(TARGET vkay POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/assimp/bin/assimp-vc142-mt.dll
         ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR}/assimp-vc142-mt.dll)
 
-# These will get problematic as shaders/ and assets/ get bigger
+# These will get problematic as shaders/ and assets/ get bigger since
+# we are copying them each rebuild
 # need a better solution at some point
 # but for now, it's fine
 add_custom_command(TARGET vkay POST_BUILD

@@ -15,8 +15,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
 

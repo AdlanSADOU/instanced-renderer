@@ -1,4 +1,7 @@
 // #define VKAY_DEBUG_ALLOCATIONS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_RADIANS
+
 #include <VkayInstancesBucket.h>
 #include <VkayTexture.h>
 #include <VkaySprite.h>
@@ -44,12 +47,12 @@ int main(int argc, char *argv[])
 
     VkayCameraCreate(&vkr, &camera);
     camera.m_projection = Camera::ORTHO;
-
+    camera.m_position = {0,0,0};
     // InstanceData instance_data;
 
-    const uint32_t ROW          = 200;
-    const uint32_t COL          = 100;
-    const int      spacing      = 10;
+    const uint32_t ROW          = 3;
+    const uint32_t COL          = 3;
+    const int      spacing      = -5;
     uint32_t       SPRITE_COUNT = ROW * COL;
     SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
 
@@ -58,15 +61,15 @@ int main(int argc, char *argv[])
     for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;
         static float _y     = 0;
-        float        _scale = .01f;
+        float        _scale = .1f;
 
         if (i > 0 && (i % ROW) == 0) j++;
         if (i == 0) _scale = 1.f;
         _x = (float)((profile.width + spacing) * (i % ROW) * _scale + 50);
         _y = (float)((profile.height + spacing) * j) * _scale + 50;
 
-        sprite.transform.position = { _x, _y, 0.f };
-        if (i == 0) sprite.transform.position = { 100, 100, -1.f };
+        sprite.transform.position = { _x-1.f, _y, .5f };
+        if (i == 0) sprite.transform.position = { 0, 0, 0 };
         // if (i == 0) sprite.transform.position = { _x + vkc.window_extent.width / 2 - profile.width , -_y - vkc.window_extent.height / 2, 0.f };
         sprite.texture_idx     = profile.id;
         sprite.transform.scale = { profile.width, profile.height, 0 };
@@ -144,19 +147,22 @@ void UpdateAndRender()
             }
         }
 
-        // if (camera.m_projection == Camera::ORTHO) {
-        //     if (_key_up) camera_y -= camera_speed * (float)dt_averaged;
-        //     if (_key_down) camera_y += camera_speed * (float)dt_averaged;
-        // } else
+        if (camera.m_projection == Camera::ORTHO) {
+            // if (_key_up) camera_y -= camera_speed * (float)dt_averaged;
+            // if (_key_down) camera_y += camera_speed * (float)dt_averaged;
+
+            if (_key_up) camera_z -= camera_speed * (float)dt_averaged;
+            if (_key_down) camera_z += camera_speed * (float)dt_averaged;
+        } else
         {
             if (_key_R) camera_y -= camera_speed * (float)dt_averaged;
             if (_key_F) camera_y += camera_speed * (float)dt_averaged;
 
-            if (_key_up) camera_z -= camera_speed * (float)dt_averaged;
-            if (_key_down) camera_z += camera_speed * (float)dt_averaged;
         }
 
-        if (_key_left) camera_x += camera_speed * (float)dt_averaged;
+        if (_key_left == true) {
+            camera_x += camera_speed * (float)dt_averaged;
+        }
         if (_key_right) camera_x -= camera_speed * (float)dt_averaged;
 
         if (_key_W) pos_y += player_speed * (float)dt_averaged;
@@ -167,8 +173,6 @@ void UpdateAndRender()
         // if (_key_E) pos_z += player_speed * (float)dt_averaged;
         if (_key_Q) pos_z -= .01f;
         if (_key_E) pos_z += .01f;
-
-
 
         static int i = 0;
         if (_key_p) {
@@ -208,11 +212,17 @@ void UpdateAndRender()
         VkayRendererBeginCommandBuffer(&vkr);
         VkayRendererBeginRenderPass(&vkr);
 
-        ((InstanceData *)instances.mapped_data_ptr)[0].pos.z += pos_z;
+        glm::vec3 *s_pos = &((InstanceData *)instances.mapped_data_ptr)[0].pos;
+        s_pos->x += pos_x;
+        s_pos->y += pos_y;
+        s_pos->z += pos_z * 1.f;
 
         camera.m_position.x += camera_x;
         camera.m_position.y += camera_y;
-        camera.m_position.z += camera_z;
+        camera.m_position.z += camera_z *.1f;
+
+        printf(" sprite: %.1f %.1f %.1f", s_pos->x, s_pos->y, s_pos->z);
+        printf(" camera: %.1f %.1f %.1f\n", camera.m_position.x, camera.m_position.y, camera.m_position.z);
 
         VkayCameraUpdate(&vkr, &camera, vkr.instanced_pipeline_layout);
         vkay::InstancesBucketDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);
@@ -223,7 +233,8 @@ void UpdateAndRender()
 
         //////////////////////////////////
         // DeltaTime
-        pos_x = pos_y = pos_z              = 0;
+        pos_x = pos_y = pos_z = 0;
+        camera_x = camera_y = camera_z     = 0;
         uint64_t        end                = SDL_GetPerformanceCounter();
         static uint64_t idx                = 0;
         dt_samples[idx++ % MAX_DT_SAMPLES] = (end - start) / (double)SDL_GetPerformanceFrequency();

@@ -80,7 +80,7 @@ void main()
     vec4 v_pos = vec4(vPosition * rotMat * _scale/2.0 + iPos, 1.0);
     // vec4 pos = vec4((v_pos.xyz) + iPos, 1.0) ;
 
-	gl_Position = cameraData.proj * (  v_pos);
+	gl_Position = cameraData.viewproj * v_pos;
 	outColor = vColor;
     outTexIdx = iTexIdx;
     outTexUV = vTexUV;

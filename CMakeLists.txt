@@ -15,7 +15,7 @@ set(THIRD_PARTY_LINK_DIRS
 
 set(INCLUDES
 ./src
-./vendor/assimp/include
+# ./vendor/assimp/include
 )
 
 set (CFLAGS -FC -GR- -EHa- -EHsc -EHs -nologo /TP /Z7 /Zf /Zi /MP)
@@ -24,7 +24,7 @@ add_library(vkay STATIC ${SOURCES})
 target_compile_options(vkay PRIVATE ${CFLAGS})
 target_link_options(vkay PRIVATE -time)
 target_link_directories(vkay PUBLIC ${THIRD_PARTY_LINK_DIRS})
-target_link_libraries(vkay SDL2 SDL2main vulkan-1 assimp-vc142-mt)
+target_link_libraries(vkay LINK_PUBLIC SDL2 SDL2main vulkan-1 assimp-vc142-mt)
 target_include_directories(vkay PUBLIC ${INCLUDES})
 
 

@@ -21,7 +21,7 @@ struct Controls
 vkay::InstanceBucket _bucket;
 vkay::Sprite         _spritePlayerShip;
 vkay::Texture        _textureRedShip;
-// BaseMesh quad = BaseMesh();
+
 // SDL complains if char const *argv[]
 int main(int argc, char *argv[])
 {
@@ -29,14 +29,13 @@ int main(int argc, char *argv[])
     VkayRendererInit(&vkc, &vkr);
     VkayCameraCreate(&vkr, &_camera);
     _camera.m_projection = Camera::ORTHO;
-    _camera.m_position   = { -7, -8, 0.f };
+    _camera.m_position   = { 0, 0, 0 };
 
     vkay::TextureCreate("./assets/spaceships/red_01.png", &_textureRedShip, &vkr);
+
     _spritePlayerShip.texture_idx        = _textureRedShip.id;
     _spritePlayerShip.transform.position = { 55, 40, 0 };
-
-    // todo(ad): this scales up the quad to the size of the texture
-    _spritePlayerShip.transform.scale = { _textureRedShip.width, _textureRedShip.height, 1 };
+    _spritePlayerShip.transform.scale    = { _textureRedShip.width, _textureRedShip.height, 1 };
 
     vkay::InstancesBucketAddSpriteInstance(&_bucket, &_spritePlayerShip);
     vkay::InstancesBucketUpload(&vkr, &_bucket, Quad().mesh);
@@ -92,20 +91,19 @@ int main(int argc, char *argv[])
         float shipX = 0, shipY = 0, shipZ = 0;
         float cameraX = 0, cameraY = 0, cameraZ = 0;
 
-        if (ctrls.key_W) shipY += .01f;
-        if (ctrls.key_S) shipY -= .01f;
-        if (ctrls.key_A) shipX -= .01f;
-        if (ctrls.key_D) shipX += .01f;
-        if (ctrls.key_Q) shipZ -= .01f;
-        if (ctrls.key_E) shipZ += .01f;
+        if (ctrls.key_W) shipY += .5f;
+        if (ctrls.key_S) shipY -= .5f;
+        if (ctrls.key_A) shipX -= .5f;
+        if (ctrls.key_D) shipX += .5f;
+        if (ctrls.key_Q) shipZ -= .5f;
+        if (ctrls.key_E) shipZ += .5f;
 
-        if (ctrls.key_up) cameraY += .01f;
-        if (ctrls.key_down) cameraY -= .01f;
-        if (ctrls.key_left) cameraX -= .01f;
-        if (ctrls.key_right) cameraX += .01f;
-        if (ctrls.key_R) cameraZ -= .01f;
-        if (ctrls.key_F) cameraZ += .01f;
-
+        if (ctrls.key_up) cameraY += .5f;
+        if (ctrls.key_down) cameraY -= .5f;
+        if (ctrls.key_left) cameraX -= .5f;
+        if (ctrls.key_right) cameraX += .5f;
+        if (ctrls.key_R) cameraZ -= .5f;
+        if (ctrls.key_F) cameraZ += .5f;
 
         s_pos->x += shipX * 1.f;
         s_pos->y += shipY * 1.f;
@@ -115,8 +113,8 @@ int main(int argc, char *argv[])
         _camera.m_position.y += cameraY * 1.f;
         _camera.m_position.z += cameraZ * .1f;
 
-        printf(" sprite: %f.1 %f.1 %f.1", s_pos->x, s_pos->y, s_pos->z);
-        printf(" camera: %f.1 %f.1 %f.1\n", _camera.m_position.x, _camera.m_position.y, _camera.m_position.z);
+        // printf(" sprite: %f.1 %f.1 %f.1", s_pos->x, s_pos->y, s_pos->z);
+        // printf(" camera: %f.1 %f.1 %f.1\n", _camera.m_position.x, _camera.m_position.y, _camera.m_position.z);
 
         VkayRendererBeginCommandBuffer(&vkr);
         VkayRendererBeginRenderPass(&vkr);

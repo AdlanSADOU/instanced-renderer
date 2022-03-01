@@ -48,7 +48,6 @@ int main(int argc, char *argv[])
     VkayCameraCreate(&vkr, &camera);
     camera.m_projection = Camera::ORTHO;
     camera.m_position = {0,0,0};
-    // InstanceData instance_data;
 
     const uint32_t ROW          = 3;
     const uint32_t COL          = 3;

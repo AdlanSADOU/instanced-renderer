@@ -241,8 +241,8 @@ void VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr)
     render_pass_info.pAttachments           = &attachment_descriptions[0];
     render_pass_info.subpassCount           = 1; // connect the subpass to the info
     render_pass_info.pSubpasses             = &subpass;
-    render_pass_info.dependencyCount = 2;
-    render_pass_info.pDependencies = attachmentDependencies;
+    render_pass_info.dependencyCount        = 2;
+    render_pass_info.pDependencies          = attachmentDependencies;
 
     VK_CHECK(vkCreateRenderPass(vkc->device, &render_pass_info, NULL, &vkr->render_pass));
 
@@ -381,7 +381,7 @@ void VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr)
     /// layout > Camera UBO
     std::vector<VkDescriptorSetLayoutBinding> global_set_layout_bindings;
     global_set_layout_bindings.push_back(desc_set_layout_binding_UBO);
-    CreateDescriptorSetLayout(vkr->device, NULL, &vkr->set_layout_global, global_set_layout_bindings.data(), (uint32_t)global_set_layout_bindings.size());
+    CreateDescriptorSetLayout(vkr->device, NULL, &vkr->set_layout_camera, global_set_layout_bindings.data(), (uint32_t)global_set_layout_bindings.size());
 
     /////////////////////////////////////
     /// Allocate sets for each camera buffer, we have a camera buffer for each framebuffer
@@ -392,7 +392,8 @@ void VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr)
         // allocate one descriptor set for each frame
     }
 
-
+    // todo(ad): We need a another pipeline for non instanced sprite rendering
+    // with different shaders
     vkr->instanced_pipeline = VkayCreateGraphicsPipelineInstanced(vkr);
     vkr->compute_pipeline   = CreateComputePipeline(vkr);
 }
@@ -560,38 +561,17 @@ FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr)
 
 VkPipeline VkayCreateGraphicsPipelineInstanced(VkayRenderer *vkr)
 {
-    VkPipelineColorBlendAttachmentState attachment_state_color_blend;
-    attachment_state_color_blend = vkinit::color_blend_attachment_state(); // a single blend attachment with no blending and writing to RGBA
-
-    // setup dummy color blending. We aren't using transparent objects yet
-    // the blending is just "no blend", but we do write to the color attachment
-    VkPipelineColorBlendStateCreateInfo colorBlending = {};
-
-    colorBlending.sType             = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.pNext             = NULL;
-    colorBlending.logicOpEnable     = VK_FALSE; // ?
-    colorBlending.logicOp           = VK_LOGIC_OP_OR; // ?
-    colorBlending.pAttachments      = &attachment_state_color_blend;
-    colorBlending.attachmentCount   = 1;
-    colorBlending.blendConstants[0] = 0.f; // ?
-    colorBlending.blendConstants[1] = 0.f; // ?
-    colorBlending.blendConstants[2] = 0.f; // ?
-    colorBlending.blendConstants[3] = 0.f; // ?
-
-    VkPipelineDepthStencilStateCreateInfo create_info_depth_stencil_state;
-    create_info_depth_stencil_state = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+    const VkPipelineColorBlendAttachmentState color_blend_attachment_state = vkinit::color_blend_attachment_state();
+    VkPipelineColorBlendStateCreateInfo       colorBlending                = vkinit::color_blend_state_create_info(&color_blend_attachment_state);
 
     /////
     // Depth attachment
     // connect the pipeline builder vertex input info to the one we get from Vertex
     // build viewport and scissor from the swapchain extents
-    VkViewport viewport;
-    viewport.x        = 0.0f;
-    viewport.y        = 0.0f;
-    viewport.width    = (float)vkr->window_extent.width;
-    viewport.height   = (float)vkr->window_extent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+    VkPipelineDepthStencilStateCreateInfo create_info_depth_stencil_state;
+    create_info_depth_stencil_state = vkinit::depth_stencil_state_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+
+    VkViewport viewport = vkinit::viewport_state((float)vkr->window_extent.width, (float)vkr->window_extent.height);
 
     VkRect2D scissor;
     scissor.offset = { 0, 0 };
@@ -636,30 +616,117 @@ VkPipeline VkayCreateGraphicsPipelineInstanced(VkayRenderer *vkr)
         vkDestroyShaderModule(vkr->device, fragmentShader, NULL);
     });
 
+
+
+
+
+    /////////////////////////////////
+    // Vertex input description
+    VertexInputDescription vertexDescription;
+
+    // we will have just 1 vertex buffer binding, with a per-vertex rate
+    VkVertexInputBindingDescription mainBinding = {};
+    mainBinding.binding                         = 0;
+    mainBinding.stride                          = sizeof(Vertex);
+    mainBinding.inputRate                       = VK_VERTEX_INPUT_RATE_VERTEX;
+    vertexDescription.bindings.push_back(mainBinding);
+
+    // Position will be stored at Location 0
+    {
+        VkVertexInputAttributeDescription position_attribute = {};
+        position_attribute.binding                           = 0;
+        position_attribute.location                          = 0;
+        position_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        position_attribute.offset                            = offsetof(Vertex, position);
+
+        // Normal will be stored at Location 1
+        VkVertexInputAttributeDescription normal_attribute = {};
+        normal_attribute.binding                           = 0;
+        normal_attribute.location                          = 1;
+        normal_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        normal_attribute.offset                            = offsetof(Vertex, normal);
+
+        VkVertexInputAttributeDescription tex_uv_attribute = {};
+        tex_uv_attribute.binding                           = 0;
+        tex_uv_attribute.location                          = 2;
+        tex_uv_attribute.format                            = VK_FORMAT_R32G32_SFLOAT;
+        tex_uv_attribute.offset                            = offsetof(Vertex, tex_uv);
+
+        // Color will be stored at Location 3
+        VkVertexInputAttributeDescription color_attribute = {};
+        color_attribute.binding                           = 0;
+        color_attribute.location                          = 3;
+        color_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        color_attribute.offset                            = offsetof(Vertex, color);
+
+
+        vertexDescription.attributes.push_back(position_attribute);
+        vertexDescription.attributes.push_back(normal_attribute);
+        vertexDescription.attributes.push_back(color_attribute);
+        vertexDescription.attributes.push_back(tex_uv_attribute);
+    }
+
+    {
+        VkVertexInputAttributeDescription position_attribute = {};
+        position_attribute.binding                           = 1;
+        position_attribute.location                          = 4;
+        position_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        position_attribute.offset                            = offsetof(InstanceData, pos);
+
+        VkVertexInputAttributeDescription rotation_attribute = {};
+        rotation_attribute.binding                           = 1;
+        rotation_attribute.location                          = 5;
+        rotation_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        rotation_attribute.offset                            = offsetof(InstanceData, rot);
+
+        VkVertexInputAttributeDescription scale_attribute = {};
+        scale_attribute.binding                           = 1;
+        scale_attribute.location                          = 6;
+        scale_attribute.format                            = VK_FORMAT_R32G32B32_SFLOAT;
+        scale_attribute.offset                            = offsetof(InstanceData, scale);
+
+        VkVertexInputAttributeDescription tex_idx_attribute = {};
+        tex_idx_attribute.binding                           = 1;
+        tex_idx_attribute.location                          = 7;
+        tex_idx_attribute.format                            = VK_FORMAT_R32_SINT;
+        tex_idx_attribute.offset                            = offsetof(InstanceData, texure_idx);
+
+        vertexDescription.attributes.push_back(position_attribute);
+        vertexDescription.attributes.push_back(rotation_attribute);
+        vertexDescription.attributes.push_back(scale_attribute);
+        vertexDescription.attributes.push_back(tex_idx_attribute);
+    }
+
+    // InstanceData
+    VkVertexInputBindingDescription instance_data_binding = {};
+    instance_data_binding.binding                         = 1;
+    instance_data_binding.stride                          = sizeof(InstanceData);
+    instance_data_binding.inputRate                       = VK_VERTEX_INPUT_RATE_INSTANCE;
+    vertexDescription.bindings.push_back(instance_data_binding);
+
     ////////////////////////////
     /// Vertex Input Description
-    VertexInputDescription               vertexDescription = GetVertexDescription(); // make this a useful function
+    // VertexInputDescription               vertexDescription = ;//GetVertexDescription(); // make this a useful function
     VkPipelineVertexInputStateCreateInfo create_info_vertex_input_state;
-    create_info_vertex_input_state                                 = vkinit::VertexInputStateCreateInfo();
+    create_info_vertex_input_state                                 = vkinit::vertex_input_state_create_info();
     create_info_vertex_input_state.pVertexAttributeDescriptions    = vertexDescription.attributes.data();
     create_info_vertex_input_state.vertexAttributeDescriptionCount = (uint32_t)vertexDescription.attributes.size();
     create_info_vertex_input_state.pVertexBindingDescriptions      = vertexDescription.bindings.data();
     create_info_vertex_input_state.vertexBindingDescriptionCount   = (uint32_t)vertexDescription.bindings.size();
 
+
+
+
+
     ////////////////////////////
     /// Input Assembly State
-    VkPipelineInputAssemblyStateCreateInfo create_info_input_assembly_state;
-    create_info_input_assembly_state = vkinit::InputAssemblyCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-
+    VkPipelineInputAssemblyStateCreateInfo ci_input_assembly_state = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     ////////////////////////////
     /// Raster State
-    VkPipelineRasterizationStateCreateInfo rasterization_state;
-    rasterization_state = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL); // configure the rasterizer to draw filled triangles
-
+    VkPipelineRasterizationStateCreateInfo ci_rasterization_state = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL); // configure the rasterizer to draw filled triangles
     ////////////////////////////
     /// Multisample State
-    VkPipelineMultisampleStateCreateInfo create_info_multisample_state;
-    create_info_multisample_state = vkinit::multisampling_state_create_info(); // we don't use multisampling, so just run the default one
+    VkPipelineMultisampleStateCreateInfo ci_multisample_state = vkinit::multisampling_state_create_info(); // we don't use multisampling, so just run the default one
 
 
 
@@ -713,7 +780,7 @@ VkPipeline VkayCreateGraphicsPipelineInstanced(VkayRenderer *vkr)
     // pipeline_layout_info.pPushConstantRanges        = &push_constant;
 
     std::vector<VkDescriptorSetLayout> set_layouts = {
-        vkr->set_layout_global,
+        vkr->set_layout_camera,
         vkr->set_layout_array_of_textures,
     };
 
@@ -728,11 +795,11 @@ VkPipeline VkayCreateGraphicsPipelineInstanced(VkayRenderer *vkr)
     pipelineInfo.stageCount                   = (uint32_t)create_info_shader_stages.size();
     pipelineInfo.pStages                      = create_info_shader_stages.data();
     pipelineInfo.pVertexInputState            = &create_info_vertex_input_state;
-    pipelineInfo.pInputAssemblyState          = &create_info_input_assembly_state;
+    pipelineInfo.pInputAssemblyState          = &ci_input_assembly_state;
     pipelineInfo.pTessellationState           = NULL;
     pipelineInfo.pViewportState               = &viewportState;
-    pipelineInfo.pRasterizationState          = &rasterization_state;
-    pipelineInfo.pMultisampleState            = &create_info_multisample_state;
+    pipelineInfo.pRasterizationState          = &ci_rasterization_state;
+    pipelineInfo.pMultisampleState            = &ci_multisample_state;
     pipelineInfo.pDepthStencilState           = &create_info_depth_stencil_state;
     pipelineInfo.pColorBlendState             = &colorBlending;
     pipelineInfo.pDynamicState                = NULL;
@@ -947,7 +1014,7 @@ void VkayRendererCleanup(VkayRenderer *vkr)
         vkDestroyPipeline(vkr->device, vkr->instanced_pipeline, NULL);
         vkDestroyPipeline(vkr->device, vkr->compute_pipeline, NULL);
         vkDestroyDescriptorSetLayout(vkr->device, vkr->set_layout_instanced_data, NULL);
-        vkDestroyDescriptorSetLayout(vkr->device, vkr->set_layout_global, NULL);
+        vkDestroyDescriptorSetLayout(vkr->device, vkr->set_layout_camera, NULL);
         vkDestroyDescriptorSetLayout(vkr->device, vkr->set_layout_array_of_textures, NULL);
         vkDestroyDescriptorPool(vkr->device, vkr->descriptor_pool_compute, NULL);
         vkDestroyDescriptorPool(vkr->device, vkr->descriptor_pool, NULL);

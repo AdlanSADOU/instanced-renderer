@@ -38,7 +38,7 @@ VkPipelineShaderStageCreateInfo vkinit::PipelineShaderStageCreateInfo(VkShaderSt
     return info;
 }
 
-VkPipelineVertexInputStateCreateInfo vkinit::VertexInputStateCreateInfo()
+VkPipelineVertexInputStateCreateInfo vkinit::vertex_input_state_create_info()
 {
     VkPipelineVertexInputStateCreateInfo info = {};
 
@@ -51,7 +51,7 @@ VkPipelineVertexInputStateCreateInfo vkinit::VertexInputStateCreateInfo()
     return info;
 }
 
-VkPipelineInputAssemblyStateCreateInfo vkinit::InputAssemblyCreateInfo(VkPrimitiveTopology topology)
+VkPipelineInputAssemblyStateCreateInfo vkinit::input_assembly_create_info(VkPrimitiveTopology topology)
 {
     VkPipelineInputAssemblyStateCreateInfo info = {};
 
@@ -79,7 +79,6 @@ VkPipelineRasterizationStateCreateInfo vkinit::rasterization_state_create_info(V
 
     info.polygonMode = polygonMode;
     info.lineWidth   = 1.0f;
-    // no backface cull
     info.cullMode  = VK_CULL_MODE_BACK_BIT;
     info.frontFace = VK_FRONT_FACE_CLOCKWISE;
     // no depth bias
@@ -121,6 +120,35 @@ VkPipelineColorBlendAttachmentState vkinit::color_blend_attachment_state()
     colorBlendAttachment.dstColorBlendFactor = VkBlendFactor::VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     colorBlendAttachment.colorBlendOp        = VkBlendOp::VK_BLEND_OP_ADD;
     return colorBlendAttachment;
+}
+
+VkPipelineColorBlendStateCreateInfo vkinit::color_blend_state_create_info(const VkPipelineColorBlendAttachmentState *attachment_state_color_blend)
+{
+    VkPipelineColorBlendStateCreateInfo colorBlending = {};
+    colorBlending.sType                               = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.pNext                               = NULL;
+    colorBlending.logicOpEnable                       = VK_FALSE; // ?
+    colorBlending.logicOp                             = VK_LOGIC_OP_OR; // ?
+    colorBlending.pAttachments                        = attachment_state_color_blend;
+    colorBlending.attachmentCount                     = 1;
+    colorBlending.blendConstants[0]                   = 0.f; // ?
+    colorBlending.blendConstants[1]                   = 0.f; // ?
+    colorBlending.blendConstants[2]                   = 0.f; // ?
+    colorBlending.blendConstants[3]                   = 0.f; // ?
+
+    return colorBlending;
+}
+
+VkViewport vkinit::viewport_state(float width, float height, float x, float y, float min_depth, float max_depth)
+{
+    VkViewport viewport;
+    viewport.x        = x;
+    viewport.y        = y;
+    viewport.width    = width;
+    viewport.height   = height;
+    viewport.minDepth = min_depth;
+    viewport.maxDepth = max_depth;
+    return viewport;
 }
 
 // Pipeline layouts contain the information about shader inputs of a given pipeline.
@@ -178,7 +206,7 @@ VkImageViewCreateInfo vkinit::imageview_create_info(VkFormat format, VkImage ima
     return info;
 }
 
-VkPipelineDepthStencilStateCreateInfo vkinit::depth_stencil_create_info(bool bDepthTest, bool bDepthWrite, VkCompareOp compareOp)
+VkPipelineDepthStencilStateCreateInfo vkinit::depth_stencil_state_create_info(bool bDepthTest, bool bDepthWrite, VkCompareOp compareOp)
 {
     VkPipelineDepthStencilStateCreateInfo info = {};
     info.sType                                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;

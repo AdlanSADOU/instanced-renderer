@@ -15,10 +15,10 @@ set(THIRD_PARTY_LINK_DIRS
 
 set(INCLUDES
 ./src
-# ./vendor/assimp/include
+./vendor/assimp/include
 )
 
-set (CFLAGS -FC -GR- -EHa- -EHsc -EHs -nologo /TP /Z7 /Zf /Zi /MP)
+set (CFLAGS /nologo /FC /GR- /EHa- /EHsc /EHs /TP /Z7 /Zf /Zi /MP)
 
 add_library(vkay STATIC ${SOURCES})
 target_compile_options(vkay PRIVATE ${CFLAGS})
@@ -28,25 +28,27 @@ target_link_libraries(vkay LINK_PUBLIC SDL2 SDL2main vulkan-1 assimp-vc142-mt)
 target_include_directories(vkay PUBLIC ${INCLUDES})
 
 
-# FILE(GLOB EXAMPLE_SOURCES ./examples/*.cpp)
-add_executable(Instances ./examples/Instances.cpp)
-target_compile_options(Instances PRIVATE ${CFLAGS})
-target_link_options(Instances PRIVATE -SUBSYSTEM:CONSOLE -time)
-target_link_libraries(Instances vkay)
-target_include_directories(Instances PUBLIC ./src)
-
 add_executable(Invaders ./examples/Invaders.cpp)
 target_compile_options(Invaders PRIVATE ${CFLAGS})
 target_link_options(Invaders PRIVATE -SUBSYSTEM:CONSOLE -time)
 target_link_libraries(Invaders vkay)
 target_include_directories(Invaders PUBLIC ./src)
 
-add_executable(gltf ./examples/gltf.cpp)
-target_compile_options(gltf PRIVATE ${CFLAGS})
-target_compile_definitions(gltf PRIVATE _CRT_SECURE_NO_WARNINGS)
-target_link_options(gltf PRIVATE -SUBSYSTEM:CONSOLE -time)
-target_link_libraries(gltf vkay)
-target_include_directories(gltf PUBLIC ./src)
+
+# FILE(GLOB EXAMPLE_SOURCES ./examples/*.cpp)
+# add_executable(Instances ./examples/Instances.cpp)
+# target_compile_options(Instances PRIVATE ${CFLAGS})
+# target_link_options(Instances PRIVATE -SUBSYSTEM:CONSOLE -time)
+# target_link_libraries(Instances vkay)
+# target_include_directories(Instances PUBLIC ./src)
+
+
+# add_executable(gltf ./examples/gltf.cpp)
+# target_compile_options(gltf PRIVATE ${CFLAGS})
+# target_compile_definitions(gltf PRIVATE _CRT_SECURE_NO_WARNINGS)
+# target_link_options(gltf PRIVATE -SUBSYSTEM:CONSOLE -time)
+# target_link_libraries(gltf vkay)
+# target_include_directories(gltf PUBLIC ./src)
 
 set(OUT_DIR $<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>)
 

@@ -155,7 +155,7 @@ struct VkayRenderer
     ////////////////////
     // Graphics
     VkDescriptorPool      descriptor_pool;
-    VkDescriptorSetLayout set_layout_global; // todo(ad): camera set layout
+    VkDescriptorSetLayout set_layout_camera; // todo(ad): camera set layout
 
     // Do not modify this
     uint32_t              texture_array_count = 0;

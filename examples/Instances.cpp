@@ -49,9 +49,9 @@ int main(int argc, char *argv[])
     camera.m_projection = Camera::ORTHO;
     camera.m_position = {0,0,0};
 
-    const uint32_t ROW          = 3;
-    const uint32_t COL          = 3;
-    const int      spacing      = -5;
+    const uint32_t ROW          = 2000;
+    const uint32_t COL          = 2000;
+    const int      spacing      = 5;
     uint32_t       SPRITE_COUNT = ROW * COL;
     SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
 
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
         static float _x     = 0;
         static float _y     = 0;
-        float        _scale = .1f;
+        float        _scale = .001f;
 
         if (i > 0 && (i % ROW) == 0) j++;
         if (i == 0) _scale = 1.f;
@@ -220,8 +220,8 @@ void UpdateAndRender()
         camera.m_position.y += camera_y;
         camera.m_position.z += camera_z *.1f;
 
-        printf(" sprite: %.1f %.1f %.1f", s_pos->x, s_pos->y, s_pos->z);
-        printf(" camera: %.1f %.1f %.1f\n", camera.m_position.x, camera.m_position.y, camera.m_position.z);
+        // printf(" sprite: %.1f %.1f %.1f", s_pos->x, s_pos->y, s_pos->z);
+        // printf(" camera: %.1f %.1f %.1f\n", camera.m_position.x, camera.m_position.y, camera.m_position.z);
 
         VkayCameraUpdate(&vkr, &camera, vkr.instanced_pipeline_layout);
         vkay::InstancesBucketDraw(VkayRendererGetCurrentFrameData(&vkr)->cmd_buffer_gfx, &vkr, &instances, quad.mesh);

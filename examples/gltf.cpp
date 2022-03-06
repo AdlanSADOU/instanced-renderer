@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     colorBlending.blendConstants[3] = 0.0;
 
     VkPipelineDepthStencilStateCreateInfo create_info_depth_stencil_state;
-    create_info_depth_stencil_state = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+    create_info_depth_stencil_state = vkinit::depth_stencil_state_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 
     /////
     // Depth attachment
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
     }
 
     VkPipelineVertexInputStateCreateInfo create_info_vertex_input_state;
-    create_info_vertex_input_state                                 = vkinit::VertexInputStateCreateInfo();
+    create_info_vertex_input_state                                 = vkinit::vertex_input_state_create_info();
     create_info_vertex_input_state.pVertexAttributeDescriptions    = description.attributes.data();
     create_info_vertex_input_state.vertexAttributeDescriptionCount = (uint32_t)description.attributes.size();
     create_info_vertex_input_state.pVertexBindingDescriptions      = description.bindings.data();
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
     ////////////////////////////
     /// Input Assembly State
     VkPipelineInputAssemblyStateCreateInfo create_info_input_assembly_state;
-    create_info_input_assembly_state = vkinit::InputAssemblyCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    create_info_input_assembly_state = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
     ////////////////////////////
     /// Raster State
@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
     pipeline_layout_info.pPushConstantRanges        = &push_constant;
 
     std::vector<VkDescriptorSetLayout> set_layouts = {
-        vkr.set_layout_global,
+        vkr.set_layout_camera,
         // vkr.set_layout_array_of_textures,
     };
 
@@ -308,7 +308,8 @@ int main(int argc, char *argv[])
 
 
     VkayCameraCreate(&vkr, &camera);
-    camera.m_position = { 0, 0, 1 };
+    camera.m_position   = { 0, 0, 0 };
+    camera.m_projection = Camera::PERSPECTIVE;
 
     VkayCreateBuffer(&triangle_ibo, vkr.allocator, sizeof(triangle.indicies), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     VkayMapMemcpyMemory(triangle.indicies, sizeof(triangle.indicies), vkr.allocator, triangle_ibo.allocation);
@@ -407,17 +408,19 @@ void UpdateAndRender()
         vkCmdBindVertexBuffers(cmd_buffer_gfx, 0, 1, &vbo.buffer, &offsets);
         vkCmdDrawIndexed(cmd_buffer_gfx, (uint32_t)data->meshes[0].primitives[0].indices->count, 1, 0, 0, 0);
 
-        // vkCmdBindIndexBuffer(cmd_buffer_gfx, triangle_ibo.buffer, 0, VK_INDEX_TYPE_UINT32);
-        // VkDeviceSize offsets = { 0 };
-        // vkCmdBindVertexBuffers(cmd_buffer_gfx, 0, 1, &triangle_vbo.buffer, &offsets);
-        // vkCmdDrawIndexed(cmd_buffer_gfx, (uint32_t)3, 1, 0, 0, 0);
+        vkCmdBindIndexBuffer(cmd_buffer_gfx, triangle_ibo.buffer, 0, VK_INDEX_TYPE_UINT32);
+        VkDeviceSize tri_offsets = { 0 };
+        vkCmdBindVertexBuffers(cmd_buffer_gfx, 0, 1, &triangle_vbo.buffer, &tri_offsets);
+        vkCmdDrawIndexed(cmd_buffer_gfx, (uint32_t)3, 1, 0, 0, 0);
 
         VkayRendererEndRenderPass(&vkr);
         VkayRendererEndCommandBuffer(&vkr);
         VkayRendererPresent(&vkr);
 
         // DeltaTime
-        pos_x = pos_y = pos_z              = 0;
+        pos_x = pos_y = pos_z = 0;
+        camera_x = camera_y = camera_z = 0;
+
         uint64_t        end                = SDL_GetPerformanceCounter();
         static uint64_t idx                = 0;
         dt_samples[idx++ % MAX_DT_SAMPLES] = (end - start) / (double)SDL_GetPerformanceFrequency();

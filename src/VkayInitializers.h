@@ -8,8 +8,8 @@ namespace vkinit {
     VkCommandPoolCreateInfo                CommandPoolCreateInfo(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags = 0);
     VkCommandBufferAllocateInfo            CommandBufferAllocateInfo(VkCommandPool pool, uint32_t count = 1, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     VkPipelineShaderStageCreateInfo        PipelineShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule shaderModule);
-    VkPipelineVertexInputStateCreateInfo   VertexInputStateCreateInfo();
-    VkPipelineInputAssemblyStateCreateInfo InputAssemblyCreateInfo(VkPrimitiveTopology topology);
+    VkPipelineVertexInputStateCreateInfo   vertex_input_state_create_info();
+    VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info(VkPrimitiveTopology topology);
 
     // In here is where we enable or disable backface culling, and set line width or wireframe drawing.
     VkPipelineRasterizationStateCreateInfo rasterization_state_create_info(VkPolygonMode polygonMode);
@@ -21,9 +21,12 @@ namespace vkinit {
     // our renderpass also has to support it, which complicates things significantly.
     VkPipelineMultisampleStateCreateInfo multisampling_state_create_info();
     VkPipelineColorBlendAttachmentState  color_blend_attachment_state();
+    VkPipelineColorBlendStateCreateInfo  color_blend_state_create_info(const VkPipelineColorBlendAttachmentState *attachment_state_color_blend);
     VkPipelineLayoutCreateInfo           pipeline_layout_create_info();
-    VkImageCreateInfo                    image_create_info(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent);
-    VkImageViewCreateInfo                imageview_create_info(VkFormat format, VkImage image, VkImageAspectFlags aspectFlags);
+    VkViewport                           viewport_state(float width, float height, float x = 0.f, float y = 0.f, float min_depth = 0.f, float max_depth = 1.f);
+
+    VkImageCreateInfo     image_create_info(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent);
+    VkImageViewCreateInfo imageview_create_info(VkFormat format, VkImage image, VkImageAspectFlags aspectFlags);
 
     // depthTestEnable holds if we should do any z-culling at all.
     // Set to VK_FALSE to draw on top of everything,
@@ -32,6 +35,6 @@ namespace vkinit {
     // While DepthTest and DepthWrite will both be true most of the time,
     // there are cases where we might want to do depth write, but without doing depthtesting;
     // it’s sometimes used for some special effects.
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_create_info(bool bDepthTest, bool bDepthWrite, VkCompareOp compareOp);
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_state_create_info(bool bDepthTest, bool bDepthWrite, VkCompareOp compareOp);
 } // namespace vkinit
 #endif // VK_INITIALIZERS

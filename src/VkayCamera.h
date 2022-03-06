@@ -35,7 +35,7 @@ void VkayCameraCreate(VkayRenderer *vkr, Camera *camera)
         VkayCreateBuffer(&camera->m_UBO[i], vkr->allocator, sizeof(Camera::Data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         VkDescriptorBufferInfo info_descriptor_camera_buffer;
-        AllocateDescriptorSets(vkr->device, vkr->descriptor_pool, 1, &vkr->set_layout_global, &camera->m_set_global[i]);
+        AllocateDescriptorSets(vkr->device, vkr->descriptor_pool, 1, &vkr->set_layout_camera, &camera->m_set_global[i]);
 
         info_descriptor_camera_buffer.buffer = camera->m_UBO[i].buffer;
         info_descriptor_camera_buffer.offset = 0;

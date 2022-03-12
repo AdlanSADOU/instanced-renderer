@@ -16,6 +16,33 @@ class vector;
 
 #define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
 
+
+struct vkayPhysicalDeviceSurfaceInfo_KHR
+{
+    using SurfaceFormats = std::vector<VkSurfaceFormatKHR>;
+    using PresentModes   = std::vector<VkPresentModeKHR>;
+
+    uint32_t                 format_count        = {};
+    SurfaceFormats           formats             = {};
+    uint32_t                 present_modes_count = {};
+    PresentModes             present_modes       = {};
+    VkSurfaceCapabilitiesKHR capabilities        = {};
+
+    void query(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+    {
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &format_count, NULL);
+        formats.resize(format_count);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &format_count, formats.data());
+
+        // todo(ad): .presentMode arbitrarily set right now, we need to check what the OS supports and pick one
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &present_modes_count, NULL);
+        present_modes.resize(present_modes_count);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &present_modes_count, present_modes.data());
+
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+    };
+};
+
 struct Color
 {
     float r;

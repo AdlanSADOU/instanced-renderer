@@ -31,11 +31,11 @@ struct VkayContext;
 
 #define SECONDS(value) (1000000000 * value)
 
-void VkayContextInit(VkayContext *vkc);
-void VkayContextCleanup(VkayContext *vkc);
+void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_height);
+void VkayContextCleanup();
 
-EXPORT void       VkayRendererInit(VkayContext *vkc, VkayRenderer *vkr);
-EXPORT void       VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
+EXPORT void       VkayRendererInit(VkayRenderer *vkr);
+EXPORT bool       VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererEndCommandBuffer(VkayRenderer *vkr);
 EXPORT void       VkayRendererBeginRenderPass(VkayRenderer *vkr);
 EXPORT void       VkayRendererEndRenderPass(VkayRenderer *vkr);
@@ -43,10 +43,6 @@ EXPORT void       VkayRendererClearColor(VkayRenderer *vkr, Color color);
 EXPORT void       VkayRendererPresent(VkayRenderer *vkr);
 EXPORT void       VkayRendererCleanup(VkayRenderer *vkr);
 EXPORT FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr);
-
-EXPORT void VkayBeginCommandBuffer(VkCommandBuffer cmd_buffer);
-EXPORT void VkayEndCommandBuffer(VkCommandBuffer cmd_buffer);
-VkResult    VkayQueueSumbit(VkQueue queue, VkCommandBuffer *cmd_buffer);
 
 #if !defined(VKAY_DEBUG_ALLOCATIONS)
 EXPORT VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
@@ -72,27 +68,26 @@ EXPORT VkResult VkayMapMemcpyMemory(void *src, size_t size, VmaAllocator allocat
 EXPORT VertexInputDescription GetVertexDescription();
 EXPORT bool                   VkayCreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
 EXPORT bool                   CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
-EXPORT VkPipeline             VkayCreateGraphicsPipelineInstanced(VkayRenderer *vkr);
 EXPORT VkPipeline             CreateComputePipeline(VkayRenderer *vkr);
 EXPORT void                   CopyBuffer(VkCommandBuffer cmd_buffer, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
 EXPORT uint32_t               FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
 EXPORT VkResult               CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
 EXPORT VkResult               AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
 
+
 struct VkayContext
 {
     SDL_Window *window = NULL;
-    // VkExtent2D  window_extent { 720, 480 };
-    VkExtent2D window_extent { 1280, 720 };
-    // VkExtent2D window_extent { 1920, 1080 };
+    VkExtent2D  window_extent {};
 
 
     ///////////////////////////
     // Vulkan initialization phase types
-    VkInstance               instance;
-    VkDebugUtilsMessengerEXT debug_messenger;
-    VkPhysicalDevice         chosen_gpu;
-    VkSurfaceKHR             surface;
+    VkInstance                        instance;
+    VkDebugUtilsMessengerEXT          debug_messenger;
+    VkPhysicalDevice                  physical_device;
+    VkSurfaceKHR                      surface;
+    vkayPhysicalDeviceSurfaceInfo_KHR ph_device_surface_info;
 
     /////////////////////////
     // Pools
@@ -115,23 +110,35 @@ struct VkayContext
 
     bool is_initialized = false;
 };
+// this is a temporary global declaration until we figure out a better way of handling the context stuf
+VkayContext *VkayGetContext();
+
+// todo(ad): we'll stick this here for now
+// but we need to figure out where to put this later
+struct vkaySwapchain
+{
+    VkSwapchainKHR           handle       = {};
+    VkFormat                 image_format = {};
+    VkColorSpaceKHR          color_space  = {};
+    std::vector<VkImageView> image_views  = {};
+    std::vector<VkImage>     images       = {};
+
+    void create(VkDevice device, uint32_t min_image_count, VmaAllocator allocator, AllocatedImage *depth_image, VkImageView *depth_image_view);
+};
 
 struct VkayRenderer
 {
-    VkDevice       device;
-    ReleaseQueue   release_queue;
-    VkSwapchainKHR swapchain;
-    VkQueue        graphics_queue;
-    VkQueue        compute_queue;
-    VkQueue        present_queue;
-    VkExtent2D     window_extent;
-    VmaAllocator   allocator;
+    VkDevice     device;
+    ReleaseQueue release_queue;
+
+    VkQueue      graphics_queue;
+    VkQueue      compute_queue;
+    VkQueue      present_queue;
+    VmaAllocator allocator;
     /////////////////////////
     // Swapchain
     // VkSwapchainKHR           swapchain;
-    VkFormat                 swapchain_image_format;
-    std::vector<VkImage>     swapchain_images;
-    std::vector<VkImageView> swapchain_image_views;
+    vkaySwapchain swapchain;
 
     VkClearValue clear_value;
 
@@ -173,6 +180,7 @@ struct VkayRenderer
     VkDescriptorSetLayout        set_layout_instanced_data;
     std::vector<VkDescriptorSet> compute_descriptor_sets;
 };
+
 
 static std::unordered_map<VkResult, std::string> vulkan_errors = {
     { (VkResult)0, "VK_SUCCESS" },
@@ -222,13 +230,13 @@ static std::unordered_map<VkResult, std::string> vulkan_errors = {
     { (VkResult)0x7FFFFFFF, "VK_RESULT_MAX_ENUM" }
 };
 
-#define VK_CHECK(x)                                                           \
-    do {                                                                      \
-        VkResult err = x;                                                     \
-        if (err) {                                                            \
-            SDL_Log("Detected Vulkan error: %s", vulkan_errors[err].c_str()); \
-            abort();                                                          \
-        }                                                                     \
+#define VKCHECK(x)                                                                                      \
+    do {                                                                                                \
+        VkResult err = x;                                                                               \
+        if (err) {                                                                                      \
+            SDL_Log("%s:%d Detected Vulkan error: %s", __FILE__, __LINE__, vulkan_errors[err].c_str()); \
+            abort();                                                                                    \
+        }                                                                                               \
     } while (0)
 
 #endif // VK_RENDERER

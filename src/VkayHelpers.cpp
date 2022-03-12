@@ -161,10 +161,10 @@ bool VkayAllocateBufferMemory(VkDevice device, VkPhysicalDevice gpu, VkBuffer bu
     uint32_t memory_type = FindProperties(&gpu_memory_properties, buffer_memory_requirements.memoryTypeBits, flags);
 
     VkMemoryAllocateInfo memory_allocate_info = {
-        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, // VkStructureType                        sType
-        nullptr, // const void                            *pNext
-        buffer_memory_requirements.size, // VkDeviceSize                           allocationSize
-        memory_type // uint32_t                               memoryTypeIndex
+        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, // VkStructureType sType
+        nullptr, // const void *pNext
+        buffer_memory_requirements.size, // VkDeviceSize allocationSize
+        memory_type // uint32_t memoryTypeIndex
     };
 
     if (vkAllocateMemory(device, &memory_allocate_info, nullptr, memory) == VK_SUCCESS) {

@@ -22,14 +22,14 @@ namespace vkay {
     {
         {
             VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-            VK_CHECK(VkayCreateBuffer(&bucket->mesh_buffer, vkr->allocator, sizeof(Vertex) * base_mesh.vertices.size(), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
-            VK_CHECK(VkayMapMemcpyMemory(base_mesh.vertices.data(), sizeof(Vertex) * base_mesh.vertices.size(), vkr->allocator, bucket->mesh_buffer.allocation));
+            VKCHECK(VkayCreateBuffer(&bucket->mesh_buffer, vkr->allocator, sizeof(Vertex) * base_mesh.vertices.size(), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
+            VKCHECK(VkayMapMemcpyMemory(base_mesh.vertices.data(), sizeof(Vertex) * base_mesh.vertices.size(), vkr->allocator, bucket->mesh_buffer.allocation));
         }
 
         {
             VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-            VK_CHECK(VkayCreateBuffer(&bucket->instance_buffer, vkr->allocator, bucket->instance_data_array.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
-            VK_CHECK(vmaMapMemory(vkr->allocator, bucket->instance_buffer.allocation, &bucket->mapped_data_ptr));
+            VKCHECK(VkayCreateBuffer(&bucket->instance_buffer, vkr->allocator, bucket->instance_data_array.size() * sizeof(InstanceData), usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU));
+            VKCHECK(vmaMapMemory(vkr->allocator, bucket->instance_buffer.allocation, &bucket->mapped_data_ptr));
             memcpy(bucket->mapped_data_ptr, bucket->instance_data_array.data(), bucket->instance_data_array.size() * sizeof(InstanceData));
 
             assert(bucket->mapped_data_ptr != NULL && "mapped_data_ptr is NULL");
@@ -69,7 +69,7 @@ namespace vkay {
     }
 
     // todo(ad): we added BaseMesh here to basically be able to pass in any mesh to be instanced, not just Quads
-    // 
+    //
     void InstancesBucketDraw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh)
     {
         // todo(ad): the issue is that for each InstanceBucket drawn we are redundently re-binding these

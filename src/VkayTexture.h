@@ -85,7 +85,7 @@ namespace vkay {
 //             VmaAllocationCreateInfo ci_allocation = {};
 //             ci_allocation.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
 
-//             VK_CHECK(vmaCreateImage(vkr->allocator, &ci_image, &ci_allocation, &image, &allocation, NULL));
+//             VKCHECK(vmaCreateImage(vkr->allocator, &ci_image, &ci_allocation, &image, &allocation, NULL));
 
 
 //             VkImageViewCreateInfo ci_image_view = {};
@@ -95,7 +95,7 @@ namespace vkay {
 //             ci_image_view.format                = VK_FORMAT_R8G8B8A8_UNORM;
 //             ci_image_view.components            = {}; // VK_COMPONENT_SWIZZLE_IDENTITY = 0
 //             ci_image_view.subresourceRange      = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-//             VK_CHECK(vkCreateImageView(vkr->device, &ci_image_view, NULL, &view));
+//             VKCHECK(vkCreateImageView(vkr->device, &ci_image_view, NULL, &view));
 
 
 //             VmaAllocationCreateInfo vmaallocInfo = {};
@@ -108,8 +108,8 @@ namespace vkay {
 //             bufferInfo.usage              = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
 //             VkayBuffer staging_buffer;
-//             // VK_CHECK(vmaCreateBuffer(vkr->allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer, &staging_buffer.allocation, NULL));
-//             VK_CHECK(VkayCreateBuffer(&staging_buffer, vkr->allocator, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
+//             // VKCHECK(vmaCreateBuffer(vkr->allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer, &staging_buffer.allocation, NULL));
+//             VKCHECK(VkayCreateBuffer(&staging_buffer, vkr->allocator, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
 
 //             void *staging_data;
 //             vmaMapMemory(vkr->allocator, staging_buffer.allocation, &staging_data);
@@ -175,7 +175,7 @@ namespace vkay {
 //             VkPipelineStageFlags dst_stage_flags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 //             vkCmdPipelineBarrier(vkr->frames[0].cmd_buffer_gfx, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &image_memory_barrier_from_transfer_to_shader_read);
 
-//             VK_CHECK(vkEndCommandBuffer(vkr->frames[0].cmd_buffer_gfx));
+//             VKCHECK(vkEndCommandBuffer(vkr->frames[0].cmd_buffer_gfx));
 
 
 //             // Submit command buffer and copy data from staging buffer to a vertex buffer
@@ -183,7 +183,7 @@ namespace vkay {
 //             submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 //             submit_info.commandBufferCount = 1;
 //             submit_info.pCommandBuffers    = &vkr->frames[0].cmd_buffer_gfx;
-//             VK_CHECK(vkQueueSubmit(vkr->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
+//             VKCHECK(vkQueueSubmit(vkr->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
 
 //             vkDeviceWaitIdle(vkr->device);
 //             VkayDestroyBuffer(vkr->allocator, staging_buffer.buffer, staging_buffer.allocation);
@@ -209,7 +209,7 @@ namespace vkay {
 //                 desc_alloc_info.descriptorSetCount          = 1;
 //                 desc_alloc_info.pSetLayouts                 = &vkr->set_layout_array_of_textures;
 
-//                 VK_CHECK(vkAllocateDescriptorSets(vkr->device, &desc_alloc_info, &vkr->set_array_of_textures));
+//                 VKCHECK(vkAllocateDescriptorSets(vkr->device, &desc_alloc_info, &vkr->set_array_of_textures));
 //             }
 
 //             VkWriteDescriptorSet setWrites[2];

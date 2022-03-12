@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 
     pipeline_layout_info.setLayoutCount = (uint32_t)set_layouts.size();
     pipeline_layout_info.pSetLayouts    = set_layouts.data();
-    VK_CHECK(vkCreatePipelineLayout(vkr.device, &pipeline_layout_info, NULL, &vkr.default_pipeline_layout));
+    VKCHECK(vkCreatePipelineLayout(vkr.device, &pipeline_layout_info, NULL, &vkr.default_pipeline_layout));
 
     // build the actual pipeline
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
     pipelineInfo.basePipelineHandle           = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex            = 0;
 
-    // it's easy to error out on create graphics pipeline, so we handle it a bit better than the common VK_CHECK case
+    // it's easy to error out on create graphics pipeline, so we handle it a bit better than the common VKCHECK case
     if (vkCreateGraphicsPipelines(vkr.device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &graphics_pipeline) != VK_SUCCESS) {
         SDL_Log("failed to create pipline\n");
         vkDestroyShaderModule(vkr.device, vertexShader, NULL);
@@ -265,18 +265,18 @@ int main(int argc, char *argv[])
 
     uint32_t indices_size = (uint32_t)primitive.indices->buffer_view->size;
     void    *indicies     = primitive.indices->buffer_view->buffer->data;
-    VK_CHECK(VkayCreateBuffer(&ibo, vkr.allocator, indices_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY));
+    VKCHECK(VkayCreateBuffer(&ibo, vkr.allocator, indices_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY));
 
     VkayBuffer staging_buffer = {};
-    VK_CHECK(VkayCreateBuffer(&staging_buffer, vkr.allocator, indices_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
-    VK_CHECK(VkayMapMemcpyMemory(indicies, indices_size, vkr.allocator, staging_buffer.allocation));
+    VKCHECK(VkayCreateBuffer(&staging_buffer, vkr.allocator, indices_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
+    VKCHECK(VkayMapMemcpyMemory(indicies, indices_size, vkr.allocator, staging_buffer.allocation));
 
     VkayBeginCommandBuffer(vkr.frames[0].cmd_buffer_gfx);
     VkBufferCopy region = {};
     region.size         = indices_size;
     vkCmdCopyBuffer(vkr.frames[0].cmd_buffer_gfx, staging_buffer.buffer, ibo.buffer, 1, &region);
     VkayEndCommandBuffer(vkr.frames[0].cmd_buffer_gfx);
-    VK_CHECK(VkayQueueSumbit(vkr.graphics_queue, &vkr.frames[0].cmd_buffer_gfx));
+    VKCHECK(VkayQueueSumbit(vkr.graphics_queue, &vkr.frames[0].cmd_buffer_gfx));
     vkDeviceWaitIdle(vkr.device);
 
 
@@ -289,19 +289,19 @@ int main(int argc, char *argv[])
     uint32_t        vertex_data_size = (uint32_t)vertex_accessor->buffer_view->size;
     void           *vertex_data      = vertex_accessor->buffer_view->buffer->data;
 
-    VK_CHECK(VkayCreateBuffer(&vbo, vkr.allocator, vertex_data_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY));
+    VKCHECK(VkayCreateBuffer(&vbo, vkr.allocator, vertex_data_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY));
 
     VkayBuffer vertex_staging_buffer = {};
-    VK_CHECK(VkayCreateBuffer(&vertex_staging_buffer, vkr.allocator, vertex_data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
-    VK_CHECK(VkayMapMemcpyMemory(vertex_data, vertex_data_size, vkr.allocator, vertex_staging_buffer.allocation));
+    VKCHECK(VkayCreateBuffer(&vertex_staging_buffer, vkr.allocator, vertex_data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY));
+    VKCHECK(VkayMapMemcpyMemory(vertex_data, vertex_data_size, vkr.allocator, vertex_staging_buffer.allocation));
 
     VkayBeginCommandBuffer(vkr.frames[0].cmd_buffer_gfx);
     VkBufferCopy vertex_buffer_region = {};
     vertex_buffer_region.size         = vertex_data_size;
     vkCmdCopyBuffer(vkr.frames[0].cmd_buffer_gfx, vertex_staging_buffer.buffer, vbo.buffer, 1, &vertex_buffer_region);
     VkayEndCommandBuffer(vkr.frames[0].cmd_buffer_gfx);
-    VK_CHECK(VkayQueueSumbit(vkr.graphics_queue, &vkr.frames[0].cmd_buffer_gfx));
-    VK_CHECK(vkDeviceWaitIdle(vkr.device));
+    VKCHECK(VkayQueueSumbit(vkr.graphics_queue, &vkr.frames[0].cmd_buffer_gfx));
+    VKCHECK(vkDeviceWaitIdle(vkr.device));
 
 
 
@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
 
     //////////////////////
     // Cleanup
-    VK_CHECK(vkDeviceWaitIdle(vkr.device));
+    VKCHECK(vkDeviceWaitIdle(vkr.device));
 
     VkayRendererCleanup(&vkr);
     VkayContextCleanup(&vkc);

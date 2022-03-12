@@ -4,7 +4,7 @@
 #include <VkaySprite.h>
 #include <VkayInstancesBucket.h>
 
-VkayContext  vkc;
+// VkayContext  vkc;
 VkayRenderer vkr;
 
 bool   _bQuit       = false;
@@ -22,11 +22,10 @@ vkay::InstanceBucket _bucket;
 vkay::Sprite         _spritePlayerShip;
 vkay::Texture        _textureRedShip;
 
-// SDL complains if char const *argv[]
 int main(int argc, char *argv[])
 {
-    VkayContextInit(&vkc);
-    VkayRendererInit(&vkc, &vkr);
+    VkayContextInit("Vkay - Invaders", 1280, 720);
+    VkayRendererInit(&vkr);
     VkayCameraCreate(&vkr, &_camera);
     _camera.m_projection = Camera::ORTHO;
     _camera.m_position   = { 0, 0, 0 };
@@ -43,6 +42,13 @@ int main(int argc, char *argv[])
     while (!_bQuit) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_WINDOWEVENT) {
+                if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    int width = 0, height = 0;
+                    // SDL_GetWindowSize(VkayGetContext()->window, (int *)&VkayGetContext()->window_extent.width, (int *)&VkayGetContext()->window_extent.height);
+                }
+            }
+
             SDL_Keycode key = e.key.keysym.sym;
             if (e.type == SDL_QUIT)
                 _bQuit = true;
@@ -116,15 +122,15 @@ int main(int argc, char *argv[])
         // printf(" sprite: %f.1 %f.1 %f.1", s_pos->x, s_pos->y, s_pos->z);
         // printf(" camera: %f.1 %f.1 %f.1\n", _camera.m_position.x, _camera.m_position.y, _camera.m_position.z);
 
-        VkayRendererBeginCommandBuffer(&vkr);
-        VkayRendererBeginRenderPass(&vkr);
+        // todo(ad): @urgent this if statent must go
+        if (!VkayRendererBeginCommandBuffer(&vkr))
+            continue;
 
         VkayRendererClearColor(&vkr, _clear_color);
         VkayCameraUpdate(&vkr, &_camera, vkr.instanced_pipeline_layout);
         vkay::InstancesBucketDraw(vkr.frames[vkr.frame_idx_inflight].cmd_buffer_gfx, &vkr, &_bucket, Quad().mesh);
 
         VkayRendererEndRenderPass(&vkr);
-        VkayRendererEndCommandBuffer(&vkr);
         VkayRendererPresent(&vkr);
     }
 
@@ -133,7 +139,7 @@ int main(int argc, char *argv[])
     vkay::TextureDestroy(&_textureRedShip, &vkr);
     VkayCameraDestroy(&vkr, &_camera);
     VkayRendererCleanup(&vkr);
-    VkayContextCleanup(&vkc);
+    VkayContextCleanup();
 
     return 0;
 }

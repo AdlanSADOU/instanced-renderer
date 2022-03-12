@@ -4,18 +4,28 @@
 #include "VkayTypes.h"
 #include <vk_mem_alloc.h>
 
-void VkayContextInit(VkayContext *vkc)
+static VkayContext vkc = {};
+
+VkayContext *VkayGetContext()
 {
+    return &vkc;
+}
+
+void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_height)
+{
+    vkc.window_extent.width  = window_width;
+    vkc.window_extent.height = window_height;
+
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
+    uint32_t window_flags = (SDL_WINDOW_VULKAN) | (SDL_WINDOW_RESIZABLE);
 
-    vkc->window = SDL_CreateWindow(
-        "Vulkan Engine",
+    vkc.window = SDL_CreateWindow(
+        title,
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
-        vkc->window_extent.width,
-        vkc->window_extent.height,
+        vkc.window_extent.width,
+        vkc.window_extent.height,
         window_flags);
 
 
@@ -31,10 +41,10 @@ void VkayContextInit(VkayContext *vkc)
     vkEnumerateInstanceExtensionProperties(NULL, &supported_extension_properties_count, supported_extention_properties.data());
 
     uint32_t required_extensions_count;
-    SDL_Vulkan_GetInstanceExtensions(vkc->window, &required_extensions_count, NULL);
+    SDL_Vulkan_GetInstanceExtensions(vkc.window, &required_extensions_count, NULL);
     // std::vector<char *> required_instance_extensions(required_extensions_count);
     const char **required_instance_extensions = new const char *[required_extensions_count];
-    SDL_Vulkan_GetInstanceExtensions(vkc->window, &required_extensions_count, required_instance_extensions);
+    SDL_Vulkan_GetInstanceExtensions(vkc.window, &required_extensions_count, required_instance_extensions);
 
     const char *validation_layers[] = {
 #if _DEBUG
@@ -61,11 +71,11 @@ void VkayContextInit(VkayContext *vkc)
     create_info_instance.pApplicationInfo        = &application_info;
     create_info_instance.enabledExtensionCount   = required_extensions_count;
     create_info_instance.ppEnabledExtensionNames = required_instance_extensions;
-    VK_CHECK(vkCreateInstance(&create_info_instance, NULL, &vkc->instance));
+    VKCHECK(vkCreateInstance(&create_info_instance, NULL, &vkc.instance));
 
 
 
-    if (!SDL_Vulkan_CreateSurface(vkc->window, vkc->instance, &vkc->surface)) {
+    if (!SDL_Vulkan_CreateSurface(vkc.window, vkc.instance, &vkc.surface)) {
         SDL_Log("SDL Failed to create Surface");
     }
 
@@ -73,23 +83,24 @@ void VkayContextInit(VkayContext *vkc)
     ////////////////////////////////////
     /// GPU Selection
     uint32_t gpu_count = 0;
-    VK_CHECK(vkEnumeratePhysicalDevices(vkc->instance, &gpu_count, NULL));
+    VKCHECK(vkEnumeratePhysicalDevices(vkc.instance, &gpu_count, NULL));
 
     // todo(ad): we're arbitrarily picking the first gpu we encounter right now
     // wich often is the one we want anyways. Must be improved to let user chose based features/extensions and whatnot
     std::vector<VkPhysicalDevice> gpus(gpu_count);
-    VK_CHECK(vkEnumeratePhysicalDevices(vkc->instance, &gpu_count, gpus.data()));
-    vkc->chosen_gpu = gpus[0];
+    VKCHECK(vkEnumeratePhysicalDevices(vkc.instance, &gpu_count, gpus.data()));
+    vkc.physical_device = gpus[0];
 
+    vkc.ph_device_surface_info.query(vkc.physical_device, vkc.surface);
 
 
     //////////////////////////////////////////
     /// Query for graphics & present Queue/s
     // for each queue family idx, try to find one that supports presenting
     uint32_t queue_family_properties_count = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(vkc->chosen_gpu, &queue_family_properties_count, NULL);
+    vkGetPhysicalDeviceQueueFamilyProperties(vkc.physical_device, &queue_family_properties_count, NULL);
     VkQueueFamilyProperties *queue_family_properties = new VkQueueFamilyProperties[queue_family_properties_count];
-    vkGetPhysicalDeviceQueueFamilyProperties(vkc->chosen_gpu, &queue_family_properties_count, queue_family_properties);
+    vkGetPhysicalDeviceQueueFamilyProperties(vkc.physical_device, &queue_family_properties_count, queue_family_properties);
 
     if (queue_family_properties == NULL) {
         // some error message
@@ -98,7 +109,7 @@ void VkayContextInit(VkayContext *vkc)
 
     VkBool32 *queue_idx_supports_present = new VkBool32[queue_family_properties_count];
     for (uint32_t i = 0; i < queue_family_properties_count; i++) {
-        vkGetPhysicalDeviceSurfaceSupportKHR(vkc->chosen_gpu, i, vkc->surface, &queue_idx_supports_present[i]);
+        vkGetPhysicalDeviceSurfaceSupportKHR(vkc.physical_device, i, vkc.surface, &queue_idx_supports_present[i]);
     }
 
     uint32_t graphics_queue_family_idx = UINT32_MAX;
@@ -145,9 +156,9 @@ void VkayContextInit(VkayContext *vkc)
         SDL_LogError(0, "Failed to find Graphics and Present queues");
     }
 
-    vkc->graphics_queue_family     = graphics_queue_family_idx;
-    vkc->present_queue_family      = present_queue_family_idx;
-    vkc->is_present_queue_separate = (graphics_queue_family_idx != present_queue_family_idx);
+    vkc.graphics_queue_family     = graphics_queue_family_idx;
+    vkc.present_queue_family      = present_queue_family_idx;
+    vkc.is_present_queue_separate = (graphics_queue_family_idx != present_queue_family_idx);
 
     const float queue_priorities[] = {
         { 1.0 }
@@ -158,13 +169,13 @@ void VkayContextInit(VkayContext *vkc)
     /////////////////////////////
     /// Device
     VkPhysicalDeviceFeatures supported_gpu_features = {};
-    vkGetPhysicalDeviceFeatures(vkc->chosen_gpu, &supported_gpu_features);
+    vkGetPhysicalDeviceFeatures(vkc.physical_device, &supported_gpu_features);
 
     // todo(ad): not used right now
     uint32_t device_properties_count = 0;
-    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkc->chosen_gpu, NULL, &device_properties_count, NULL));
+    VKCHECK(vkEnumerateDeviceExtensionProperties(vkc.physical_device, NULL, &device_properties_count, NULL));
     VkExtensionProperties *device_extension_properties = new VkExtensionProperties[device_properties_count];
-    VK_CHECK(vkEnumerateDeviceExtensionProperties(vkc->chosen_gpu, NULL, &device_properties_count, device_extension_properties));
+    VKCHECK(vkEnumerateDeviceExtensionProperties(vkc.physical_device, NULL, &device_properties_count, device_extension_properties));
 
     const char *enabled_device_extension_names[] = {
         "VK_KHR_swapchain",
@@ -212,31 +223,31 @@ void VkayContextInit(VkayContext *vkc)
     create_info_device.ppEnabledExtensionNames = enabled_device_extension_names;
     create_info_device.pEnabledFeatures        = &supported_gpu_features;
 
-    VK_CHECK(vkCreateDevice(vkc->chosen_gpu, &create_info_device, NULL, &vkc->device));
+    VKCHECK(vkCreateDevice(vkc.physical_device, &create_info_device, NULL, &vkc.device));
 
-    if (!vkc->is_present_queue_separate) {
-        vkGetDeviceQueue(vkc->device, graphics_queue_family_idx, 0, &vkc->graphics_queue);
+    if (!vkc.is_present_queue_separate) {
+        vkGetDeviceQueue(vkc.device, graphics_queue_family_idx, 0, &vkc.graphics_queue);
     } else {
         // todo(ad): get seperate present queue
     }
 
-    vkGetDeviceQueue(vkc->device, vkc->compute_queue_family, 0, &vkc->compute_queue);
+    vkGetDeviceQueue(vkc.device, vkc.compute_queue_family, 0, &vkc.compute_queue);
 
-    vkc->is_initialized = true;
+    vkc.is_initialized = true;
 }
 
-void VkayContextCleanup(VkayContext *vkc)
+void VkayContextCleanup()
 {
-    if (vkc->is_initialized) {
-        vkDeviceWaitIdle(vkc->device);
+    if (vkc.is_initialized) {
+        vkDeviceWaitIdle(vkc.device);
 
-        vkc->release_queue.flush();
+        vkc.release_queue.flush();
 
 
-        vkDestroySurfaceKHR(vkc->instance, vkc->surface, NULL);
+        vkDestroySurfaceKHR(vkc.instance, vkc.surface, NULL);
 
-        vkDestroyDevice(vkc->device, NULL);
-        vkDestroyInstance(vkc->instance, NULL);
-        SDL_DestroyWindow(vkc->window);
+        vkDestroyDevice(vkc.device, NULL);
+        vkDestroyInstance(vkc.instance, NULL);
+        SDL_DestroyWindow(vkc.window);
     }
 }

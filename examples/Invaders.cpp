@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
                     // SDL_GetWindowSize(VkayGetContext()->window, (int *)&VkayGetContext()->window_extent.width, (int *)&VkayGetContext()->window_extent.height);
                 }
             }
-
+ 
             SDL_Keycode key = e.key.keysym.sym;
             if (e.type == SDL_QUIT)
                 _bQuit = true;

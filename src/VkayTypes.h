@@ -43,6 +43,23 @@ struct vkayPhysicalDeviceSurfaceInfo_KHR
     };
 };
 
+struct Vec2
+{
+    float x = {};
+    float y = {};
+};
+
+struct PushConstantsComputeShader
+{
+    float     time_in_seconds = {};
+    float     deltaTime       = {};
+    float     width           = {};
+    float     height          = {};
+    int mouse_x = {};
+    int mouse_y = {};
+    bool      mouse_left      = false;
+};
+
 struct Color
 {
     float r;

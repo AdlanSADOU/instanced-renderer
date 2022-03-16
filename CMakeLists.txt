@@ -9,13 +9,13 @@ FILE(GLOB SOURCES ./src/*.cpp)
 
 set(THIRD_PARTY_LINK_DIRS
 "./vendor/SDL2/lib/x64"
-"./vendor/Vulkan/1.2.198.1/Lib"
+"./vendor/Vulkan/lib"
 "./vendor/assimp/lib"
 )
 
 set(INCLUDES
 ./src
-./vendor/assimp/include
+# ./vendor/assimp/include
 )
 
 set (CFLAGS /nologo /FC /GR- /EHa- /EHsc /EHs /TP /Z7 /Zf /Zi /MP)
@@ -24,7 +24,7 @@ add_library(vkay STATIC ${SOURCES})
 target_compile_options(vkay PRIVATE ${CFLAGS})
 target_link_options(vkay PRIVATE -time)
 target_link_directories(vkay PUBLIC ${THIRD_PARTY_LINK_DIRS})
-target_link_libraries(vkay LINK_PUBLIC SDL2 SDL2main vulkan-1 assimp-vc142-mt)
+target_link_libraries(vkay LINK_PUBLIC SDL2 SDL2main vulkan-1)
 target_include_directories(vkay PUBLIC ${INCLUDES})
 
 
@@ -35,12 +35,12 @@ target_link_libraries(Invaders vkay)
 target_include_directories(Invaders PUBLIC ./src)
 
 
-# FILE(GLOB EXAMPLE_SOURCES ./examples/*.cpp)
-# add_executable(Instances ./examples/Instances.cpp)
-# target_compile_options(Instances PRIVATE ${CFLAGS})
-# target_link_options(Instances PRIVATE -SUBSYSTEM:CONSOLE -time)
-# target_link_libraries(Instances vkay)
-# target_include_directories(Instances PUBLIC ./src)
+FILE(GLOB EXAMPLE_SOURCES ./examples/*.cpp)
+add_executable(Instances ./examples/Instances.cpp)
+target_compile_options(Instances PRIVATE ${CFLAGS})
+target_link_options(Instances PRIVATE -SUBSYSTEM:CONSOLE -time)
+target_link_libraries(Instances vkay)
+target_include_directories(Instances PUBLIC ./src)
 
 
 # add_executable(gltf ./examples/gltf.cpp)

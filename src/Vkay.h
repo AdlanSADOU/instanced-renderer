@@ -1,6 +1,8 @@
 ﻿#if !defined(VK_RENDERER)
 #define VK_RENDERER
 
+// #define NOPASS
+
 #ifdef _WIN32
 #define __func__ __FUNCTION__
 #endif
@@ -34,15 +36,14 @@ struct VkayContext;
 void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_height);
 void VkayContextCleanup();
 
-EXPORT void       VkayRendererInit(VkayRenderer *vkr);
-EXPORT bool       VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
-EXPORT void       VkayRendererEndCommandBuffer(VkayRenderer *vkr);
-EXPORT void       VkayRendererBeginRenderPass(VkayRenderer *vkr);
-EXPORT void       VkayRendererEndRenderPass(VkayRenderer *vkr);
-EXPORT void       VkayRendererClearColor(VkayRenderer *vkr, Color color);
-EXPORT void       VkayRendererPresent(VkayRenderer *vkr);
-EXPORT void       VkayRendererCleanup(VkayRenderer *vkr);
-EXPORT FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr);
+EXPORT void VkayRendererInit(VkayRenderer *vkr);
+EXPORT bool VkayRendererBeginCommandBuffer(VkayRenderer *vkr);
+EXPORT void VkayRendererEndCommandBuffer(VkayRenderer *vkr);
+EXPORT void VkayRendererBeginRenderPass(VkayRenderer *vkr);
+EXPORT void VkayRendererEndRenderPass(VkayRenderer *vkr);
+EXPORT void VkayRendererClearColor(VkayRenderer *vkr, Color color);
+EXPORT void VkayRendererPresent(VkayRenderer *vkr);
+EXPORT void VkayRendererCleanup(VkayRenderer *vkr);
 
 #if !defined(VKAY_DEBUG_ALLOCATIONS)
 EXPORT VkResult VkayCreateBuffer(VkayBuffer *dst_buffer, VmaAllocator allocator, size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage);
@@ -65,14 +66,12 @@ EXPORT VkResult VkayMapMemcpyMemory(void *src, size_t size, VmaAllocator allocat
 #define VkayAllocateImageMemory(allocator, image, allocation, usage)             VkayAllocateImageMemory(allocator, image, allocation, usage, __LINE__, __FILE__)
 #endif
 
-EXPORT VertexInputDescription GetVertexDescription();
-EXPORT bool                   VkayCreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
-EXPORT bool                   CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
-EXPORT VkPipeline             CreateComputePipeline(VkayRenderer *vkr);
-EXPORT void                   CopyBuffer(VkCommandBuffer cmd_buffer, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
-EXPORT uint32_t               FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
-EXPORT VkResult               CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
-EXPORT VkResult               AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
+// todo(ad): unsued
+EXPORT bool       CreateUniformBuffer(VkDevice device, VkDeviceSize size, VkBuffer *out_buffer);
+EXPORT void       CopyBuffer(VkCommandBuffer cmd_buffer, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
+EXPORT uint32_t   FindProperties(const VkPhysicalDeviceMemoryProperties *pMemoryProperties, uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
+EXPORT VkResult   CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count);
+EXPORT VkResult   AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set);
 
 
 struct VkayContext
@@ -117,11 +116,12 @@ VkayContext *VkayGetContext();
 // but we need to figure out where to put this later
 struct vkaySwapchain
 {
-    VkSwapchainKHR           handle       = {};
-    VkFormat                 image_format = {};
-    VkColorSpaceKHR          color_space  = {};
-    std::vector<VkImageView> image_views  = {};
-    std::vector<VkImage>     images       = {};
+    VkSwapchainKHR           handle            = {};
+    VkFormat                 image_format      = {};
+    VkColorSpaceKHR          color_space       = {};
+    VkImageSubresourceRange  subresource_range = {};
+    std::vector<VkImageView> image_views       = {};
+    std::vector<VkImage>     images            = {};
 
     void create(VkDevice device, uint32_t min_image_count, VmaAllocator allocator, AllocatedImage *depth_image, VkImageView *depth_image_view);
 };

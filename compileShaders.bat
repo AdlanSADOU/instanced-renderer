@@ -1,6 +1,6 @@
 @echo off
 
-set PATH_VulkanSDK_bin=%cd%/vendor/Vulkan/1.2.198.1/Bin
+set PATH_VulkanSDK_bin=%cd%/vendor/Vulkan/Bin
 
 pushd shaders
 
@@ -14,5 +14,3 @@ pushd shaders
 %PATH_VulkanSDK_bin%/glslc.exe writeRenderTarget.comp -o writeRenderTarget.comp.spv
 
 popd
-
-pause

@@ -8,8 +8,27 @@
 
 #define DEPTH_FORMAT VK_FORMAT_D16_UNORM
 
+
+static bool       VkayCreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
+static VkPipeline CreateComputePipeline(VkayRenderer *vkr);
+
+void VkayRendererClearColor(VkayRenderer *vkr, Color color)
+{
+    vkr->clear_value.color.float32[3] = color.a;
+    vkr->clear_value.color.float32[0] = color.r;
+    vkr->clear_value.color.float32[1] = color.g;
+    vkr->clear_value.color.float32[2] = color.b;
+}
+
+static FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr)
+{
+    return &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT];
+}
+
 static void createFramebuffers(VkDevice device, std::vector<VkFramebuffer> *framebuffers, vkaySwapchain swapchain, VkRenderPass render_pass, VkImageView depth_image_view)
 {
+
+#ifndef NOPASS
     for (size_t i = 0; i < framebuffers->size(); i++) {
         vkDestroyFramebuffer(VkayGetContext()->device, (*framebuffers)[i], NULL);
     }
@@ -38,6 +57,7 @@ static void createFramebuffers(VkDevice device, std::vector<VkFramebuffer> *fram
 
         VKCHECK(vkCreateFramebuffer(device, &fb_info, NULL, &(*framebuffers)[i]));
     }
+#endif
 };
 
 void VkayRendererInit(VkayRenderer *vkr)
@@ -69,7 +89,7 @@ void VkayRendererInit(VkayRenderer *vkr)
     ////////////////////////////////////////////
     /// Swapchain
     vkr->swapchain.create(vkc->device, FRAME_BUFFER_COUNT, vkr->allocator, &vkr->depth_image, &vkr->depth_image_view);
-
+    vkr->depth_format = DEPTH_FORMAT;
     //@recreate
     ///////////////////////////////////
     /// Depth Image
@@ -78,7 +98,7 @@ void VkayRendererInit(VkayRenderer *vkr)
 
 
 
-
+#ifndef NOPASS
     /////////////////////////////////////////////////////
     // Default renderpass
     // Color attachment
@@ -141,12 +161,12 @@ void VkayRendererInit(VkayRenderer *vkr)
     attachmentDependencies[1].dstAccessMask   = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
     attachmentDependencies[1].dependencyFlags = 0;
 
-
-
     /////
     // RenderPass creation
     VkAttachmentDescription attachment_descriptions[2] = { color_attachment, depth_attachment };
+#endif
 
+#ifndef NOPASS
     VkRenderPassCreateInfo render_pass_info = {};
     render_pass_info.sType                  = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_info.attachmentCount        = 2; // connect the color attachment to the info
@@ -162,17 +182,16 @@ void VkayRendererInit(VkayRenderer *vkr)
         vkDestroyRenderPass(vkc->device, vkr->render_pass, NULL);
     });
 
-
-
-
-
-    ///////////////////////////////////////////////
+    //////////////////////////////////////////////
     // Framebuffer initialization
     // create the framebuffers for the swapchain images. This will connect the render-pass to the images for rendering
 
     // grab how many images we have in the swapchain
 
     createFramebuffers(vkr->device, &vkr->framebuffers, vkr->swapchain, vkr->render_pass, vkr->depth_image_view);
+#endif
+
+
 
 
 
@@ -428,7 +447,6 @@ void VkayRendererInit(VkayRenderer *vkr)
 
     ////////////////////////////
     /// Vertex Input Description
-    // VertexInputDescription               vertexDescription = ;//GetVertexDescription(); // make this a useful function
     VkPipelineVertexInputStateCreateInfo create_info_vertex_input_state;
     create_info_vertex_input_state                                 = vkinit::vertex_input_state_create_info();
     create_info_vertex_input_state.pVertexAttributeDescriptions    = vertexDescription.attributes.data();
@@ -510,10 +528,17 @@ void VkayRendererInit(VkayRenderer *vkr)
     pipeline_layout_info.pSetLayouts    = set_layouts.data();
     VKCHECK(vkCreatePipelineLayout(vkr->device, &pipeline_layout_info, NULL, &vkr->instanced_pipeline_layout));
 
+    VkPipelineRenderingCreateInfo ci_pipeline_rendering = {};
+    ci_pipeline_rendering.sType                         = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    ci_pipeline_rendering.colorAttachmentCount          = 1;
+    ci_pipeline_rendering.pColorAttachmentFormats       = &vkr->swapchain.image_format;
+    ci_pipeline_rendering.depthAttachmentFormat         = DEPTH_FORMAT;
+    ci_pipeline_rendering.stencilAttachmentFormat       = DEPTH_FORMAT;
+
     // build the actual pipeline
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.sType                        = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.pNext                        = NULL;
+    pipelineInfo.pNext                        = &ci_pipeline_rendering;
     pipelineInfo.stageCount                   = (uint32_t)create_info_shader_stages.size();
     pipelineInfo.pStages                      = create_info_shader_stages.data();
     pipelineInfo.pVertexInputState            = &create_info_vertex_input_state;
@@ -526,51 +551,37 @@ void VkayRendererInit(VkayRenderer *vkr)
     pipelineInfo.pColorBlendState             = &colorBlending;
     pipelineInfo.pDynamicState                = NULL;
     pipelineInfo.layout                       = vkr->instanced_pipeline_layout;
-    pipelineInfo.renderPass                   = vkr->render_pass;
-    pipelineInfo.subpass                      = 0;
-    pipelineInfo.basePipelineHandle           = VK_NULL_HANDLE;
-    pipelineInfo.basePipelineIndex            = 0;
-    pipelineInfo.pDynamicState                = &ci_dynamic_state;
+
+#ifndef NOPASS
+    pipelineInfo.renderPass = vkr->render_pass;
+#endif
+
+    pipelineInfo.subpass            = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex  = 0;
+    pipelineInfo.pDynamicState      = &ci_dynamic_state;
 
     if (vkCreateGraphicsPipelines(vkr->device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &vkr->instanced_pipeline) != VK_SUCCESS) {
         SDL_Log("failed to create pipline\n");
         vkDestroyShaderModule(vkr->device, vertexShader, NULL);
         vkDestroyShaderModule(vkr->device, fragmentShader, NULL);
-        // failed to create graphics pipeline
     }
-
-
-    //
-
-
 
     vkr->compute_pipeline = CreateComputePipeline(vkr);
 }
 
 
 
+
+
+//
+//
+//
+//                      Rendering
+//
+//
+//
 ////////////////////////////////////////////////////////////////////////
-/// Rendering
-void VkayBeginCommandBuffer(VkCommandBuffer cmd_buffer)
-{
-    VkCommandBufferBeginInfo cmd_begin_info = {};
-    cmd_begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmd_begin_info.pNext                    = NULL;
-    cmd_begin_info.pInheritanceInfo         = NULL;
-    cmd_begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // We will use this command buffer exactly once (per frame)
-    VKCHECK(vkBeginCommandBuffer(cmd_buffer, &cmd_begin_info));
-}
-
-
-// todo(ad): must take proper args (VkQueue, VkFence, ...)
-VkResult VkayQueueSumbit(VkQueue queue, VkCommandBuffer *cmd_buffer)
-{
-    VkSubmitInfo submit_info       = {};
-    submit_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers    = cmd_buffer;
-    return vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
-}
 
 bool VkayRendererBeginCommandBuffer(VkayRenderer *vkr)
 {
@@ -596,13 +607,18 @@ bool VkayRendererBeginCommandBuffer(VkayRenderer *vkr)
     if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
         vkDeviceWaitIdle(vkr->device);
         vkr->swapchain.create(VkayGetContext()->device, FRAME_BUFFER_COUNT, vkr->allocator, &vkr->depth_image, &vkr->depth_image_view);
+
+#ifndef NOPASS
         createFramebuffers(vkr->device, &vkr->framebuffers, vkr->swapchain, vkr->render_pass, vkr->depth_image_view);
+#endif
+
         return false;
     } else {
         VKCHECK(result);
     }
-    VKCHECK(vkResetFences(vkr->device, 1, g_inflight_render_fence));
 
+
+    VKCHECK(vkResetFences(vkr->device, 1, g_inflight_render_fence));
     VKCHECK(vkResetCommandBuffer(*g_inflight_main_command_buffer, 0)); // now that we are sure that the commands finished executing, we can safely reset the command buffer to begin recording again.
 
 
@@ -622,11 +638,17 @@ bool VkayRendererBeginCommandBuffer(VkayRenderer *vkr)
     // clear_value.color = { { 0.0f, 0.0f, flash, 1.0f } };
 
     VkClearValue depth_clear          = {};
-    depth_clear.depth_stencil.depth   = 1.f;
+    depth_clear.depthStencil.depth    = 1.f;
     VkClearValue union_clear_values[] = { vkr->clear_value, depth_clear };
 
 
     VkExtent2D window_extent = VkayGetContext()->window_extent;
+
+
+
+
+
+#ifndef NOPASS
     //////////////////////
     // BEGIN renderpass
     VkRenderPassBeginInfo rpInfo = {};
@@ -637,9 +659,73 @@ bool VkayRendererBeginCommandBuffer(VkayRenderer *vkr)
     rpInfo.renderArea.offset.y   = 0;
     rpInfo.renderArea.extent     = window_extent;
     rpInfo.framebuffer           = vkr->framebuffers[vkr->frames[vkr->frame_idx_inflight].idx_swapchain_image];
-    rpInfo.clear_value_count     = 2;
+    rpInfo.clearValueCount       = 2;
     rpInfo.pClearValues          = union_clear_values;
     vkCmdBeginRenderPass(*g_inflight_main_command_buffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+#endif
+
+
+
+
+
+#ifdef NOPASS
+    {
+        VkImageMemoryBarrier swapchain_image_layout_transition = {};
+        swapchain_image_layout_transition.sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        swapchain_image_layout_transition.dstAccessMask        = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        swapchain_image_layout_transition.oldLayout            = VK_IMAGE_LAYOUT_UNDEFINED;
+        swapchain_image_layout_transition.newLayout            = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        swapchain_image_layout_transition.image                = vkr->swapchain.images[vkr->frame_idx_inflight];
+        swapchain_image_layout_transition.subresourceRange     = vkr->swapchain.subresource_range;
+
+        VkPipelineStageFlags src_stage_flags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        VkPipelineStageFlags dst_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        vkCmdPipelineBarrier(vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT].cmd_buffer_gfx,
+            src_stage_flags, dst_stage_flags, 0, 0, NULL, 0, NULL, 1,
+            &swapchain_image_layout_transition);
+    }
+    {
+        VkImageMemoryBarrier depthStencil_image_layout_transition = {};
+        depthStencil_image_layout_transition.sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        depthStencil_image_layout_transition.dstAccessMask        = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        depthStencil_image_layout_transition.oldLayout            = VK_IMAGE_LAYOUT_UNDEFINED;
+        depthStencil_image_layout_transition.newLayout            = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+        depthStencil_image_layout_transition.image                = vkr->depth_image.image;
+        depthStencil_image_layout_transition.subresourceRange     = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+
+        VkPipelineStageFlags src_stage_flags = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        VkPipelineStageFlags dst_stage_flags = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        vkCmdPipelineBarrier(vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT].cmd_buffer_gfx,
+            src_stage_flags, dst_stage_flags, 0, 0, NULL, 0, NULL, 1,
+            &depthStencil_image_layout_transition);
+    }
+
+    VkRenderingAttachmentInfoKHR color_attachment = {};
+    color_attachment.sType                        = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+    color_attachment.imageView                    = vkr->swapchain.image_views[vkr->frame_idx_inflight];
+    color_attachment.imageLayout                  = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
+    color_attachment.loadOp                       = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment.storeOp                      = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment.clearValue                   = vkr->clear_value;
+
+    VkRenderingAttachmentInfoKHR depthStencil_attachment = {};
+    depthStencil_attachment.sType                        = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+    depthStencil_attachment.imageView                    = vkr->depth_image_view;
+    depthStencil_attachment.imageLayout                  = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL_KHR;
+    depthStencil_attachment.loadOp                       = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthStencil_attachment.storeOp                      = VK_ATTACHMENT_STORE_OP_STORE;
+    depthStencil_attachment.clearValue.depthStencil      = { 1.0f, 0 };
+
+    VkRenderingInfoKHR rendering_info   = {};
+    rendering_info.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments    = &color_attachment;
+    rendering_info.pDepthAttachment     = &depthStencil_attachment;
+    rendering_info.pStencilAttachment   = &depthStencil_attachment;
+    rendering_info.renderArea.offset    = { 0, 0 };
+    rendering_info.renderArea.extent    = window_extent;
+    vkCmdBeginRendering(*g_inflight_main_command_buffer, &rendering_info);
+#endif
 
 
 
@@ -654,56 +740,42 @@ bool VkayRendererBeginCommandBuffer(VkayRenderer *vkr)
     vkCmdSetViewport(*g_inflight_main_command_buffer, 0, 1, &viewport);
     vkCmdSetScissor(*g_inflight_main_command_buffer, 0, 1, &scissor);
 
-
-
-
     return true;
 }
 
-void VkayRendererClearColor(VkayRenderer *vkr, Color color)
-{
-    vkr->clear_value.color.float32[3] = color.a;
-    vkr->clear_value.color.float32[0] = color.r;
-    vkr->clear_value.color.float32[1] = color.g;
-    vkr->clear_value.color.float32[2] = color.b;
-}
 
-void VkayRendererPresent(VkayRenderer *vkr)
-{
-    // this will put the image we just rendered into the visible window.
-    // we want to g_inflight_render_semaphore for that,
-    // as it's necessary that drawing commands have finished before the image is displayed
-    VkPresentInfoKHR presentInfo = {};
-    presentInfo.sType            = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.pNext            = NULL;
 
-    presentInfo.pSwapchains    = &vkr->swapchain.handle;
-    presentInfo.swapchainCount = 1;
 
-    presentInfo.pWaitSemaphores    = &VkayRendererGetCurrentFrameData(vkr)->render_semaphore;
-    presentInfo.waitSemaphoreCount = 1;
-
-    presentInfo.pImageIndices = &vkr->frames[vkr->frame_idx_inflight].idx_swapchain_image;
-
-    VkResult result;
-    result = vkQueuePresentKHR(vkr->graphics_queue, &presentInfo);
-    if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
-        vkr->swapchain.create(vkr->device, FRAME_BUFFER_COUNT, vkr->allocator, &vkr->depth_image, &vkr->depth_image_view);
-        createFramebuffers(vkr->device, &vkr->framebuffers, vkr->swapchain, vkr->render_pass, vkr->depth_image_view);
-        return;
-    } else {
-        VKCHECK(result);
-    }
-
-    vkr->frame_idx_inflight++;
-    vkr->frame_idx_inflight = vkr->frame_idx_inflight % FRAME_BUFFER_COUNT;
-}
 
 void VkayRendererEndRenderPass(VkayRenderer *vkr)
 {
     ////////////////////////////////////////////////
     // END renderpass & command buffer recording
+#ifndef NOPASS
     vkCmdEndRenderPass(VkayRendererGetCurrentFrameData(vkr)->cmd_buffer_gfx);
+#endif
+
+#ifdef NOPASS
+    vkCmdEndRendering(VkayRendererGetCurrentFrameData(vkr)->cmd_buffer_gfx);
+
+    VkImageMemoryBarrier swapchain_image_layout_transition = {};
+    swapchain_image_layout_transition.sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    swapchain_image_layout_transition.srcAccessMask        = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    swapchain_image_layout_transition.oldLayout            = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    swapchain_image_layout_transition.newLayout            = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    swapchain_image_layout_transition.image                = vkr->swapchain.images[vkr->frame_idx_inflight];
+    swapchain_image_layout_transition.subresourceRange     = vkr->swapchain.subresource_range;
+
+    VkPipelineStageFlags src_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkPipelineStageFlags dst_stage_flags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    vkCmdPipelineBarrier(VkayRendererGetCurrentFrameData(vkr)->cmd_buffer_gfx,
+        src_stage_flags, dst_stage_flags, 0, 0, NULL, 0, NULL, 1,
+        &swapchain_image_layout_transition);
+#endif
+
+
+
+
 
     VKCHECK(vkEndCommandBuffer(VkayRendererGetCurrentFrameData(vkr)->cmd_buffer_gfx));
 
@@ -727,10 +799,48 @@ void VkayRendererEndRenderPass(VkayRenderer *vkr)
     VKCHECK(vkQueueSubmit(vkr->graphics_queue, 1, &submit_info, VkayRendererGetCurrentFrameData(vkr)->render_fence));
 }
 
-FrameData *VkayRendererGetCurrentFrameData(VkayRenderer *vkr)
+
+
+
+
+void VkayRendererPresent(VkayRenderer *vkr)
 {
-    return &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT];
+    // this will put the image we just rendered into the visible window.
+    // we want to g_inflight_render_semaphore for that,
+    // as it's necessary that drawing commands have finished before the image is displayed
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType            = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.pNext            = NULL;
+
+    presentInfo.pSwapchains    = &vkr->swapchain.handle;
+    presentInfo.swapchainCount = 1;
+
+    presentInfo.pWaitSemaphores    = &VkayRendererGetCurrentFrameData(vkr)->render_semaphore;
+    presentInfo.waitSemaphoreCount = 1;
+
+    presentInfo.pImageIndices = &vkr->frames[vkr->frame_idx_inflight].idx_swapchain_image;
+
+    VkResult result;
+    result = vkQueuePresentKHR(vkr->graphics_queue, &presentInfo);
+    if ((result == VK_ERROR_OUT_OF_DATE_KHR) || (result == VK_SUBOPTIMAL_KHR)) {
+        vkr->swapchain.create(vkr->device, FRAME_BUFFER_COUNT, vkr->allocator, &vkr->depth_image, &vkr->depth_image_view);
+
+#ifndef NOPASS
+        createFramebuffers(vkr->device, &vkr->framebuffers, vkr->swapchain, vkr->render_pass, vkr->depth_image_view);
+#endif
+
+        return;
+    } else {
+        VKCHECK(result);
+    }
+
+    vkr->frame_idx_inflight++;
+    vkr->frame_idx_inflight = vkr->frame_idx_inflight % FRAME_BUFFER_COUNT;
 }
+
+
+
+
 
 VkPipeline CreateComputePipeline(VkayRenderer *vkr)
 {
@@ -794,7 +904,7 @@ VkPipeline CreateComputePipeline(VkayRenderer *vkr)
     // Push Constants
     VkPushConstantRange push_constant_range = {};
     push_constant_range.stageFlags          = VK_SHADER_STAGE_COMPUTE_BIT;
-    push_constant_range.size                = sizeof(float_t);
+    push_constant_range.size                = sizeof(PushConstantsComputeShader);
     push_constant_range.offset              = 0;
 
     std::vector<VkPushConstantRange> push_constant_ranges {};
@@ -965,8 +1075,8 @@ void vkaySwapchain::create(VkDevice device, uint32_t min_image_count, VmaAllocat
     create_info_swapchain.preTransform             = physical_device_info.capabilities.currentTransform;
     create_info_swapchain.compositeAlpha           = (VkCompositeAlphaFlagBitsKHR)physical_device_info.capabilities.supportedCompositeAlpha; // todo(ad): this might only work if there's only one flag
     // create_info_swapchain.presentMode              = VK_PRESENT_MODE_MAILBOX_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
-    // create_info_swapchain.presentMode              = VK_PRESENT_MODE_FIFO_RELAXED_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
-    create_info_swapchain.presentMode  = VK_PRESENT_MODE_IMMEDIATE_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
+    create_info_swapchain.presentMode              = VK_PRESENT_MODE_FIFO_RELAXED_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
+    // create_info_swapchain.presentMode  = VK_PRESENT_MODE_IMMEDIATE_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
     create_info_swapchain.clipped      = VK_TRUE;
     create_info_swapchain.oldSwapchain = VK_NULL_HANDLE;
 
@@ -982,21 +1092,24 @@ void vkaySwapchain::create(VkDevice device, uint32_t min_image_count, VmaAllocat
 
     image_views.resize(swapchain_image_count);
 
+    subresource_range.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    subresource_range.baseMipLevel   = 0;
+    subresource_range.levelCount     = 1;
+    subresource_range.baseArrayLayer = 0;
+    subresource_range.layerCount     = 1;
+
     for (size_t i = 0; i < image_views.size(); i++) {
-        VkImageViewCreateInfo image_view_create_info           = {};
-        image_view_create_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        image_view_create_info.image                           = images[i];
-        image_view_create_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
-        image_view_create_info.format                          = image_format;
-        image_view_create_info.components.r                    = VK_COMPONENT_SWIZZLE_IDENTITY;
-        image_view_create_info.components.g                    = VK_COMPONENT_SWIZZLE_IDENTITY;
-        image_view_create_info.components.b                    = VK_COMPONENT_SWIZZLE_IDENTITY;
-        image_view_create_info.components.a                    = VK_COMPONENT_SWIZZLE_IDENTITY;
-        image_view_create_info.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-        image_view_create_info.subresourceRange.baseMipLevel   = 0;
-        image_view_create_info.subresourceRange.levelCount     = 1;
-        image_view_create_info.subresourceRange.baseArrayLayer = 0;
-        image_view_create_info.subresourceRange.layerCount     = 1;
+
+        VkImageViewCreateInfo image_view_create_info = {};
+        image_view_create_info.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        image_view_create_info.image                 = images[i];
+        image_view_create_info.viewType              = VK_IMAGE_VIEW_TYPE_2D;
+        image_view_create_info.format                = image_format;
+        image_view_create_info.components.r          = VK_COMPONENT_SWIZZLE_IDENTITY;
+        image_view_create_info.components.g          = VK_COMPONENT_SWIZZLE_IDENTITY;
+        image_view_create_info.components.b          = VK_COMPONENT_SWIZZLE_IDENTITY;
+        image_view_create_info.components.a          = VK_COMPONENT_SWIZZLE_IDENTITY;
+        image_view_create_info.subresourceRange      = subresource_range;
 
         vkCreateImageView(device, &image_view_create_info, NULL, &image_views[i]);
     }

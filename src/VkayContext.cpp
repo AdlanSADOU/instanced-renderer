@@ -29,11 +29,16 @@ void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_h
         window_flags);
 
 
-    VkValidationFeatureEnableEXT enabled_validation_feature[] = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT };
-    VkValidationFeaturesEXT      validation_features          = {};
-    validation_features.sType                                 = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-    validation_features.enabledValidationFeatureCount         = ARR_COUNT(enabled_validation_feature);
-    validation_features.pEnabledValidationFeatures            = enabled_validation_feature;
+    VkValidationFeatureEnableEXT enabled_validation_feature[] = {
+        VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT
+        // VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+    };
+
+    VkValidationFeaturesEXT validation_features       = {};
+    validation_features.sType                         = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+    validation_features.enabledValidationFeatureCount = ARR_COUNT(enabled_validation_feature);
+    validation_features.pEnabledValidationFeatures    = enabled_validation_feature;
+
 
     uint32_t supported_extension_properties_count;
     vkEnumerateInstanceExtensionProperties(NULL, &supported_extension_properties_count, NULL);
@@ -53,6 +58,7 @@ void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_h
         { "VK_LAYER_LUNARG_monitor" },
     };
 
+
     VkApplicationInfo application_info  = {};
     application_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     application_info.pNext              = NULL;
@@ -60,7 +66,7 @@ void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_h
     application_info.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
     application_info.pEngineName        = "engine name";
     application_info.engineVersion      = VK_MAKE_VERSION(0, 1, 0);
-    application_info.apiVersion         = VK_API_VERSION_1_2;
+    application_info.apiVersion         = VK_API_VERSION_1_3;
 
     VkInstanceCreateInfo create_info_instance    = {};
     create_info_instance.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -72,8 +78,6 @@ void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_h
     create_info_instance.enabledExtensionCount   = required_extensions_count;
     create_info_instance.ppEnabledExtensionNames = required_instance_extensions;
     VKCHECK(vkCreateInstance(&create_info_instance, NULL, &vkc.instance));
-
-
 
     if (!SDL_Vulkan_CreateSurface(vkc.window, vkc.instance, &vkc.surface)) {
         SDL_Log("SDL Failed to create Surface");
@@ -177,23 +181,29 @@ void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_h
     VkExtensionProperties *device_extension_properties = new VkExtensionProperties[device_properties_count];
     VKCHECK(vkEnumerateDeviceExtensionProperties(vkc.physical_device, NULL, &device_properties_count, device_extension_properties));
 
+#if 1
+    SDL_Log("Device Extensions count: %d\n", device_properties_count);
+    for (size_t i = 0; i < device_properties_count; i++) {
+        if (strcmp(device_extension_properties[i].extensionName, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) == 0)
+            SDL_Log("%d: %s\n", device_extension_properties[i].specVersion, device_extension_properties[i].extensionName);
+    }
+#endif
+
     const char *enabled_device_extension_names[] = {
-        "VK_KHR_swapchain",
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        // VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, // core in v1.3
+        VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
     };
 
-    VkPhysicalDeviceVulkan11Features gpu_vulkan_11_features = {};
-    gpu_vulkan_11_features.sType                            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-    gpu_vulkan_11_features.shaderDrawParameters             = VK_TRUE;
-
     std::vector<VkDeviceQueueCreateInfo> create_info_device_queues = {};
-
-    VkDeviceQueueCreateInfo ci_graphics_queue = {};
-    ci_graphics_queue.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    ci_graphics_queue.pNext                   = NULL;
-    ci_graphics_queue.flags                   = 0;
-    ci_graphics_queue.queueFamilyIndex        = graphics_queue_family_idx;
-    ci_graphics_queue.queueCount              = 1;
-    ci_graphics_queue.pQueuePriorities        = queue_priorities;
+    VkDeviceQueueCreateInfo              ci_graphics_queue         = {};
+    ci_graphics_queue.sType                                        = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    ci_graphics_queue.pNext                                        = NULL;
+    ci_graphics_queue.flags                                        = 0;
+    ci_graphics_queue.queueFamilyIndex                             = graphics_queue_family_idx;
+    ci_graphics_queue.queueCount                                   = 1;
+    ci_graphics_queue.pQueuePriorities                             = queue_priorities;
     create_info_device_queues.push_back(ci_graphics_queue);
 
     VkDeviceQueueCreateInfo ci_compute_queue = {};
@@ -205,15 +215,35 @@ void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_h
     ci_compute_queue.pQueuePriorities        = queue_priorities;
     create_info_device_queues.push_back(ci_compute_queue);
 
+
+
+
+
+    VkPhysicalDeviceVulkan11Features gpu_vulkan_11_features = {};
+    gpu_vulkan_11_features.sType                            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+    gpu_vulkan_11_features.shaderDrawParameters             = VK_TRUE;
+
+
+
+    VkPhysicalDeviceSynchronization2Features synchronization2_features = {};
+    synchronization2_features.sType                                    = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+    synchronization2_features.synchronization2                         = VK_TRUE;
+
     VkPhysicalDeviceRobustness2FeaturesEXT robustness_feature_ext = {};
     robustness_feature_ext.sType                                  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
     robustness_feature_ext.nullDescriptor                         = VK_TRUE;
+    robustness_feature_ext.pNext                                  = &synchronization2_features;
+
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering = {};
+    dynamic_rendering.sType                                       = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+    dynamic_rendering.dynamicRendering                            = VK_TRUE;
+    dynamic_rendering.pNext                                       = &robustness_feature_ext;
 
     // gpu_vulkan_11_features.pNext = &robustness_feature_ext;
 
     VkDeviceCreateInfo create_info_device   = {};
     create_info_device.sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    create_info_device.pNext                = &robustness_feature_ext;
+    create_info_device.pNext                = &dynamic_rendering;
     create_info_device.flags                = 0;
     create_info_device.queueCreateInfoCount = 1;
     create_info_device.pQueueCreateInfos    = create_info_device_queues.data();
@@ -232,6 +262,8 @@ void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_h
     }
 
     vkGetDeviceQueue(vkc.device, vkc.compute_queue_family, 0, &vkc.compute_queue);
+
+
 
     vkc.is_initialized = true;
 }

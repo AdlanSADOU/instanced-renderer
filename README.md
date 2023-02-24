@@ -1,5 +1,6 @@
-
-<!-- <img src="https://github.com/AdlanSADOU/Vulkan_Renderer/blob/master/.misc/v0.1.gif" width="44%" height="44%"> -->
+<p align="center">
+<img src="https://github.com/AdlanSADOU/Instanced-Renderer/blob/master/.previews/instanced-renderer-preview.png" width="60%" height="60%">
+</p>
 
 # Quick Warning Notice
 This project is still under heavy development and in early stage. I'm still working on & exploring techniques, thus the API is not yet fleshed out.

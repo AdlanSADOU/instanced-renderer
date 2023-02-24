@@ -1,11 +1,11 @@
-#include "VkayInstancesBucket.h"
+#include "VkayBucket.h"
 #include "Vkay.h"
 #include "VkaySprite.h"
 #include "VkayTexture.h"
 
 namespace vkay {
 
-    void InstancesBucketAddSpriteInstance(InstanceBucket *instanceBucket, Sprite *sprite)
+    void BucketAddSpriteInstance(InstanceBucket *instanceBucket, Sprite *sprite)
     {
         InstanceData idata = {};
         idata.pos          = sprite->transform.position;
@@ -18,7 +18,7 @@ namespace vkay {
     {
     }
 
-    bool InstancesBucketUpload(VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh)
+    bool BucketUpload(VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh)
     {
         {
             VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -56,7 +56,7 @@ namespace vkay {
         return true;
     }
 
-    void InstancesDestroyInstance(VkayRenderer *vkr, uint32_t instance_index, InstanceBucket *bucket)
+    void BucketDestroyInstance(VkayRenderer *vkr, uint32_t instance_index, InstanceBucket *bucket)
     {
         if (instance_index >= bucket->instance_data_array.size()) {
             SDL_Log("InstanceData : element %d does not exist\n", instance_index);
@@ -70,7 +70,7 @@ namespace vkay {
 
     // todo(ad): we added BaseMesh here to basically be able to pass in any mesh to be instanced, not just Quads
     //
-    void InstancesBucketDraw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh)
+    void BucketDraw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh)
     {
         // todo(ad): the issue is that for each InstanceBucket drawn we are redundently re-binding these
         vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkr->instanced_pipeline);
@@ -84,7 +84,7 @@ namespace vkay {
         vkCmdDraw(cmd_buffer, (uint32_t)base_mesh.vertices.size(), (uint32_t)bucket->instance_data_array.size(), 0, 0);
     }
 
-    void InstancesDestroy(VkayRenderer *vkr, InstanceBucket *bucket)
+    void BucketDestroy(VkayRenderer *vkr, InstanceBucket *bucket)
     {
         VkayDestroyBuffer(vkr->allocator, bucket->mesh_buffer.buffer, bucket->mesh_buffer.allocation);
         vmaUnmapMemory(vkr->allocator, bucket->instance_buffer.allocation);

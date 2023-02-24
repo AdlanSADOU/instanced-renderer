@@ -1,13 +1,11 @@
+// #define VKAY_DEBUG_ALLOCATIONS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_RADIANS
 
 #include <VkayBucket.h>
 #include <VkayTexture.h>
 #include <VkaySprite.h>
-
-#define VKAY_DEBUG_ALLOCATIONS
 #include <Vkay.h>
-
 #include <VkayCamera.h>
 
 void UpdateAndRender();
@@ -29,63 +27,55 @@ const uint64_t MAX_DT_SAMPLES = 256;
 float dt_samples[MAX_DT_SAMPLES] = {};
 float dt_averaged                = 0;
 
-vkay::InstanceBucket instances;
-
-vkay::Texture profile;
-vkay::Texture itoldu;
 
 Camera camera;
 
 VkayRenderer vkr;
 Quad         quad;
 
-PushConstantsComputeShader pushConstants = {};
+AllocatedImage render_target      = {};
+VkImageView    render_target_view = {};
+void          *pixels;
 
 int main(int argc, char *argv[])
 {
-    VkayContextInit("Instances", 1280, 720);
+    VkayContextInit("Boids", 1920, 1080);
     VkayRendererInit(&vkr);
-
-    vkay::TextureCreate("./assets/triangle.png", &profile, &vkr);
 
     VkayCameraCreate(&vkr, &camera);
     camera.m_projection = Camera::ORTHO;
     camera.m_position   = { 0, 0, 0 };
 
-    const uint32_t ROW          = 2000;
-    const uint32_t COL          = 2000;
-    const int      spacing      = 15;
-    uint32_t       SPRITE_COUNT = ROW * COL;
-    SDL_Log("Sprites on screen: %d\n", SPRITE_COUNT);
 
+    bool res=VkayAllocateImageMemory(vkr.allocator, render_target.image, &render_target.allocation, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    if (!res)
+        SDL_Log("allocation failed");
 
+    VkImageCreateInfo ci_image = {};
+    ci_image.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ci_image.imageType         = VK_IMAGE_TYPE_2D;
+    ci_image.format            = VK_FORMAT_R8G8B8A8_UNORM;
+    ci_image.extent            = { (uint32_t)64, (uint32_t)64, 1 };
+    ci_image.mipLevels         = 1;
+    ci_image.arrayLayers       = 1;
+    ci_image.samples           = VK_SAMPLE_COUNT_1_BIT;
+    ci_image.usage             = VK_IMAGE_USAGE_SAMPLED_BIT;
+    ci_image.tiling            = VK_IMAGE_TILING_OPTIMAL; // 0
+    ci_image.sharingMode       = VK_SHARING_MODE_EXCLUSIVE; // 0
+    ci_image.initialLayout     = VK_IMAGE_LAYOUT_UNDEFINED; // 0
 
+    VmaAllocationCreateInfo ci_allocation = {};
+    ci_allocation.usage                   = VMA_MEMORY_USAGE_GPU_TO_CPU;
+    VKCHECK(vmaCreateImage(vkr.allocator, &ci_image, &ci_allocation, &render_target.image, &render_target.allocation, NULL));
 
+    VKCHECK(vmaMapMemory(vkr.allocator, render_target.allocation, &pixels));
 
-    vkay::Sprite sprite = {};
-    // Generate InstanceData for each sprite
-    for (size_t i = 0, j = 0; i < SPRITE_COUNT; i++) {
-        static float _x     = 0;
-        static float _y     = 0;
-        float        _scale = .2f;
+    // char *pixelBuffer = (char *)pixels;
+    // pixelBuffer[0]    = 120;
+    // pixelBuffer[1]    = 120;
+    // pixelBuffer[2]    = 120;
+    // pixelBuffer[3]    = 120;
 
-        if (i > 0 && (i % ROW) == 0) j++;
-        // if (i == 0) _scale = 1.f;
-        _x = (float)((profile.width + spacing) * (i % ROW) * _scale + 50);
-        _y = (float)((profile.height + spacing) * j) * _scale + 50;
-
-        sprite.transform.position = { _x - 4000.f, _y - 2000, .0f };
-        // if (i == 0) sprite.transform.position = { 0, 0, 0 };
-        // if (i == 0) sprite.transform.position = { _x + vkc.window_extent.width / 2 - profile.width , -_y - vkc.window_extent.height / 2, 0.f };
-        sprite.texture_idx     = profile.id;
-        sprite.transform.scale = { profile.width, profile.height, 0 };
-        sprite.transform.scale *= _scale;
-        vkay::BucketAddSpriteInstance(&instances, &sprite);
-    }
-
-    vkay::BucketUpload(&vkr, &instances, quad.mesh);
-    pushConstants.width  = (float)instances.instance_data_array.size();
-    pushConstants.height = 0;
 
     /////////////////////
     // Main loop
@@ -97,10 +87,8 @@ int main(int argc, char *argv[])
 
     //////////////////////
     // Cleanup
-    vkDeviceWaitIdle(vkr.device);
-    vkay::TextureDestroy(&profile, &vkr);
 
-    vkay::BucketDestroy(&vkr, &instances);
+    vkDeviceWaitIdle(vkr.device);
     VkayCameraDestroy(&vkr, &camera);
     VkayRendererCleanup(&vkr);
     VkayContextCleanup();
@@ -202,63 +190,13 @@ void UpdateAndRender()
         if (_key_Q) pos_z -= .01f;
         if (_key_E) pos_z += .01f;
 
-        static int i = 0;
-        if (_key_p) {
-            vkay::BucketDestroyInstance(&vkr, i++, &instances);
-        }
-
-
-        SDL_GetMouseState(&pushConstants.mouse_x, &pushConstants.mouse_y);
-        pushConstants.mouse_y = VkayGetContext()->window_extent.height - pushConstants.mouse_y; // account for opposite starting corners
-        pushConstants.time_in_seconds += dt_averaged;
-        pushConstants.deltaTime  = dt_averaged;
-        pushConstants.mouse_left = _mouse_left;
-        // printf("time: %.2f dt: %.6f --- %d %d\n", pushConstants.time_in_seconds, pushConstants.deltaTime, pushConstants.mouse_pos.x, pushConstants.mouse_pos.y);
-
-
-
-
-
-        ///////////////////////////////
-        // Compute dispatch
-        vkWaitForFences(vkr.device, 1, &vkr.frames[0].compute_fence, true, SECONDS(1));
-        vkResetFences(vkr.device, 1, &vkr.frames[0].compute_fence);
-        vkResetCommandBuffer(vkr.frames[0].cmd_buffer_cmp, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
-
-        VkCommandBufferBeginInfo begin_info = {};
-        begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin_info.flags                    = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        vkBeginCommandBuffer(vkr.frames[0].cmd_buffer_cmp, &begin_info);
-        vkCmdBindPipeline(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline);
-        vkCmdBindDescriptorSets(vkr.frames[0].cmd_buffer_cmp, VK_PIPELINE_BIND_POINT_COMPUTE, vkr.compute_pipeline_layout, 0, 1, vkr.compute_descriptor_sets.data(), 0, 0);
-        vkCmdPushConstants(vkr.frames[0].cmd_buffer_cmp, vkr.compute_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantsComputeShader), &pushConstants);
-        vkCmdDispatch(vkr.frames[0].cmd_buffer_cmp, (uint32_t)(instances.instance_data_array.size() / 32), 1, 1);
-        vkEndCommandBuffer(vkr.frames[0].cmd_buffer_cmp);
-
-        VkSubmitInfo submit_info         = {};
-        submit_info.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submit_info.waitSemaphoreCount   = 0;
-        submit_info.pWaitSemaphores      = NULL;
-        submit_info.pWaitDstStageMask    = NULL;
-        submit_info.commandBufferCount   = 1;
-        submit_info.pCommandBuffers      = &vkr.frames[0].cmd_buffer_cmp;
-        submit_info.signalSemaphoreCount = 0;
-        submit_info.pSignalSemaphores    = NULL;
-        vkQueueSubmit(vkr.compute_queue, 1, &submit_info, vkr.frames[0].compute_fence);
-
 
 
 
 
         //////////////////////////////////
         // Rendering
-        if (!VkayRendererBeginCommandBuffer(&vkr)) continue;
-
-        glm::vec3 *s_pos = &((InstanceData *)instances.mapped_data_ptr)[0].pos;
-        s_pos->x += pos_x;
-        s_pos->y += pos_y;
-        s_pos->z += pos_z * 1.f;
+        if (!VkayRendererBeginCommandBuffer(&vkr)) return;
 
         camera.m_position.x += camera_x;
         camera.m_position.y += camera_y;
@@ -268,7 +206,25 @@ void UpdateAndRender()
         // printf(" camera: %.1f %.1f %.1f\n", camera.m_position.x, camera.m_position.y, camera.m_position.z);
 
         VkayCameraUpdate(&vkr, &camera, vkr.instanced_pipeline_layout);
-        vkay::BucketDraw(vkr.frames[vkr.frame_idx_inflight].cmd_buffer_gfx, &vkr, &instances, quad.mesh);
+
+
+        VkImageSubresourceLayers subresource;
+        subresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresource.mipLevel       = 0;
+        subresource.baseArrayLayer = 0;
+        subresource.layerCount     = 1;
+
+        VkOffset3D extent = { (int32_t)VkayGetContext()->window_extent.width, (int32_t)VkayGetContext()->window_extent.height, 0 };
+
+        VkImageBlit region;
+        region.srcSubresource = subresource;
+        region.srcOffsets[0]  = { 0, 0, 0 };
+        region.srcOffsets[1]  = extent;
+        region.dstSubresource = subresource;
+        region.dstOffsets[0]  = { 0, 0, 0 };
+        region.dstOffsets[1]  = extent;
+
+        vkCmdBlitImage(vkr.frames[vkr.frame_idx_inflight].cmd_buffer_gfx, render_target.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, vkr.swapchain.images[vkr.frame_idx_inflight], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_NEAREST);
 
         VkayRendererEndRenderPass(&vkr);
         VkayRendererPresent(&vkr);

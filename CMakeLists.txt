@@ -35,12 +35,18 @@ target_link_libraries(Invaders vkay)
 target_include_directories(Invaders PUBLIC ./src)
 
 
-FILE(GLOB EXAMPLE_SOURCES ./examples/*.cpp)
 add_executable(Instances ./examples/Instances.cpp)
 target_compile_options(Instances PRIVATE ${CFLAGS})
 target_link_options(Instances PRIVATE -SUBSYSTEM:CONSOLE -time)
 target_link_libraries(Instances vkay)
 target_include_directories(Instances PUBLIC ./src)
+
+
+add_executable(Boids ./examples/boids.cpp)
+target_compile_options(Boids PRIVATE ${CFLAGS})
+target_link_options(Boids PRIVATE -SUBSYSTEM:CONSOLE -time)
+target_link_libraries(Boids vkay)
+target_include_directories(Boids PUBLIC ./src)
 
 
 # add_executable(gltf ./examples/gltf.cpp)

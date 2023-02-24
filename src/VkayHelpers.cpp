@@ -40,7 +40,6 @@ void GetDescriptorSetLayoutBinding(uint32_t binding, VkDescriptorType descriptor
 
 VkResult CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks *allocator, VkDescriptorSetLayout *set_layout, const VkDescriptorSetLayoutBinding *bindings, uint32_t binding_count)
 {
-
     VkDescriptorSetLayoutCreateInfo create_info_desc_set_layout = {};
     create_info_desc_set_layout.sType                           = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     create_info_desc_set_layout.pNext                           = NULL;
@@ -54,7 +53,6 @@ VkResult CreateDescriptorSetLayout(VkDevice device, const VkAllocationCallbacks 
 
 VkResult AllocateDescriptorSets(VkDevice device, VkDescriptorPool descriptor_pool, uint32_t descriptor_set_count, const VkDescriptorSetLayout *set_layouts, VkDescriptorSet *descriptor_set)
 {
-
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.pNext                       = NULL;
     allocInfo.sType                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;

@@ -26,19 +26,19 @@ namespace vkay {
 
     struct InstanceBucket
     {
-        void                     *mapped_data_ptr        = {};
-        std::vector<InstanceData> instance_data_array    = {};
-        VkayBuffer                instance_buffer = {};
+        void                     *mapped_data_ptr     = {};
+        std::vector<InstanceData> instance_data_array = {};
+        VkayBuffer                instance_buffer     = {};
 
         VkayBuffer mesh_buffer = {};
     };
 
-    void InstancesBucketAddSpriteInstance(InstanceBucket *instanceBucket, Sprite *sprite);
-    void InstancesBucketSetBaseMesh();
-    bool InstancesBucketUpload(VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh);
-    void InstancesDestroyInstance(VkayRenderer *vkr, uint32_t instance_index, InstanceBucket *bucket);
-    void InstancesBucketDraw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh);
-    void InstancesDestroy(VkayRenderer *vkr, InstanceBucket *bucket);
+    void BucketAddSpriteInstance(InstanceBucket *instance_bucket, Sprite *sprite);
+    void BucketSetBaseMesh();
+    bool BucketUpload(VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh);
+    void BucketDestroyInstance(VkayRenderer *vkr, uint32_t instance_index, InstanceBucket *bucket);
+    void BucketDraw(VkCommandBuffer cmd_buffer, VkayRenderer *vkr, InstanceBucket *bucket, BaseMesh base_mesh);
+    void BucketDestroy(VkayRenderer *vkr, InstanceBucket *bucket);
 }
 
 #endif // VKAY_INSTANCES

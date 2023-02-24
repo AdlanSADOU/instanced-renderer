@@ -52,9 +52,11 @@ void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_h
     SDL_Vulkan_GetInstanceExtensions(vkc.window, &required_extensions_count, required_instance_extensions);
 
     const char *validation_layers[] = {
+
 #if _DEBUG
-        { "VK_LAYER_KHRONOS_validation" },
+        // { "VK_LAYER_KHRONOS_validation" },
 #endif
+
         { "VK_LAYER_LUNARG_monitor" },
     };
 
@@ -68,10 +70,12 @@ void VkayContextInit(const char *title, uint32_t window_width, uint32_t window_h
     application_info.engineVersion      = VK_MAKE_VERSION(0, 1, 0);
     application_info.apiVersion         = VK_API_VERSION_1_3;
 
-    VkInstanceCreateInfo create_info_instance    = {};
-    create_info_instance.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    create_info_instance.pNext                   = &validation_features;
-    create_info_instance.enabledLayerCount       = ARR_COUNT(validation_layers);
+    VkInstanceCreateInfo create_info_instance = {};
+    create_info_instance.sType                = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+#if _DEBUG
+    create_info_instance.pNext             = &validation_features;
+#endif
+    create_info_instance.enabledLayerCount = ARR_COUNT(validation_layers);
     create_info_instance.ppEnabledLayerNames     = validation_layers;
     create_info_instance.flags                   = 0;
     create_info_instance.pApplicationInfo        = &application_info;

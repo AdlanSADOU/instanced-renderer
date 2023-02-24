@@ -10,7 +10,7 @@
 
 
 static bool       VkayCreateShaderModule(const char *filepath, VkShaderModule *out_ShaderModule, VkDevice device);
-static VkPipeline CreateComputePipeline(VkayRenderer *vkr);
+static VkPipeline VkayCreateComputePipeline(VkayRenderer *vkr);
 
 void VkayRendererClearColor(VkayRenderer *vkr, Color color)
 {
@@ -268,7 +268,7 @@ void VkayRendererInit(VkayRenderer *vkr)
     VkDescriptorPoolCreateInfo pool_info = {};
     pool_info.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.flags                      = 0;
-    pool_info.maxSets                    = 4; // max times we can vkAllocateDescriptorSets
+    pool_info.maxSets                    = 4; 
     pool_info.poolSizeCount              = (uint32_t)sizes.size();
     pool_info.pPoolSizes                 = sizes.data();
     vkCreateDescriptorPool(vkr->device, &pool_info, NULL, &vkr->descriptor_pool);
@@ -485,9 +485,11 @@ void VkayRendererInit(VkayRenderer *vkr)
     desc_set_layout_binding_sampled_image.stageFlags                   = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     /// layout > array of textures & sampler
-    std::vector<VkDescriptorSetLayoutBinding> array_of_textures_set_layout_bindings;
-    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampler);
-    array_of_textures_set_layout_bindings.push_back(desc_set_layout_binding_sampled_image);
+    std::vector<VkDescriptorSetLayoutBinding> array_of_textures_set_layout_bindings = {
+        desc_set_layout_binding_sampler,
+        desc_set_layout_binding_sampled_image
+    };
+
     CreateDescriptorSetLayout(vkr->device, NULL, &vkr->set_layout_array_of_textures, array_of_textures_set_layout_bindings.data(), (uint32_t)array_of_textures_set_layout_bindings.size());
 
     // Sampler
@@ -567,7 +569,7 @@ void VkayRendererInit(VkayRenderer *vkr)
         vkDestroyShaderModule(vkr->device, fragmentShader, NULL);
     }
 
-    vkr->compute_pipeline = CreateComputePipeline(vkr);
+    vkr->compute_pipeline = VkayCreateComputePipeline(vkr);
 }
 
 
@@ -594,10 +596,10 @@ bool VkayRendererBeginCommandBuffer(VkayRenderer *vkr)
     VkCommandBuffer *g_inflight_main_command_buffer;
     // VkDescriptorSet *g_inflight_global_descriptor_set;
 
-    g_inflight_render_fence        = &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT].render_fence;
-    g_inflight_present_semaphore   = &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT].present_semaphore;
-    g_inflight_render_semaphore    = &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT].render_semaphore;
-    g_inflight_main_command_buffer = &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT].cmd_buffer_gfx;
+    g_inflight_render_fence        = &vkr->frames[vkr->frame_idx_inflight].render_fence;
+    g_inflight_present_semaphore   = &vkr->frames[vkr->frame_idx_inflight].present_semaphore;
+    g_inflight_render_semaphore    = &vkr->frames[vkr->frame_idx_inflight].render_semaphore;
+    g_inflight_main_command_buffer = &vkr->frames[vkr->frame_idx_inflight].cmd_buffer_gfx;
     // g_inflight_global_descriptor_set = &vkr->frames[vkr->frame_idx_inflight % FRAME_BUFFER_COUNT].set_global;
 
 
@@ -842,7 +844,10 @@ void VkayRendererPresent(VkayRenderer *vkr)
 
 
 
-VkPipeline CreateComputePipeline(VkayRenderer *vkr)
+/////////////////////////////////////////////
+//      Compute Pipeline
+
+VkPipeline VkayCreateComputePipeline(VkayRenderer *vkr)
 {
     VkShaderModule compute_shader_module;
     if (!VkayCreateShaderModule("./shaders/basicComputeShader.comp.spv", &compute_shader_module, vkr->device)) {
@@ -1021,6 +1026,7 @@ void VkayRendererCleanup(VkayRenderer *vkr)
         vkDeviceWaitIdle(vkr->device);
 
         vkr->release_queue.flush();
+        // vmafree
         vmaDestroyAllocator(vkr->allocator);
 
         vkDestroySwapchainKHR(vkr->device, vkr->swapchain.handle, NULL);
@@ -1074,8 +1080,8 @@ void vkaySwapchain::create(VkDevice device, uint32_t min_image_count, VmaAllocat
     create_info_swapchain.pQueueFamilyIndices      = NULL;
     create_info_swapchain.preTransform             = physical_device_info.capabilities.currentTransform;
     create_info_swapchain.compositeAlpha           = (VkCompositeAlphaFlagBitsKHR)physical_device_info.capabilities.supportedCompositeAlpha; // todo(ad): this might only work if there's only one flag
-    // create_info_swapchain.presentMode              = VK_PRESENT_MODE_MAILBOX_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
-    create_info_swapchain.presentMode              = VK_PRESENT_MODE_FIFO_RELAXED_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
+    create_info_swapchain.presentMode              = VK_PRESENT_MODE_MAILBOX_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
+    // create_info_swapchain.presentMode              = VK_PRESENT_MODE_FIFO_RELAXED_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
     // create_info_swapchain.presentMode  = VK_PRESENT_MODE_IMMEDIATE_KHR; // todo(ad): setting this arbitrarily, must check if supported and desired
     create_info_swapchain.clipped      = VK_TRUE;
     create_info_swapchain.oldSwapchain = VK_NULL_HANDLE;

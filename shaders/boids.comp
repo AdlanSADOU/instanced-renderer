@@ -28,13 +28,13 @@ layout(push_constant) uniform Constants{
     bool mouse_left;
 };
 
-float speed = 40;
+float speed = 80;
 vec2 velocity;
 
 void main()
 {
-    // if(gl_GlobalInvocationID.x >= size_x)
-    //     return;
+    if(gl_GlobalInvocationID.x >= size_x)
+        return;
 
     vec3 pos = instance_data[gl_GlobalInvocationID.x].pos;
 
@@ -48,9 +48,10 @@ void main()
 
     instance_data[gl_GlobalInvocationID.x].pos += (target_direction) * speed * deltaTime ;
 
+    // float t = mod(time_in_seconds, 360);
     pos = instance_data[gl_GlobalInvocationID.x].pos;
     float cosf = dot(target_direction, pos) / (length(target_direction)*length(pos));
-    instance_data[gl_GlobalInvocationID.x].rot = vec3(atan(cosf), 0, 0.0);
+    instance_data[gl_GlobalInvocationID.x].rot = vec3(atan(cosf)+90, 0, 0.0);
 
     // debugPrintfEXT("mouse pos: %d %d\n", mouse_x, mouse_y);
 }

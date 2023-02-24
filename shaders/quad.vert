@@ -11,22 +11,16 @@ layout (location = 5) in vec3 iRot;
 layout (location = 6) in vec3 iScale;
 layout (location = 7) in int  iTexIdx;
 
-layout(set = 0, binding = 0) uniform CameraBuffer
+layout (location = 0) out vec3 outColor;
+layout (location = 1) out vec2 outTexUV;
+layout (location = 2) out flat int  outTexIdx;
+
+layout(set = 0, binding = 0) uniform cameraBuffer
 {
 	mat4 view;
 	mat4 proj;
 	mat4 viewproj;
 } cameraData;
-
-layout (push_constant) uniform constants
-{
-	vec4 data;
-	mat4 render_matrix;
-} PushConstants;
-
-layout (location = 0) out vec3 outColor;
-layout (location = 1) out vec2 outTexUV;
-layout (location = 2) out flat int  outTexIdx;
 
 mat4 translationMatrix(vec3 pos)
 {

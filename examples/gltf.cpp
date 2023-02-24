@@ -39,7 +39,7 @@ Transform   triangle_transform = {};
 
 int main(int argc, char *argv[])
 {
-    VkayContextInit(&vkc);
+    Init(&vkc);
     VkayRendererInit(&vkc, &vkr);
 
     ///////////////
@@ -327,7 +327,7 @@ int main(int argc, char *argv[])
     VKCHECK(vkDeviceWaitIdle(vkr.device));
 
     VkayRendererCleanup(&vkr);
-    VkayContextCleanup(&vkc);
+    Free(&vkc);
     return 0;
 }
 

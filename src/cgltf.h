@@ -200,6 +200,17 @@ typedef enum cgltf_primitive_type
 	cgltf_primitive_type_triangle_fan,
 } cgltf_primitive_type;
 
+const char* cgltf_primitive_type_str[]
+{
+	"cgltf_primitive_type_points",
+	"cgltf_primitive_type_lines",
+	"cgltf_primitive_type_line_loop",
+	"cgltf_primitive_type_line_strip",
+	"cgltf_primitive_type_triangles",
+	"cgltf_primitive_type_triangle_strip",
+	"cgltf_primitive_type_triangle_fan",
+};
+
 typedef enum cgltf_alpha_mode
 {
 	cgltf_alpha_mode_opaque,

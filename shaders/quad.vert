@@ -11,22 +11,16 @@ layout (location = 5) in vec3 iRot;
 layout (location = 6) in vec3 iScale;
 layout (location = 7) in int  iTexIdx;
 
-layout(set = 0, binding = 0) uniform CameraBuffer
+layout (location = 0) out vec3 outColor;
+layout (location = 1) out vec2 outTexUV;
+layout (location = 2) out flat int  outTexIdx;
+
+layout(set = 0, binding = 0) uniform cameraBuffer
 {
 	mat4 view;
 	mat4 proj;
 	mat4 viewproj;
 } cameraData;
-
-layout (push_constant) uniform constants
-{
-	vec4 data;
-	mat4 render_matrix;
-} PushConstants;
-
-layout (location = 0) out vec3 outColor;
-layout (location = 1) out vec2 outTexUV;
-layout (location = 2) out flat int  outTexIdx;
 
 mat4 translationMatrix(vec3 pos)
 {
@@ -69,12 +63,18 @@ void main()
         0.0,  -s,   c
     );
 
-	mat3 rotMat = _mz * _my * _mx;
+    mat3 _scale = mat3(
+        iScale.x, 0.0, 0.0,
+        0.0, iScale.y, 0.0,
+        0.0,  0.0, iScale.z
+    );
 
-    vec4 v_pos = vec4(vPosition * rotMat, 1.0);
-    vec4 pos = vec4((v_pos.xyz * iScale/2) + iPos, 1.0) ;
+	mat3 rotMat = _mx * _mz * _my;
 
-	gl_Position = cameraData.proj * ( cameraData.view * pos);
+    vec4 v_pos = vec4(vPosition * rotMat * _scale/2.0 + iPos, 1.0);
+    // vec4 pos = vec4((v_pos.xyz) + iPos, 1.0) ;
+
+	gl_Position = cameraData.viewproj * v_pos;
 	outColor = vColor;
     outTexIdx = iTexIdx;
     outTexUV = vTexUV;

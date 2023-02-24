@@ -16,33 +16,121 @@ class vector;
 
 #define ARR_COUNT(arr) (sizeof(arr) / sizeof(arr[0]))
 
+
+struct vkayPhysicalDeviceSurfaceInfo_KHR
+{
+    using SurfaceFormats = std::vector<VkSurfaceFormatKHR>;
+    using PresentModes   = std::vector<VkPresentModeKHR>;
+
+    uint32_t                 format_count        = {};
+    SurfaceFormats           formats             = {};
+    uint32_t                 present_modes_count = {};
+    PresentModes             present_modes       = {};
+    VkSurfaceCapabilitiesKHR capabilities        = {};
+
+    void query(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+    {
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &format_count, NULL);
+        formats.resize(format_count);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &format_count, formats.data());
+
+        // todo(ad): .presentMode arbitrarily set right now, we need to check what the OS supports and pick one
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &present_modes_count, NULL);
+        present_modes.resize(present_modes_count);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &present_modes_count, present_modes.data());
+
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+    };
+};
+
+struct Vec2
+{
+    float x = {};
+    float y = {};
+};
+
+struct PushConstantsComputeShader
+{
+    float     time_in_seconds = {};
+    float     deltaTime       = {};
+    float     width           = {};
+    float     height          = {};
+    int mouse_x = {};
+    int mouse_y = {};
+    bool      mouse_left      = false;
+};
+
+struct Color
+{
+    float r;
+    float g;
+    float b;
+    float a;
+
+    Color()
+    {
+        a = r = g = b = 0;
+    }
+
+    Color(float r, float g, float b, float a)
+    {
+        this->r = r;
+        this->g = g;
+        this->b = b;
+        this->a = a;
+    }
+};
+
 struct Vertex
 {
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec2 tex_uv;
-    glm::vec3 color;
+    glm::vec4 color;
 };
 
-struct Mesh
+struct Vertex2
+{
+    glm::vec3 position;
+    // glm::vec3 normal;
+};
+
+struct BaseMesh
 {
     std::vector<Vertex> vertices = {};
 };
 
 struct Quad
 {
-    Mesh mesh = {};
+    BaseMesh mesh = {};
 
     Quad()
     {
         mesh.vertices.resize(6);
-        mesh.vertices[0] = { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f } }; // bot-left1
-        mesh.vertices[1] = { { -1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } }; // top-left
-        mesh.vertices[2] = { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } }; // top-right1
-        mesh.vertices[3] = { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f } }; // bot-left2
-        mesh.vertices[4] = { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } }; // top-right2
-        mesh.vertices[5] = { { +1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f } }; // bot-right
+        mesh.vertices[0] = { { -1.0f, -1.0f, 1.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }; // bot-left1
+        mesh.vertices[1] = { { -1.0f, +1.0f, 1.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }; // top-left
+        mesh.vertices[2] = { { +1.0f, +1.0f, 1.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }; // top-right1
+        mesh.vertices[3] = { { -1.0f, -1.0f, 1.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }; // bot-left2
+        mesh.vertices[4] = { { +1.0f, +1.0f, 1.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }; // top-right2
+        mesh.vertices[5] = { { +1.0f, -1.0f, 1.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }; // bot-right
     }
+};
+
+struct Triangle
+{
+    BaseMesh mesh = {};
+
+    Triangle()
+    {
+        mesh.vertices.resize(3);
+        mesh.vertices[0] = { { -1.0f, -1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }; // bot-left1
+        mesh.vertices[1] = { { -1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }; // top-left
+        mesh.vertices[2] = { { +1.0f, +1.0f, 0.f }, { 0.0f, 0.0f, -1.f }, { 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f } }; // top-right1
+    }
+
+    uint32_t indicies[3] = {
+        0, 1, 2
+    };
 };
 
 struct InstanceData
@@ -50,7 +138,7 @@ struct InstanceData
     alignas(16) glm::vec3 pos   = {};
     alignas(16) glm::vec3 rot   = {};
     alignas(16) glm::vec3 scale = {};
-    int32_t texure_id;
+    int32_t texure_idx;
 };
 
 struct FrameData
@@ -94,22 +182,19 @@ struct Material
     VkPipelineLayout pipeline_layout;
 };
 
-
-// struct Mesh
-// {
-//     std::vector<Vertex> vertices;
-//     VkayBuffer          vertex_buffer;
-//     VkayBuffer          index_buffer;
-
-//     bool LoadFromObj(const char *filename);
-// };
-
-struct RenderObject
+struct Transform
 {
-    Mesh     *mesh            = {};
-    Material *material        = {};
-    glm::mat4 transformMatrix = {};
+    alignas(16) glm::vec3 position;
+    alignas(16) glm::vec3 rotation;
+    alignas(16) glm::vec3 scale;
 };
+
+// struct RenderObject
+// {
+//     Mesh     *mesh            = {};
+//     Material *material        = {};
+//     glm::mat4 transformMatrix = {};
+// };
 
 ////////////////////////////
 // todo(ad): cleanup

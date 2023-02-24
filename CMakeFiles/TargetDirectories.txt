@@ -1,0 +1,6 @@
+W:/CPP/ex-vulkan/CMakeFiles/vkay.dir
+W:/CPP/ex-vulkan/CMakeFiles/Instances.dir
+W:/CPP/ex-vulkan/CMakeFiles/Invaders.dir
+W:/CPP/ex-vulkan/CMakeFiles/gltf.dir
+W:/CPP/ex-vulkan/CMakeFiles/ALL_BUILD.dir
+W:/CPP/ex-vulkan/CMakeFiles/ZERO_CHECK.dir
